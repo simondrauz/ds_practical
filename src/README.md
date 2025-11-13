@@ -3,7 +3,7 @@
 Implement reusable Python modules supporting the centralized Trajectron++ analysis pipeline.
 
 ## Suggested Structure
-- `data/` loaders and dataset abstractions that wrap TrajData and nuScenes assets.
+- `data/` loaders and dataset abstractions that wrap trajdata and nuScenes assets.
 - `features/` feature engineering utilities for agent dynamics and scene context.
 - `clustering/` manual split definitions and algorithmic clustering drivers.
 - `evaluation/` scripts to train/evaluate Trajectron++ and aggregate metrics.

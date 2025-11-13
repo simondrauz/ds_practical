@@ -3,10 +3,10 @@
 Use this folder for exploratory and reporting notebooks that accompany the centralized analysis.
 
 ## Current Notebooks
-- `00_setup_validation.ipynb` — Verifies environment setup, dataset access, and TrajData functionality.
+- `00_setup_validation.ipynb` — Verifies environment setup, dataset access, and trajdata functionality.
 
 ## Planned Notebook Types
-- Data characterization reports leveraging TrajData feature extraction.
+- Data characterization reports leveraging trajdata feature extraction.
 - Clustering experiments comparing manual heuristics and algorithmic results.
 - Performance evaluation dashboards summarizing Trajectron++ metrics across clusters.
 
