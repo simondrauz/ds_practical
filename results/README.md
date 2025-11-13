@@ -20,6 +20,6 @@ results/
 - **metrics/**: Structured data exports for reproducibility and downstream analysis
 - **reports/**: Markdown/PDF summaries combining qualitative insights with quantitative results
 
-## Next Steps
-- Agree on a filename convention that encodes analysis phase, data subset, and timestamp
-- Automate export scripts in `src/` to populate this directory consistently
+
+For the overall project structure, see the [main README](../README.md).
+

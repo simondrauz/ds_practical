@@ -54,6 +54,27 @@ This repository explores how data characteristics drawn from the nuScenes datase
    ```
 4. Open `notebooks/00_setup_validation.ipynb` and run all cells to verify the setup
 
+### Trajectron++ Setup
+The Trajectron++ model will be integrated in Step 3 for performance evaluation. Setup options:
+
+1. **Using the official Trajectron++ repository:**
+   ```bash
+   git clone https://github.com/StanfordASL/Trajectron-plus-plus.git
+   # Follow their installation instructions in Trajectron-plus-plus/README.md
+   ```
+
+2. **Integration approach** (to be determined during development):
+   - Option A: Use pretrained weights from their repository
+   - Option B: Train from scratch on nuScenes clusters
+   - Option C: Fine-tune pretrained weights on cluster-specific data
+
+### Optional: Experiment Tracking
+If using Weights & Biases for experiment tracking:
+```bash
+pip install wandb
+wandb login  # Follow prompts to authenticate
+```
+
 ## Project Workflow
 - **Step 0 — Setup Validation:** Run `notebooks/00_setup_validation.ipynb` to verify dataset access and trajdata functionality.
 - **Step 1 — Data Characterization:** Use the trajdata library to summarize nuScenes agent behaviors, scene context, and interaction cues (upcoming notebook).

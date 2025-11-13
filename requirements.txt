@@ -12,3 +12,6 @@ ipykernel>=6.25
 tqdm>=4.66
 pyyaml>=6.0
 tensorboard>=2.15
+
+# Optional: Experiment tracking (uncomment if using)
+# wandb>=0.16.0
