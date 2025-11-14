@@ -93,3 +93,5 @@ cluster_evaluation:
   cluster_file: "../data/metadata/cluster_assignments.json"
 ```
 
+For the overall project structure, see the [main README](../README.md).
+

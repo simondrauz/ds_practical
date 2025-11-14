@@ -13,3 +13,5 @@ Use this folder for exploratory and reporting notebooks that accompany the centr
 ## Next Steps
 - Draft an initial EDA notebook (`01_data_characterization.ipynb`) to inspect per-agent and per-scene statistics.
 - Outline a results notebook that compiles plots exported from `results/`.
+
+For the overall project structure, see the [main README](../README.md).

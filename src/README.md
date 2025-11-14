@@ -13,3 +13,5 @@ Implement reusable Python modules supporting the centralized Trajectron++ analys
 - Define a configuration schema under `config/` and mirror it with parsing utilities here.
 - Implement deterministic data splits to ensure reproducibility across experiments.
 - Add unit tests (future `tests/` directory) once core modules solidify.
+
+For the overall project structure, see the [main README](../README.md).
