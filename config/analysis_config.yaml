@@ -1,0 +1,97 @@
+# Data Analysis Configuration
+# This file centralizes all configuration parameters for the trajectory data analysis pipeline.
+# All hard-coded values from notebooks should reference this configuration file.
+
+# Dataset configuration
+dataset:
+  # Dataset name (e.g., "nusc_mini" for nuScenes mini, "nusc_trainval" for full dataset)
+  name: "nusc_mini"
+  # Dataset loading mode:
+  # - "exploratory": use the values in this YAML file
+  # - "eval_aligned": mirror Trajectron eval settings from a run config.json
+  mode: "exploratory"
+  
+  # Root path to the raw dataset (relative to project root)
+  root_path: "../data/raw"
+  
+  # Cache path for processed trajdata files (relative to project root)
+  cache_path: "../data/processed/trajdata_cache"
+
+# Optional: pull dataset configuration from a specific training run's config.json.
+run_config:
+  # If true AND dataset.mode == "eval_aligned", the notebooks will load a run config.json.
+  enabled: false
+  # The training/eval run directory name under experiments/nuScenes/models
+  run_name: ""
+  # Optional explicit path to a config.json (overrides run_name when set)
+  config_path: ""
+
+# trajdata library configuration
+trajdata:
+  # Agent-centric analysis settings (used in 02_agent_centered_trajectory_metrics_analysis.ipynb)
+  agent_centric:
+    # Timestep interval in seconds for resampling trajectories
+    desired_dt: 0.1
+    
+    # History duration [past_start, past_end] in seconds (both negative, relative to current timestep)
+    history_sec: [3.2, 3.2]
+    
+    # Future duration [future_start, future_end] in seconds (both positive, relative to current timestep)
+    future_sec: [4.8, 4.8]
+  
+  # Scene-centric analysis settings (used in 03_scene_centered_trajectory_metrics_analysis.ipynb)
+  scene_centric:
+    # Timestep interval in seconds for scene-level analysis
+    desired_dt: 0.5
+    
+    # No history needed for scene-centric instantaneous metrics
+    history_sec: [0.0, 0.0]
+    
+    # No future needed for scene-centric instantaneous metrics
+    future_sec: [0.0, 0.0]
+  
+  # Map rasterization parameters
+  map_params:
+    # Pixels per meter for rasterized maps
+    px_per_m: 2
+    
+    # Size of the rasterized map in pixels (creates px_per_m x px_per_m resolution maps)
+    map_size_px: 224
+  
+  # Include rasterized map in data loading
+  incl_raster_map: true
+  
+  # Include vector map data in data loading
+  incl_vector_map: true
+  
+  # Number of parallel workers for data loading (0 = single-threaded)
+  # Set to "auto" to use (cpu_count - 1) or specify an integer
+  num_workers: 0
+
+# Analysis configuration
+analysis:
+  # Sample size for agent-centric analysis (to reduce computation time)
+  sample_size: 5000
+  
+  # Collision detection threshold in meters (agents closer than this are considered in collision)
+  collision_threshold_m: 0.75
+  
+  # Off-road detection threshold in meters (distance from drivable area)
+  off_road_threshold_m: 3.0
+  
+  # Linear trajectory threshold as percentage (path efficiency >= this is considered linear)
+  linear_path_threshold_pct: 90
+  
+  # Minimum bounding box area in square meters (for spatial density calculations)
+  min_bbox_area_m2: 0.01
+
+# Output configuration
+output:
+  # Root directory for all analysis results (relative to project root)
+  results_dir: "../results"
+  
+  # Directory for visualization plots (relative to project root)
+  plots_dir: "../results/plots/characterization"
+  
+  # Directory for computed metrics (CSV/JSON files) (relative to project root)
+  metrics_dir: "../results/metrics"
