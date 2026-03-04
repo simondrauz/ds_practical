@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import csv
 import json
 import os
 import pathlib
@@ -407,6 +408,14 @@ def train(rank, args):
             with torch.no_grad():
                 # Calculate evaluation loss
                 eval_perf = defaultdict(lambda: defaultdict(list))
+                per_traj_rows = []
+                metrics_to_write = [
+                    "ml_ade",
+                    "ml_fde",
+                    "min_ade_5",
+                    "nll_mean",
+                    "nll_final",
+                ]
 
                 batch: AgentBatch
                 for batch in tqdm(
@@ -416,14 +425,33 @@ def train(rank, args):
                     disable=(rank > 0),
                     desc=f"Epoch {epoch} Eval",
                 ):
-                    eval_results: Dict[AgentType, Dict[str, torch.Tensor]] = (
+                    eval_results = (
                         trajectron_module.predict_and_evaluate_batch(
-                            batch, update_mode=UpdateMode.BATCH_FROM_PRIOR
+                            batch,
+                            update_mode=UpdateMode.BATCH_FROM_PRIOR,
+                            output_for_pd=True,
                         )
                     )
-                    for agent_type, metric_dict in eval_results.items():
+                    agent_types = batch.agent_types()
+                    for agent_type, metric_dict in zip(agent_types, eval_results):
                         for metric, values in metric_dict.items():
+                            if metric == "data_idx":
+                                continue
                             eval_perf[agent_type][metric].append(values.cpu().numpy())
+                        data_idx = np.atleast_1d(metric_dict["data_idx"].cpu().numpy())
+                        metric_arrays = {
+                            metric: np.atleast_1d(
+                                metric_dict[metric].cpu().numpy()
+                            ).tolist()
+                            for metric in metrics_to_write
+                            if metric in metric_dict
+                        }
+                        for row_idx, idx_val in enumerate(data_idx.tolist()):
+                            row = {"data_idx": int(idx_val)}
+                            for metric in metrics_to_write:
+                                if metric in metric_arrays:
+                                    row[metric] = float(metric_arrays[metric][row_idx])
+                            per_traj_rows.append(row)
 
                 if torch.cuda.is_available() and dist.get_world_size() > 1:
                     gathered_values = all_gather(eval_perf)
@@ -431,6 +459,11 @@ def train(rank, args):
                         eval_perf = []
                         for eval_dicts in gathered_values:
                             eval_perf.extend(eval_dicts)
+                    gathered_rows = all_gather(per_traj_rows)
+                    if rank == 0:
+                        per_traj_rows = []
+                        for rank_rows in gathered_rows:
+                            per_traj_rows.extend(rank_rows)
 
                 if rank == 0:
                     evaluation.log_batch_errors(
@@ -448,6 +481,21 @@ def train(rank, args):
                         epoch,
                         curr_iter,
                     )
+                    metrics_dir = (
+                        pathlib.Path(__file__).parent.resolve()
+                        / "experiments"
+                        / "trajectory_metrics"
+                        / model_dir_subfolder
+                    )
+                    metrics_dir.mkdir(parents=True, exist_ok=True)
+                    metrics_path = metrics_dir / f"eval_epoch_{epoch}.csv"
+                    with open(
+                        metrics_path, "w", newline="", encoding="utf-8"
+                    ) as csvfile:
+                        fieldnames = ["data_idx"] + metrics_to_write
+                        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(per_traj_rows)
 
                     ####################################
                     #           VIZUALIZATION          #
