@@ -30,6 +30,11 @@ trajdata_cache/
 wandb/
 experiments/trajectory_metrics/
 experiments/trajectory_metrics_joined/
+experiments/nuScenes/models/
+results/metrics/*.csv
+results/plots/characterization/*.png
+.mplconfig/
+*.egg-info/
 *.pt
 
 # Data (heavy files tracked separately in data/.gitignore)

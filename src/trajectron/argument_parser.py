@@ -14,20 +14,26 @@
 # limitations under the License.
 
 import argparse
+import json
+import getpass
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[2]
+
 # Add experiments/nuScenes to path to import user_config
 sys.path.insert(
-    0, str(Path(__file__).parent.parent.parent / "experiments" / "nuScenes")
+    0, str(ROOT / "experiments" / "nuScenes")
 )
 
 try:
     from user_config import DEFAULT_USER, get_available_users
 except ImportError:
-    # Fallback if user_config doesn't exist yet
-    DEFAULT_USER = "simon"
-    get_available_users = lambda: ["simon", "zoe"]
+    # Fallback when user_config.py is unavailable: use current OS user.
+    DEFAULT_USER = getpass.getuser() or "default"
+
+    def get_available_users():
+        return [DEFAULT_USER]
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -370,9 +376,17 @@ if args.trajdata_cache_dir is None or args.data_loc_dict is None:
                 dataset_name = "nusc_mini"  # default fallback
             nusc_raw_path = user_paths["nusc_raw"]
             args.data_loc_dict = f'{{"{dataset_name}": "{nusc_raw_path}"}}'
-    except (ImportError, KeyError) as e:
-        # Fallback to hardcoded defaults if user_config not available
+    except (ImportError, KeyError):
+        # Fallback to repository-relative defaults if user_config is unavailable.
+        default_cache = ROOT / "data" / "processed" / "trajdata_cache"
+        default_raw = ROOT / "data" / "raw"
         if args.trajdata_cache_dir is None:
-            args.trajdata_cache_dir = "/Users/zoe/.unified_data_cache"
+            args.trajdata_cache_dir = str(default_cache)
         if args.data_loc_dict is None:
-            args.data_loc_dict = '{"nusc_mini": "/workspace/datasets/nuScenes"}'
+            if "nusc" in args.train_data:
+                dataset_name = (
+                    "nusc_trainval" if "trainval" in args.train_data else "nusc_mini"
+                )
+            else:
+                dataset_name = "nusc_mini"
+            args.data_loc_dict = json.dumps({dataset_name: str(default_raw)})
