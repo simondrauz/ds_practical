@@ -21,9 +21,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
-# Add experiments/nuScenes to path to import user_config
+# Add config/experimental_setup/nuScenes to path to import user_config
 sys.path.insert(
-    0, str(ROOT / "experiments" / "nuScenes")
+    0, str(ROOT / "config" / "experimental_setup" / "nuScenes")
 )
 
 try:
@@ -234,7 +234,7 @@ parser.add_argument(
     "--log_dir",
     help="what dir to save training information (i.e., saved models, logs, etc)",
     type=str,
-    default="../experiments/logs",
+    default="../results/trajectory_prediction/logs",
 )
 
 parser.add_argument(

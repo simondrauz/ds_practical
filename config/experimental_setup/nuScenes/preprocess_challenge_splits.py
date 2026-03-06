@@ -14,6 +14,8 @@ from trajdata.dataset_specific.nusc import NuscDataset, nusc_utils
 
 from user_config import DEFAULT_USER, get_available_users, get_user_paths
 
+OUTPUT_DIR: Final[Path] = Path(__file__).resolve().parent
+
 
 ###########################################################################
 # Parse command-line arguments for user-specific paths
@@ -41,7 +43,7 @@ print(f"  NUSC_RAW_DATA_DIR: {NUSC_RAW_DATA_DIR}")
 #   python preprocess_challenge_splits.py --user zoe
 #
 # Example torchrun command (both scripts now support --user argument):
-#   torchrun --nproc_per_node=1 train_unified.py --user simon --eval_every=1 --vis_every=1 --batch_size=256 --eval_batch_size=256 --preprocess_workers=16 --log_dir=experiments/nuScenes/models --log_tag=nusc_adaptive_tpp --train_epochs=20 --conf=experiments/nuScenes/models/nusc_mm_sec4_tpp-13_Sep_2022_11_06_01/config.json --train_data=nusc_trainval-train --eval_data=nusc_trainval-train_val --history_sec=2.0 --prediction_sec=6.0
+#   torchrun --nproc_per_node=1 train_unified.py --user simon --eval_every=1 --vis_every=1 --batch_size=256 --eval_batch_size=256 --preprocess_workers=16 --log_dir=results/trajectory_prediction/nuScenes/models --log_tag=nusc_adaptive_tpp --train_epochs=20 --conf=results/trajectory_prediction/nuScenes/models/nusc_mm_sec4_tpp-13_Sep_2022_11_06_01/config.json --train_data=nusc_trainval-train --eval_data=nusc_trainval-train_val --history_sec=2.0 --prediction_sec=6.0
 
 # Load training and evaluation environments and scenes
 attention_radius = defaultdict(
@@ -100,5 +102,5 @@ for split in ["train", "train_val", "val"]:
                     )
 
     print(split, len(within_challenge_split))
-    with open(f"predchal_{split}_index.pkl", "wb") as f:
+    with open(OUTPUT_DIR / f"predchal_{split}_index.pkl", "wb") as f:
         pkl.dump(within_challenge_split, f)

@@ -59,7 +59,9 @@ def restrict_to_predchal(
 ) -> None:
     curr_dir = pathlib.Path(__file__).parent.resolve()
     with open(
-        curr_dir / f"experiments/nuScenes/predchal{city}_{split}_index.pkl", "rb"
+        curr_dir
+        / f"config/experimental_setup/nuScenes/predchal{city}_{split}_index.pkl",
+        "rb",
     ) as f:
         within_challenge_split = pickle.load(f)
 
@@ -483,7 +485,8 @@ def train(rank, args):
                     )
                     metrics_dir = (
                         pathlib.Path(__file__).parent.resolve()
-                        / "experiments"
+                        / "results"
+                        / "trajectory_prediction"
                         / "trajectory_metrics"
                         / model_dir_subfolder
                     )

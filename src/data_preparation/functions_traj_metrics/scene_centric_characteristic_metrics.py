@@ -7,7 +7,7 @@ from typing import Dict, Iterable, List
 
 import numpy as np
 
-from trajectron.analysis.helper_functions_characteristic_metrics import (
+from data_preparation.functions_traj_metrics.helper_functions_characteristic_metrics import (
     as_xy,
     bbox_from_positions,
     count_agent_types,
@@ -103,4 +103,3 @@ def compute_scene_characteristic_metrics(
         metrics[f"scene_density_{type_name}"] = float(count / bbox_area)
 
     return metrics
-

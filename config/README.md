@@ -1,6 +1,6 @@
 # Configuration Directory
 
-This directory contains configuration files for reproducible experiments.
+This directory contains configuration files for reproducible experiments, including setup assets under `experimental_setup/`.
 
 ## Purpose
 
@@ -36,9 +36,9 @@ random_seed:
 
 # Results output
 results:
-  plots_dir: "../results/plots"
-  metrics_dir: "../results/metrics"
-  reports_dir: "../results/reports"
+  plots_dir: "../results/evaluation/plots"
+  metrics_dir: "../results/evaluation/metrics"
+  reports_dir: "../results/evaluation/reports"
 ```
 
 ### `clustering_config.yaml` (Step 2)
@@ -94,4 +94,3 @@ cluster_evaluation:
 ```
 
 For the overall project structure, see the [main README](../README.md).
-

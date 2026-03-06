@@ -18,14 +18,15 @@ The main workflow is:
 ## Repository Contents
 
 - `train_unified.py`: Main multi-GPU/multi-process training and evaluation entrypoint (via `torchrun`).
-- `src/trajectron/`: Trajectron++ model, evaluation, utilities, and metric-analysis modules.
-- `scripts/join_characteristic_metrics.py`: Joins characteristic metrics onto `eval_epoch_*.csv`.
+- `src/trajectron/`: Trajectron++ model, evaluation, and utilities.
+- `src/data_preparation/`: Metric-analysis modules and data-preparation scripts.
+- `src/data_preparation/join_characteristic_metrics.py`: Joins characteristic metrics onto `eval_epoch_*.csv`.
 - `config/nuScenes.json`: Default training hyperparameter config used by `--conf`.
 - `config/analysis_config.yaml`: Notebook analysis configuration.
-- `experiments/nuScenes/user_config.py`: User-specific local paths for data/cache.
-- `experiments/nuScenes/preprocess_challenge_splits.py`: Generates prediction-challenge split index files.
-- `experiments/trajectory_metrics/`: Per-epoch evaluation CSVs from training.
-- `experiments/trajectory_metrics_joined/`: Joined CSV/Parquet outputs with characteristic metrics.
+- `config/experimental_setup/nuScenes/user_config.py`: User-specific local paths for data/cache.
+- `config/experimental_setup/nuScenes/preprocess_challenge_splits.py`: Generates prediction-challenge split index files.
+- `results/trajectory_prediction/trajectory_metrics/`: Per-epoch evaluation CSVs from training.
+- `results/trajectory_prediction/trajectory_metrics_joined/`: Joined CSV/Parquet outputs with characteristic metrics.
 - `unified-av-data-loader/`: Vendored `trajdata` package source.
 - `notebooks/`:
   - `00_setup_validation.ipynb`
@@ -62,8 +63,8 @@ Quick sanity checks:
 
 ```bash
 python train_unified.py --help
-python scripts/join_characteristic_metrics.py --help
-python -c "import trajectron; import trajectron.analysis.characteristic_metrics"
+python -m data_preparation.join_characteristic_metrics --help
+python -c "import trajectron; import data_preparation.functions_traj_metrics.characteristic_metrics"
 ```
 
 ## Dataset Setup (nuScenes)
@@ -91,10 +92,10 @@ data/processed/trajdata_cache/
 
 Two options are supported:
 
-1. Use `--user` with `experiments/nuScenes/user_config.py`.
+1. Use `--user` with `config/experimental_setup/nuScenes/user_config.py`.
 2. Pass paths directly via CLI (`--trajdata_cache_dir` and `--data_loc_dict`).
 
-If your username is not in `experiments/nuScenes/user_config.py`, add a profile before running with `--user`.
+If your username is not in `config/experimental_setup/nuScenes/user_config.py`, add a profile before running with `--user`.
 
 Example direct override:
 
@@ -105,7 +106,7 @@ Example direct override:
 
 ## Prediction-Challenge Split Indexes
 
-For `nusc_trainval-*` training/evaluation, the split index files under `experiments/nuScenes/` are required:
+For `nusc_trainval-*` training/evaluation, the split index files under `config/experimental_setup/nuScenes/` are required:
 
 - `predchal_train_index.pkl`
 - `predchal_train_val_index.pkl`
@@ -114,9 +115,9 @@ For `nusc_trainval-*` training/evaluation, the split index files under `experime
 They are already present in this repo. Regenerate only if needed:
 
 ```bash
-cd experiments/nuScenes
+cd config/experimental_setup/nuScenes
 python preprocess_challenge_splits.py --user <your_user>
-cd ../..
+cd ../../..
 ```
 
 ## Training and Evaluation
@@ -125,7 +126,7 @@ cd ../..
 During evaluation it writes per-trajectory CSVs to:
 
 ```text
-experiments/trajectory_metrics/<run_name>/eval_epoch_<N>.csv
+results/trajectory_prediction/trajectory_metrics/<run_name>/eval_epoch_<N>.csv
 ```
 
 ### Example: quick mini sanity run
@@ -143,7 +144,7 @@ torchrun --nproc_per_node=1 train_unified.py \
   --train_epochs 1 \
   --eval_every 1 \
   --save_every 1 \
-  --log_dir experiments/nuScenes/models \
+  --log_dir results/trajectory_prediction/nuScenes/models \
   --log_tag nusc_mini_debug_tpp
 ```
 
@@ -163,7 +164,7 @@ torchrun --nproc_per_node=1 train_unified.py \
   --train_epochs 20 \
   --eval_every 1 \
   --save_every 1 \
-  --log_dir experiments/nuScenes/models \
+  --log_dir results/trajectory_prediction/nuScenes/models \
   --log_tag nusc_adaptive_tpp
 ```
 
@@ -177,10 +178,10 @@ Notes:
 After training has produced `eval_epoch_*.csv`, run:
 
 ```bash
-python scripts/join_characteristic_metrics.py \
-  --conf experiments/nuScenes/models/<run_name>/config.json \
-  --run_dir experiments/trajectory_metrics/<run_name> \
-  --output_root experiments/trajectory_metrics_joined \
+python -m data_preparation.join_characteristic_metrics \
+  --conf results/trajectory_prediction/nuScenes/models/<run_name>/config.json \
+  --run_dir results/trajectory_prediction/trajectory_metrics/<run_name> \
+  --output_root results/trajectory_prediction/trajectory_metrics_joined \
   --format csv
 ```
 
@@ -192,7 +193,7 @@ Optional:
 Output files are written to:
 
 ```text
-experiments/trajectory_metrics_joined/<run_name>/eval_epoch_<N>.csv
+results/trajectory_prediction/trajectory_metrics_joined/<run_name>/eval_epoch_<N>.csv
 ```
 
 ## Notebook Workflow
@@ -213,11 +214,11 @@ Suggested order:
 - Missing config file:
   - Ensure `--conf` points to a valid JSON, or use default `config/nuScenes.json`.
 - Join script reports missing eval CSV:
-  - Confirm training ran with evaluation enabled and wrote to `experiments/trajectory_metrics/...`.
+  - Confirm training ran with evaluation enabled and wrote to `results/trajectory_prediction/trajectory_metrics/...`.
 - Join results look misaligned:
   - Use the same dataset split/history/future/path settings as the training run config.
 - nuScenes challenge split errors:
-  - Ensure `predchal_*.pkl` files exist in `experiments/nuScenes/`.
+  - Ensure `predchal_*.pkl` files exist in `config/experimental_setup/nuScenes/`.
 
 ## Acknowledgements
 

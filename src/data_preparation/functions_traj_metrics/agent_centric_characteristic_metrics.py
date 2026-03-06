@@ -17,7 +17,7 @@ from typing import Dict, Optional
 
 import numpy as np
 
-from trajectron.analysis.helper_functions_characteristic_metrics import (
+from data_preparation.functions_traj_metrics.helper_functions_characteristic_metrics import (
     as_xy,
     full_traj_xy,
     safe_stat,

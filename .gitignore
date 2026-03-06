@@ -28,11 +28,11 @@ Thumbs.db
 trajdata_cache/
 *.log
 wandb/
-experiments/trajectory_metrics/
-experiments/trajectory_metrics_joined/
-experiments/nuScenes/models/
-results/metrics/*.csv
-results/plots/characterization/*.png
+results/trajectory_prediction/trajectory_metrics/
+results/trajectory_prediction/trajectory_metrics_joined/
+results/trajectory_prediction/nuScenes/models/
+results/evaluation/metrics/*.csv
+results/evaluation/plots/characterization/*.png
 .mplconfig/
 *.egg-info/
 *.pt

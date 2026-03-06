@@ -1,17 +1,11 @@
 # Source Code Directory
 
-Implement reusable Python modules supporting the centralized Trajectron++ analysis pipeline.
+This directory contains the project Python packages.
 
-## Suggested Structure
-- `data/` loaders and dataset abstractions that wrap trajdata and nuScenes assets.
-- `features/` feature engineering utilities for agent dynamics and scene context.
-- `clustering/` manual split definitions and algorithmic clustering drivers.
-- `evaluation/` scripts to train/evaluate Trajectron++ and aggregate metrics.
-- `utils/` common helpers (logging, configuration management, reproducibility aids).
+## Structure
+- `trajectron/`: core Trajectron++ model, training, evaluation, and utilities.
+- `data_preparation/`: trajectory-metric functions and preprocessing/join utilities.
+- `data_modelling/`: reserved for upcoming modeling modules.
+- `data_evaluation/`: reserved for upcoming evaluation modules.
 
-## Next Steps
-- Define a configuration schema under `config/` and mirror it with parsing utilities here.
-- Implement deterministic data splits to ensure reproducibility across experiments.
-- Add unit tests (future `tests/` directory) once core modules solidify.
-
-For the overall project structure, see the [main README](../README.md).
+For repository-level workflow and commands, see the [main README](../README.md).

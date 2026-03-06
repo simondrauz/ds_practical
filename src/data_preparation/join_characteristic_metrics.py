@@ -25,16 +25,16 @@ from trajdata import AgentType, UnifiedDataset
 from trajdata.data_structures.data_index import AgentDataIndex
 from tqdm.auto import tqdm
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.append(str(SRC_ROOT))
 
-from trajectron.analysis.agent_centric_characteristic_metrics import (  # noqa: E402
+from data_preparation.functions_traj_metrics.agent_centric_characteristic_metrics import (  # noqa: E402
     CharacteristicMetricConfig,
     compute_characteristic_metrics as compute_agent_characteristic_metrics,
 )
-from trajectron.analysis.scene_centric_characteristic_metrics import (  # noqa: E402
+from data_preparation.functions_traj_metrics.scene_centric_characteristic_metrics import (  # noqa: E402
     SceneCharacteristicMetricConfig,
     compute_scene_characteristic_metrics,
 )
@@ -66,7 +66,13 @@ def restrict_to_predchal(dataset: UnifiedDataset, split: str, city: str = "") ->
     This mirrors the behavior in `train_unified.py` when evaluating on
     `nusc_trainval-train_val`.
     """
-    predchal_path = ROOT / "experiments" / "nuScenes" / f"predchal{city}_{split}_index.pkl"
+    predchal_path = (
+        ROOT
+        / "config"
+        / "experimental_setup"
+        / "nuScenes"
+        / f"predchal{city}_{split}_index.pkl"
+    )
     if not predchal_path.exists():
         raise FileNotFoundError(f"Prediction challenge index not found at {predchal_path}")
 
@@ -283,7 +289,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--metrics_root",
         type=Path,
-        default=ROOT / "experiments" / "trajectory_metrics",
+        default=ROOT / "results" / "trajectory_prediction" / "trajectory_metrics",
         help="Root directory containing Trajectron eval_epoch_*.csv files.",
     )
     parser.add_argument(
@@ -295,7 +301,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output_root",
         type=Path,
-        default=ROOT / "experiments" / "trajectory_metrics_joined",
+        default=ROOT
+        / "results"
+        / "trajectory_prediction"
+        / "trajectory_metrics_joined",
         help="Where to write joined outputs.",
     )
     parser.add_argument(
