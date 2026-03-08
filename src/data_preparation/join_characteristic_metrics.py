@@ -216,6 +216,12 @@ def compute_metrics_for_indices(
             )
         elem = dataset[idx]
         metrics = compute_agent_characteristic_metrics(elem, metric_cfg)
+        # Preserve the trajectory's agent category for downstream grouped analysis.
+        metrics["agent_type"] = (
+            elem.agent_type.name
+            if isinstance(elem.agent_type, AgentType)
+            else str(elem.agent_type)
+        )
         metrics["data_idx"] = int(idx)
         rows.append(metrics)
     return pd.DataFrame(rows)
