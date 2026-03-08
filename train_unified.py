@@ -44,6 +44,7 @@ from trajectron.model.model_registrar import ModelRegistrar
 from trajectron.model.model_utils import UpdateMode
 from trajectron.model.trajectron import Trajectron
 from trajectron.utils.comm import all_gather
+from shared_config.map_config import load_vector_map_settings
 
 # torch.autograd.set_detect_anomaly(True)
 
@@ -195,7 +196,7 @@ def train(rank, args):
     if hyperparams["augment_input_noise"] > 0.0:
         augmentations.append(NoiseHistories(stddev=hyperparams["augment_input_noise"]))
 
-    map_params = {"px_per_m": 2, "map_size_px": 100, "offset_frac_xy": (-0.75, 0.0)}
+    map_params = load_vector_map_settings()["raster_map_params"]
 
     train_dataset = UnifiedDataset(
         desired_data=[hyperparams["train_data"]],

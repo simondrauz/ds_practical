@@ -21,6 +21,7 @@ from typing import Dict, Iterable, List, Set, Tuple
 
 import numpy as np
 import pandas as pd
+import yaml
 from trajdata import AgentType, UnifiedDataset
 from trajdata.data_structures.data_index import AgentDataIndex
 from tqdm.auto import tqdm
@@ -38,6 +39,7 @@ from data_preparation.functions_traj_metrics.scene_centric_characteristic_metric
     SceneCharacteristicMetricConfig,
     compute_scene_characteristic_metrics,
 )
+from shared_config.map_config import load_vector_map_settings  # noqa: E402
 
 
 def _str2bool(val: str) -> bool:
@@ -123,16 +125,29 @@ def _parse_data_dirs(hyperparams: Dict) -> Dict[str, str]:
         ) from exc
 
 
+def _load_analysis_incl_vector_map(analysis_conf: Path) -> bool:
+    with open(analysis_conf, "r", encoding="utf-8") as f:
+        analysis_cfg = yaml.safe_load(f) or {}
+
+    try:
+        return bool(analysis_cfg["trajdata"]["incl_vector_map"])
+    except Exception as exc:  # pragma: no cover - explicit error message path
+        raise KeyError(
+            f"Missing `trajdata.incl_vector_map` in analysis config: {analysis_conf}"
+        ) from exc
+
+
 def build_agent_eval_dataset(
-    hyperparams: Dict, data_dirs: Dict[str, str], incl_vector_map: bool
+    hyperparams: Dict,
+    data_dirs: Dict[str, str],
+    incl_vector_map: bool,
+    raster_map_params: Dict,
 ) -> UnifiedDataset:
     """Builds the agent-centric dataset aligned with the eval loop.
 
     The parameters here intentionally match the eval dataset construction in
     `train_unified.py` (including filters and map parameters).
     """
-    map_params = {"px_per_m": 2, "map_size_px": 100, "offset_frac_xy": (-0.75, 0.0)}
-
     dataset = UnifiedDataset(
         desired_data=[hyperparams["eval_data"]],
         centric="agent",
@@ -141,7 +156,7 @@ def build_agent_eval_dataset(
         agent_interaction_distances=_attention_radius(),
         incl_robot_future=hyperparams.get("incl_robot_node", False),
         incl_raster_map=hyperparams.get("map_encoding", False),
-        raster_map_params=map_params,
+        raster_map_params=raster_map_params,
         incl_vector_map=incl_vector_map,
         only_predict=[AgentType.VEHICLE, AgentType.PEDESTRIAN],
         no_types=[AgentType.UNKNOWN],
@@ -159,7 +174,7 @@ def build_agent_eval_dataset(
 
 
 def build_scene_eval_dataset(
-    hyperparams: Dict, data_dirs: Dict[str, str]
+    hyperparams: Dict, data_dirs: Dict[str, str], incl_vector_map: bool
 ) -> UnifiedDataset:
     """Builds a scene-centric dataset keyed by (scene_path, scene_ts).
 
@@ -174,7 +189,7 @@ def build_scene_eval_dataset(
         agent_interaction_distances=_attention_radius(),
         incl_robot_future=hyperparams.get("incl_robot_node", False),
         incl_raster_map=False,
-        incl_vector_map=False,
+        incl_vector_map=incl_vector_map,
         only_predict=[AgentType.VEHICLE, AgentType.PEDESTRIAN],
         no_types=[AgentType.UNKNOWN],
         num_workers=hyperparams.get("preprocess_workers", 0),
@@ -293,6 +308,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--conf", type=Path, required=True, help="Path to config.json used for training/eval.")
     parser.add_argument(
+        "--analysis_conf",
+        type=Path,
+        default=ROOT / "config" / "analysis_config.yaml",
+        help="Path to analysis_config.yaml used to source trajdata.incl_vector_map.",
+    )
+    parser.add_argument(
         "--metrics_root",
         type=Path,
         default=ROOT / "results" / "trajectory_prediction" / "trajectory_metrics",
@@ -321,8 +342,19 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--incl_vector_map",
+        dest="incl_vector_map",
         action="store_true",
-        help="Include vector maps to compute off-road metrics (slower, but enables off_road).",
+        default=None,
+        help=(
+            "Include vector maps to compute off-road metrics. "
+            "Defaults to trajdata.incl_vector_map from analysis_config.yaml when omitted."
+        ),
+    )
+    parser.add_argument(
+        "--no_incl_vector_map",
+        dest="incl_vector_map",
+        action="store_false",
+        help="Disable vector map loading even if enabled in analysis_config.yaml.",
     )
 
     # Hyperparameter overrides to ensure dataset matches eval loop.
@@ -345,12 +377,24 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """Entry point: align dataset, compute metrics, and join per eval file."""
     args = parse_args()
+    default_incl_vector_map = _load_analysis_incl_vector_map(args.analysis_conf)
+    map_settings = load_vector_map_settings()
+    incl_vector_map = (
+        args.incl_vector_map
+        if args.incl_vector_map is not None
+        else default_incl_vector_map
+    )
     hyperparams = load_hyperparams(args.conf, args)
     data_dirs = _parse_data_dirs(hyperparams)
     agent_dataset = build_agent_eval_dataset(
-        hyperparams, data_dirs, incl_vector_map=args.incl_vector_map
+        hyperparams,
+        data_dirs,
+        incl_vector_map=incl_vector_map,
+        raster_map_params=map_settings["raster_map_params"],
     )
-    scene_dataset = build_scene_eval_dataset(hyperparams, data_dirs)
+    scene_dataset = build_scene_eval_dataset(
+        hyperparams, data_dirs, incl_vector_map=incl_vector_map
+    )
 
     metric_cfg = CharacteristicMetricConfig(
         collision_threshold_m=args.collision_threshold_m,
