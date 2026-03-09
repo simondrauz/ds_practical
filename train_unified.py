@@ -39,7 +39,7 @@ from trajdata.visualization import vis as trajdata_vis
 
 import trajectron.evaluation as evaluation
 import trajectron.visualization as visualization
-from trajectron.argument_parser import args
+from trajectron.argument_parser import args, provided_cli_dests
 from trajectron.model.model_registrar import ModelRegistrar
 from trajectron.model.model_utils import UpdateMode
 from trajectron.model.trajectron import Trajectron
@@ -109,11 +109,18 @@ def train(rank, args):
     with open(args.conf, "r", encoding="utf-8") as conf_json:
         hyperparams = json.load(conf_json)
 
-    # Add hyperparams from arguments
-    hyperparams.update({k: v for k, v in vars(args).items() if v is not None})
-    hyperparams["edge_encoding"] = not args.no_edge_encoding
-    if args.learning_rate is not None:
-        hyperparams["learning_rate"] = args.learning_rate
+    # CLI args override config only when passed explicitly.
+    # Argparse defaults fill missing config keys as a fallback.
+    for key, value in vars(args).items():
+        if key in provided_cli_dests:
+            hyperparams[key] = value
+        elif key not in hyperparams and value is not None:
+            hyperparams[key] = value
+
+    if "no_edge_encoding" in provided_cli_dests:
+        hyperparams["edge_encoding"] = not args.no_edge_encoding
+    elif "edge_encoding" not in hyperparams:
+        hyperparams["edge_encoding"] = not args.no_edge_encoding
 
     # Distributed LR Scaling
     hyperparams["learning_rate"] *= dist.get_world_size()

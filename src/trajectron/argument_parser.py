@@ -48,7 +48,7 @@ parser.add_argument(
     "--conf",
     help="path to json config file for hyperparameters",
     type=str,
-    default="config/nuScenes.json",
+    default="config/runtime_config.json",
 )
 
 parser.add_argument(
@@ -354,7 +354,23 @@ parser.add_argument(
     default=1,
 )
 
+
+def _get_explicit_cli_dests(parsed_parser: argparse.ArgumentParser) -> set:
+    """Returns argparse destination names explicitly set via CLI flags."""
+    explicit_dests = set()
+    for token in sys.argv[1:]:
+        if not token.startswith("--"):
+            continue
+        option = token.split("=", maxsplit=1)[0]
+        action = parsed_parser._option_string_actions.get(option)
+        if action is not None:
+            explicit_dests.add(action.dest)
+
+    return explicit_dests
+
+
 args = parser.parse_args()
+provided_cli_dests = _get_explicit_cli_dests(parser)
 
 # Set user-specific paths if not provided explicitly
 if args.trajdata_cache_dir is None or args.data_loc_dict is None:

@@ -21,7 +21,7 @@ The main workflow is:
 - `src/trajectron/`: Trajectron++ model, evaluation, and utilities.
 - `src/data_preparation/`: Metric-analysis modules and data-preparation scripts.
 - `src/data_preparation/join_characteristic_metrics.py`: Joins characteristic metrics onto `eval_epoch_*.csv`.
-- `config/nuScenes.json`: Default training hyperparameter config used by `--conf`.
+- `config/runtime_config.json`: Default training hyperparameter config used by `--conf`.
 - `config/analysis_config.yaml`: Notebook analysis configuration.
 - `config/experimental_setup/nuScenes/user_config.py`: User-specific local paths for data/cache.
 - `config/experimental_setup/nuScenes/preprocess_challenge_splits.py`: Generates prediction-challenge split index files.
@@ -134,19 +134,13 @@ results/trajectory_prediction/trajectory_metrics/<run_name>/eval_epoch_<N>.csv
 ```bash
 torchrun --nproc_per_node=1 train_unified.py \
   --user simon \
-  --conf config/runtime_config.json \
-  --train_data nusc_mini-mini_train \
-  --eval_data nusc_mini-mini_val \
-  --history_sec 2.0 \
-  --prediction_sec 6.0 \
-  --batch_size 64 \
-  --eval_batch_size 64 \
-  --train_epochs 1 \
-  --eval_every 1 \
-  --save_every 1 \
-  --log_dir results/trajectory_prediction/nuScenes/models \
-  --log_tag nusc_mini_debug_tpp
+  --conf config/runtime_config.json
 ```
+
+This is equivalent to explicitly passing those values on the command line because
+`config/runtime_config.json` now contains:
+`train_data`, `eval_data`, `history_sec`, `prediction_sec`, `batch_size`, `eval_batch_size`,
+`train_epochs`, `eval_every`, `save_every`, `log_dir`, and `log_tag`.
 
 ### Example: trainval-style run
 
@@ -171,7 +165,9 @@ torchrun --nproc_per_node=1 train_unified.py \
 Notes:
 
 - `train_unified.py` uses Weights & Biases (`wandb`). Configure as needed (or disable with `WANDB_MODE=disabled`).
-- The default config path is `config/runtime_config.json`.
+- Config resolution order is: explicit CLI args > `--conf` JSON > argparse defaults.
+- Explicit means you passed the flag in the command itself (`--key value` or `--key=value`).
+- If `--conf` is omitted, parser default is `config/runtime_config.json`.
 
 ## Compute and Join Characteristic Metrics
 

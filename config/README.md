@@ -17,6 +17,41 @@ This directory contains configuration files for reproducible experiments, includ
 
 `analysis_config.yaml` stores the vector-map inclusion default (`trajdata.incl_vector_map`) for notebooks and joined-metrics analysis.
 
+## Training Runtime Configs (`--conf`)
+
+Training/eval hyperparameters for `train_unified.py` are read from a JSON file passed via `--conf`.
+
+Common files in this folder:
+- `runtime_config.json`: recommended local run config (used by short `torchrun` command examples).
+- `nuScenes.json`: baseline Trajectron++ config.
+
+### Resolution Order
+
+At runtime, values are resolved in this order:
+1. Explicit CLI flags (highest priority).
+2. Values from the JSON config file passed to `--conf`.
+3. Argparse defaults (only for keys missing from config).
+
+"Explicit CLI flag" means it is present in the command (`--key value` or `--key=value`).
+If `--conf` is omitted, parser default is `config/runtime_config.json`.
+
+### Example Commands
+
+Config-driven mini run:
+```bash
+torchrun --nproc_per_node=1 train_unified.py \
+  --user simon \
+  --conf config/runtime_config.json
+```
+
+Override one config value explicitly:
+```bash
+torchrun --nproc_per_node=1 train_unified.py \
+  --user simon \
+  --conf config/runtime_config.json \
+  --batch_size 128
+```
+
 ## Purpose
 
 Centralize all experiment parameters, paths, and hyperparameters to ensure:
