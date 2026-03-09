@@ -21,7 +21,7 @@ dataset:
 run_config:
   # If true AND dataset.mode == "eval_aligned", the notebooks will load a run config.json.
   enabled: false
-  # The training/eval run directory name under results/trajectory_prediction/nuScenes/models
+  # The training/eval run directory name under results/trajectory_prediction/nuScenes/models (e.g. nusc_adaptive_tpp-26_Jan_2026_18_59_43)
   run_name: ""
   # Optional explicit path to a config.json (overrides run_name when set)
   config_path: ""
@@ -49,21 +49,14 @@ trajdata:
     
     # No future needed for scene-centric instantaneous metrics
     future_sec: [0.0, 0.0]
-  
-  # Map rasterization parameters
-  map_params:
-    # Pixels per meter for rasterized maps
-    px_per_m: 2
-    
-    # Size of the rasterized map in pixels (creates px_per_m x px_per_m resolution maps)
-    map_size_px: 224
-  
+
+  # Shared map parameters are loaded from config/shared_config.yaml.
+  # Include vector map elements in data loading
+  incl_vector_map: true
+
   # Include rasterized map in data loading
   incl_raster_map: true
-  
-  # Include vector map data in data loading
-  incl_vector_map: true
-  
+
   # Number of parallel workers for data loading (0 = single-threaded)
   # Set to "auto" to use (cpu_count - 1) or specify an integer
   num_workers: 0

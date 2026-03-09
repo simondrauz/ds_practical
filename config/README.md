@@ -2,6 +2,21 @@
 
 This directory contains configuration files for reproducible experiments, including setup assets under `experimental_setup/`.
 
+## Shared Runtime Settings
+
+`shared_config.yaml` centralizes trajdata shared runtime settings used across:
+- `train_unified.py`
+- `src/data_preparation/join_characteristic_metrics.py`
+- `notebooks/02_agent_centered_trajectory_metrics_analysis.ipynb`
+- `notebooks/03_scene_centered_trajectory_metrics_analysis.ipynb`
+
+`shared_config.yaml` currently contains:
+- `vector_map.raster_map_params`
+- `agent_type_defaults` (`only_predict`, `no_types`)
+- `attention_radius`
+
+`analysis_config.yaml` stores the vector-map inclusion default (`trajdata.incl_vector_map`) for notebooks and joined-metrics analysis.
+
 ## Purpose
 
 Centralize all experiment parameters, paths, and hyperparameters to ensure:

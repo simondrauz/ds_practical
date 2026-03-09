@@ -44,12 +44,20 @@ from trajectron.model.model_registrar import ModelRegistrar
 from trajectron.model.model_utils import UpdateMode
 from trajectron.model.trajectron import Trajectron
 from trajectron.utils.comm import all_gather
+from shared_config.config_loader import (
+    load_agent_type_defaults,
+    load_attention_radius,
+    load_vector_map_settings,
+    parse_agent_type_list,
+)
 
 # torch.autograd.set_detect_anomaly(True)
 
 # Note: The cache path is now set via --user argument or --trajdata_cache_dir
 # from trajdata.caching import EnvCache
 # cache = EnvCache("/Users/zoe/.unified_data_cache")
+
+DEFAULT_ONLY_PREDICT, DEFAULT_NO_TYPES = load_agent_type_defaults()
 
 
 def restrict_to_predchal(
@@ -140,6 +148,17 @@ def train(rank, args):
 
         hyperparams = run.config
 
+    only_predict = parse_agent_type_list(
+        hyperparams.get("only_predict"),
+        DEFAULT_ONLY_PREDICT,
+        key_name="only_predict",
+    )
+    no_types = parse_agent_type_list(
+        hyperparams.get("no_types"),
+        DEFAULT_NO_TYPES,
+        key_name="no_types",
+    )
+
     print("-----------------------")
     print("| TRAINING PARAMETERS |")
     print("-----------------------")
@@ -153,6 +172,8 @@ def train(rank, args):
     print("| Preprocess Workers: %s" % hyperparams["preprocess_workers"])
     print("| Robot Future: %s" % hyperparams["incl_robot_node"])
     print("| Map Encoding: %s" % hyperparams["map_encoding"])
+    print("| Only Predict: %s" % [agent_type.name for agent_type in only_predict])
+    print("| Excluded Types: %s" % [agent_type.name for agent_type in no_types])
     print("| Added Input Noise: %.2f" % hyperparams["augment_input_noise"])
     print("| Overall GMM Components: %d" % hyperparams["K"])
     if hyperparams["adaptive"] and not hyperparams["only_k0"]:
@@ -181,13 +202,7 @@ def train(rank, args):
         print("model_dir:", model_dir_subfolder)
 
     # Load training and evaluation environments and scenes
-    attention_radius = defaultdict(
-        lambda: 20.0
-    )  # Default range is 20m unless otherwise specified.
-    attention_radius[(AgentType.PEDESTRIAN, AgentType.PEDESTRIAN)] = 10.0
-    attention_radius[(AgentType.PEDESTRIAN, AgentType.VEHICLE)] = 20.0
-    attention_radius[(AgentType.VEHICLE, AgentType.PEDESTRIAN)] = 20.0
-    attention_radius[(AgentType.VEHICLE, AgentType.VEHICLE)] = 30.0
+    attention_radius = load_attention_radius()
 
     data_dirs: Dict[str, str] = json.loads(hyperparams["data_loc_dict"])
 
@@ -195,7 +210,7 @@ def train(rank, args):
     if hyperparams["augment_input_noise"] > 0.0:
         augmentations.append(NoiseHistories(stddev=hyperparams["augment_input_noise"]))
 
-    map_params = {"px_per_m": 2, "map_size_px": 100, "offset_frac_xy": (-0.75, 0.0)}
+    map_params = load_vector_map_settings()["raster_map_params"]
 
     train_dataset = UnifiedDataset(
         desired_data=[hyperparams["train_data"]],
@@ -205,8 +220,8 @@ def train(rank, args):
         incl_robot_future=hyperparams["incl_robot_node"],
         incl_raster_map=hyperparams["map_encoding"],
         raster_map_params=map_params,
-        only_predict=[AgentType.VEHICLE, AgentType.PEDESTRIAN],
-        no_types=[AgentType.UNKNOWN],
+        only_predict=only_predict,
+        no_types=no_types,
         augmentations=augmentations if len(augmentations) > 0 else None,
         num_workers=hyperparams["preprocess_workers"],
         cache_location=hyperparams["trajdata_cache_dir"],
@@ -239,8 +254,8 @@ def train(rank, args):
         incl_robot_future=hyperparams["incl_robot_node"],
         incl_raster_map=hyperparams["map_encoding"],
         raster_map_params=map_params,
-        only_predict=[AgentType.VEHICLE, AgentType.PEDESTRIAN],
-        no_types=[AgentType.UNKNOWN],
+        only_predict=only_predict,
+        no_types=no_types,
         num_workers=hyperparams["preprocess_workers"],
         cache_location=hyperparams["trajdata_cache_dir"],
         data_dirs=data_dirs,
