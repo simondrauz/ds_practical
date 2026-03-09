@@ -2,24 +2,19 @@
 
 This directory contains configuration files for reproducible experiments, including setup assets under `experimental_setup/`.
 
-## Shared Map Settings
+## Shared Runtime Settings
 
-`vector_map_config.yaml` centralizes trajdata raster map parameters used across:
+`shared_config.yaml` centralizes trajdata shared runtime settings used across:
 - `train_unified.py`
 - `src/data_preparation/join_characteristic_metrics.py`
 - `notebooks/02_agent_centered_trajectory_metrics_analysis.ipynb`
 - `notebooks/03_scene_centered_trajectory_metrics_analysis.ipynb`
 
-These defaults are aligned with `train_unified.py` map parameters.
+`shared_config.yaml` currently contains:
+- `vector_map.raster_map_params`
+- `attention_radius`
+
 `analysis_config.yaml` stores the vector-map inclusion default (`trajdata.incl_vector_map`) for notebooks and joined-metrics analysis.
-
-## Shared Attention Radii
-
-`attention_radii_config.yaml` centralizes agent interaction attention radii used across:
-- `train_unified.py`
-- `src/data_preparation/join_characteristic_metrics.py`
-- `notebooks/02_agent_centered_trajectory_metrics_analysis.ipynb`
-- `notebooks/03_scene_centered_trajectory_metrics_analysis.ipynb`
 
 ## Purpose
 

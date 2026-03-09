@@ -1,0 +1,20 @@
+# Shared configuration used across training scripts, metric-joining, and notebooks.
+
+vector_map:
+  # Rasterization settings passed to UnifiedDataset(..., raster_map_params=...).
+  raster_map_params:
+    px_per_m: 2
+    map_size_px: 100
+    offset_frac_xy: [-0.75, 0.0]
+
+attention_radius:
+  # Default interaction radius in meters for unspecified pairs.
+  default: 20.0
+  # Per-agent-type interaction radii in meters.
+  pairs:
+    PEDESTRIAN:
+      PEDESTRIAN: 10.0
+      VEHICLE: 20.0
+    VEHICLE:
+      PEDESTRIAN: 20.0
+      VEHICLE: 30.0

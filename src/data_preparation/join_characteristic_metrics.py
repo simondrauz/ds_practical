@@ -38,8 +38,10 @@ from data_preparation.functions_traj_metrics.scene_centric_characteristic_metric
     SceneCharacteristicMetricConfig,
     compute_scene_characteristic_metrics,
 )
-from shared_config.attention_config import load_attention_radius  # noqa: E402
-from shared_config.map_config import load_vector_map_settings  # noqa: E402
+from shared_config.config_loader import (  # noqa: E402
+    load_attention_radius,
+    load_vector_map_settings,
+)
 
 
 def _str2bool(val: str) -> bool:

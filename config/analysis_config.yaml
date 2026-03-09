@@ -50,7 +50,7 @@ trajdata:
     # No future needed for scene-centric instantaneous metrics
     future_sec: [0.0, 0.0]
 
-  # Shared map/vector-map defaults are loaded from config/vector_map_config.yaml.
+  # Shared map parameters are loaded from config/shared_config.yaml.
   # Include rasterized map in data loading
   incl_raster_map: true
 

@@ -1,9 +1,0 @@
-# Shared raster map settings for trajdata dataset construction.
-# Values are intentionally aligned with train_unified.py defaults.
-
-vector_map:
-  # Rasterization settings passed to UnifiedDataset(..., raster_map_params=...).
-  raster_map_params:
-    px_per_m: 2
-    map_size_px: 100
-    offset_frac_xy: [-0.75, 0.0]

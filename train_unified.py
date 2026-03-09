@@ -44,8 +44,7 @@ from trajectron.model.model_registrar import ModelRegistrar
 from trajectron.model.model_utils import UpdateMode
 from trajectron.model.trajectron import Trajectron
 from trajectron.utils.comm import all_gather
-from shared_config.attention_config import load_attention_radius
-from shared_config.map_config import load_vector_map_settings
+from shared_config.config_loader import load_attention_radius, load_vector_map_settings
 
 # torch.autograd.set_detect_anomaly(True)
 
