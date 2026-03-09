@@ -51,6 +51,9 @@ trajdata:
     future_sec: [0.0, 0.0]
 
   # Shared map parameters are loaded from config/shared_config.yaml.
+  # Include vector map elements in data loading
+  incl_vector_map: true
+
   # Include rasterized map in data loading
   incl_raster_map: true
 
