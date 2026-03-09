@@ -134,7 +134,7 @@ results/trajectory_prediction/trajectory_metrics/<run_name>/eval_epoch_<N>.csv
 ```bash
 torchrun --nproc_per_node=1 train_unified.py \
   --user simon \
-  --conf config/nuScenes.json \
+  --conf config/runtime_config.json \
   --train_data nusc_mini-mini_train \
   --eval_data nusc_mini-mini_val \
   --history_sec 2.0 \
@@ -153,7 +153,7 @@ torchrun --nproc_per_node=1 train_unified.py \
 ```bash
 torchrun --nproc_per_node=1 train_unified.py \
   --user simon \
-  --conf config/nuScenes.json \
+  --conf config/runtime_config.json \
   --train_data nusc_trainval-train \
   --eval_data nusc_trainval-train_val \
   --history_sec 2.0 \
@@ -171,7 +171,7 @@ torchrun --nproc_per_node=1 train_unified.py \
 Notes:
 
 - `train_unified.py` uses Weights & Biases (`wandb`). Configure as needed (or disable with `WANDB_MODE=disabled`).
-- The default config path is `config/nuScenes.json`.
+- The default config path is `config/runtime_config.json`.
 
 ## Compute and Join Characteristic Metrics
 
@@ -212,7 +212,7 @@ Suggested order:
 - `ModuleNotFoundError: trajectron` or `trajdata`:
   - Re-run editable installs: `pip install -e unified-av-data-loader && pip install -e .`
 - Missing config file:
-  - Ensure `--conf` points to a valid JSON, or use default `config/nuScenes.json`.
+  - Ensure `--conf` points to a valid JSON, or use default `config/runtime_config.json`.
 - Join script reports missing eval CSV:
   - Confirm training ran with evaluation enabled and wrote to `results/trajectory_prediction/trajectory_metrics/...`.
 - Join results look misaligned:
