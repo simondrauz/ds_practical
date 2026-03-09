@@ -296,7 +296,6 @@
   "sigma_eps_init": 1,
   "alpha_init": 0.001,
   "only_predict": [
-    "VEHICLE",
     "PEDESTRIAN"
   ],
   "no_types": [
