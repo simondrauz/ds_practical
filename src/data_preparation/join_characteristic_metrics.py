@@ -39,9 +39,13 @@ from data_preparation.functions_traj_metrics.scene_centric_characteristic_metric
     compute_scene_characteristic_metrics,
 )
 from shared_config.config_loader import (  # noqa: E402
+    load_agent_type_defaults,
     load_attention_radius,
     load_vector_map_settings,
+    parse_agent_type_list,
 )
+
+DEFAULT_ONLY_PREDICT, DEFAULT_NO_TYPES = load_agent_type_defaults()
 
 
 def _str2bool(val: str) -> bool:
@@ -140,6 +144,13 @@ def build_agent_eval_dataset(
     The parameters here intentionally match the eval dataset construction in
     `train_unified.py` (including filters and map parameters).
     """
+    only_predict = parse_agent_type_list(
+        hyperparams.get("only_predict"), DEFAULT_ONLY_PREDICT, "only_predict"
+    )
+    no_types = parse_agent_type_list(
+        hyperparams.get("no_types"), DEFAULT_NO_TYPES, "no_types"
+    )
+
     dataset = UnifiedDataset(
         desired_data=[hyperparams["eval_data"]],
         centric="agent",
@@ -150,8 +161,8 @@ def build_agent_eval_dataset(
         incl_raster_map=hyperparams.get("map_encoding", False),
         raster_map_params=raster_map_params,
         incl_vector_map=incl_vector_map,
-        only_predict=[AgentType.VEHICLE, AgentType.PEDESTRIAN],
-        no_types=[AgentType.UNKNOWN],
+        only_predict=only_predict,
+        no_types=no_types,
         num_workers=hyperparams.get("preprocess_workers", 0),
         cache_location=hyperparams["trajdata_cache_dir"],
         data_dirs=data_dirs,
@@ -173,6 +184,13 @@ def build_scene_eval_dataset(
     This uses the same temporal windows and interaction radii as the eval loop
     so that the scene context is comparable to the agent-centric samples.
     """
+    only_predict = parse_agent_type_list(
+        hyperparams.get("only_predict"), DEFAULT_ONLY_PREDICT, "only_predict"
+    )
+    no_types = parse_agent_type_list(
+        hyperparams.get("no_types"), DEFAULT_NO_TYPES, "no_types"
+    )
+
     dataset = UnifiedDataset(
         desired_data=[hyperparams["eval_data"]],
         centric="scene",
@@ -182,8 +200,8 @@ def build_scene_eval_dataset(
         incl_robot_future=hyperparams.get("incl_robot_node", False),
         incl_raster_map=False,
         incl_vector_map=incl_vector_map,
-        only_predict=[AgentType.VEHICLE, AgentType.PEDESTRIAN],
-        no_types=[AgentType.UNKNOWN],
+        only_predict=only_predict,
+        no_types=no_types,
         num_workers=hyperparams.get("preprocess_workers", 0),
         cache_location=hyperparams["trajdata_cache_dir"],
         data_dirs=data_dirs,

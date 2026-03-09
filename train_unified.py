@@ -44,7 +44,12 @@ from trajectron.model.model_registrar import ModelRegistrar
 from trajectron.model.model_utils import UpdateMode
 from trajectron.model.trajectron import Trajectron
 from trajectron.utils.comm import all_gather
-from shared_config.config_loader import load_attention_radius, load_vector_map_settings
+from shared_config.config_loader import (
+    load_agent_type_defaults,
+    load_attention_radius,
+    load_vector_map_settings,
+    parse_agent_type_list,
+)
 
 # torch.autograd.set_detect_anomaly(True)
 
@@ -52,42 +57,7 @@ from shared_config.config_loader import load_attention_radius, load_vector_map_s
 # from trajdata.caching import EnvCache
 # cache = EnvCache("/Users/zoe/.unified_data_cache")
 
-DEFAULT_ONLY_PREDICT = [AgentType.VEHICLE, AgentType.PEDESTRIAN]
-DEFAULT_NO_TYPES = [AgentType.UNKNOWN]
-
-
-def _parse_agent_type_list(
-    raw_values, default_values, key_name: str
-):
-    """Parses config-provided agent type names into trajdata AgentType enums."""
-    if raw_values is None:
-        return list(default_values)
-
-    if not isinstance(raw_values, (list, tuple)):
-        raise TypeError(
-            f"`{key_name}` must be a list of agent type names, got {type(raw_values)}"
-        )
-
-    parsed = []
-    for raw_val in raw_values:
-        if isinstance(raw_val, AgentType):
-            parsed.append(raw_val)
-            continue
-        if not isinstance(raw_val, str):
-            raise TypeError(
-                f"`{key_name}` entries must be strings or AgentType values, got {type(raw_val)}"
-            )
-
-        enum_name = raw_val.split(".")[-1].upper()
-        if enum_name not in AgentType.__members__:
-            valid_types = ", ".join(AgentType.__members__.keys())
-            raise ValueError(
-                f"Unknown agent type `{raw_val}` in `{key_name}`. "
-                f"Expected one of: {valid_types}"
-            )
-        parsed.append(AgentType[enum_name])
-
-    return parsed
+DEFAULT_ONLY_PREDICT, DEFAULT_NO_TYPES = load_agent_type_defaults()
 
 
 def restrict_to_predchal(
@@ -178,12 +148,12 @@ def train(rank, args):
 
         hyperparams = run.config
 
-    only_predict = _parse_agent_type_list(
+    only_predict = parse_agent_type_list(
         hyperparams.get("only_predict"),
         DEFAULT_ONLY_PREDICT,
         key_name="only_predict",
     )
-    no_types = _parse_agent_type_list(
+    no_types = parse_agent_type_list(
         hyperparams.get("no_types"),
         DEFAULT_NO_TYPES,
         key_name="no_types",

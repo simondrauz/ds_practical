@@ -7,6 +7,14 @@ vector_map:
     map_size_px: 100
     offset_frac_xy: [-0.75, 0.0]
 
+agent_type_defaults:
+  # Default agent-type filters passed to UnifiedDataset.
+  only_predict:
+    - VEHICLE
+    - PEDESTRIAN
+  no_types:
+    - UNKNOWN
+
 attention_radius:
   # Default interaction radius in meters for unspecified pairs.
   default: 20.0
