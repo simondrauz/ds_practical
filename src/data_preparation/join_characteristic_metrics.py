@@ -15,7 +15,6 @@ import argparse
 import json
 import pickle
 import sys
-from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, List, Set, Tuple
 
@@ -39,6 +38,7 @@ from data_preparation.functions_traj_metrics.scene_centric_characteristic_metric
     SceneCharacteristicMetricConfig,
     compute_scene_characteristic_metrics,
 )
+from shared_config.attention_config import load_attention_radius  # noqa: E402
 from shared_config.map_config import load_vector_map_settings  # noqa: E402
 
 
@@ -50,16 +50,6 @@ def _str2bool(val: str) -> bool:
     if lowered in {"0", "false", "f", "no", "n"}:
         return False
     raise argparse.ArgumentTypeError(f"Cannot interpret boolean value from: {val}")
-
-
-def _attention_radius() -> Dict:
-    """Returns the agent interaction distances used in training/eval."""
-    radius = defaultdict(lambda: 20.0)
-    radius[(AgentType.PEDESTRIAN, AgentType.PEDESTRIAN)] = 10.0
-    radius[(AgentType.PEDESTRIAN, AgentType.VEHICLE)] = 20.0
-    radius[(AgentType.VEHICLE, AgentType.PEDESTRIAN)] = 20.0
-    radius[(AgentType.VEHICLE, AgentType.VEHICLE)] = 30.0
-    return radius
 
 
 def restrict_to_predchal(dataset: UnifiedDataset, split: str, city: str = "") -> None:
@@ -153,7 +143,7 @@ def build_agent_eval_dataset(
         centric="agent",
         history_sec=(hyperparams["history_sec"], hyperparams["history_sec"]),
         future_sec=(hyperparams["prediction_sec"], hyperparams["prediction_sec"]),
-        agent_interaction_distances=_attention_radius(),
+        agent_interaction_distances=load_attention_radius(),
         incl_robot_future=hyperparams.get("incl_robot_node", False),
         incl_raster_map=hyperparams.get("map_encoding", False),
         raster_map_params=raster_map_params,
@@ -186,7 +176,7 @@ def build_scene_eval_dataset(
         centric="scene",
         history_sec=(hyperparams["history_sec"], hyperparams["history_sec"]),
         future_sec=(hyperparams["prediction_sec"], hyperparams["prediction_sec"]),
-        agent_interaction_distances=_attention_radius(),
+        agent_interaction_distances=load_attention_radius(),
         incl_robot_future=hyperparams.get("incl_robot_node", False),
         incl_raster_map=False,
         incl_vector_map=incl_vector_map,

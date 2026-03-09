@@ -44,6 +44,7 @@ from trajectron.model.model_registrar import ModelRegistrar
 from trajectron.model.model_utils import UpdateMode
 from trajectron.model.trajectron import Trajectron
 from trajectron.utils.comm import all_gather
+from shared_config.attention_config import load_attention_radius
 from shared_config.map_config import load_vector_map_settings
 
 # torch.autograd.set_detect_anomaly(True)
@@ -232,13 +233,7 @@ def train(rank, args):
         print("model_dir:", model_dir_subfolder)
 
     # Load training and evaluation environments and scenes
-    attention_radius = defaultdict(
-        lambda: 20.0
-    )  # Default range is 20m unless otherwise specified.
-    attention_radius[(AgentType.PEDESTRIAN, AgentType.PEDESTRIAN)] = 10.0
-    attention_radius[(AgentType.PEDESTRIAN, AgentType.VEHICLE)] = 20.0
-    attention_radius[(AgentType.VEHICLE, AgentType.PEDESTRIAN)] = 20.0
-    attention_radius[(AgentType.VEHICLE, AgentType.VEHICLE)] = 30.0
+    attention_radius = load_attention_radius()
 
     data_dirs: Dict[str, str] = json.loads(hyperparams["data_loc_dict"])
 

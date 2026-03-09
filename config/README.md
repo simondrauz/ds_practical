@@ -13,6 +13,14 @@ This directory contains configuration files for reproducible experiments, includ
 These defaults are aligned with `train_unified.py` map parameters.
 `analysis_config.yaml` stores the vector-map inclusion default (`trajdata.incl_vector_map`) for notebooks and joined-metrics analysis.
 
+## Shared Attention Radii
+
+`attention_radii_config.yaml` centralizes agent interaction attention radii used across:
+- `train_unified.py`
+- `src/data_preparation/join_characteristic_metrics.py`
+- `notebooks/02_agent_centered_trajectory_metrics_analysis.ipynb`
+- `notebooks/03_scene_centered_trajectory_metrics_analysis.ipynb`
+
 ## Purpose
 
 Centralize all experiment parameters, paths, and hyperparameters to ensure:
