@@ -12,6 +12,7 @@ This directory contains configuration files for reproducible experiments, includ
 
 `shared_config.yaml` currently contains:
 - `vector_map.raster_map_params`
+- `agent_type_defaults` (`only_predict`, `no_types`)
 - `attention_radius`
 
 `analysis_config.yaml` stores the vector-map inclusion default (`trajdata.incl_vector_map`) for notebooks and joined-metrics analysis.
