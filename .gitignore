@@ -33,6 +33,7 @@ results/trajectory_prediction/trajectory_metrics_joined/
 results/trajectory_prediction/nuScenes/models/
 results/evaluation/metrics/*.csv
 results/evaluation/plots/characterization/*.png
+results/interpretable_model
 .mplconfig/
 *.egg-info/
 *.pt
