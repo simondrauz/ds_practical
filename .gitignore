@@ -36,6 +36,7 @@ results/evaluation/plots/characterization/*.png
 # Results artifacts
 results/**/plots/
 results/**/*.csv
+results/interpretable_model/
 .mplconfig/
 *.egg-info/
 *.pt
