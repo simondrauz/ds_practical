@@ -59,33 +59,44 @@ class RunContext:
 
 
 def get_exported_model_info(manifest: dict[str, Any]) -> dict[str, Any]:
-    final_model = manifest["final_model"]
+    final_model = manifest.get("final_model", {})
     target_col = manifest["target_col"]
+    model_id = manifest["model_id"]
+    is_gam_model = model_id == "gam" or model_id.startswith("gam-")
 
     exported_name = final_model.get("exported_model_name")
     if exported_name is None:
         exported_name = final_model.get("selected_variant_name")
     if exported_name is None:
-        exported_name = "XGBoost" if manifest["model_id"] == "xgboost" else manifest["model_id"]
+        exported_name = manifest.get("variant_name")
+    if exported_name is None:
+        exported_name = "XGBoost" if model_id == "xgboost" else model_id
 
     exported_kind = final_model.get("exported_model_kind")
     if exported_kind is None:
-        exported_kind = final_model.get("selected_variant_model_kind", manifest["model_id"])
+        exported_kind = final_model.get("selected_variant_model_kind")
+    if exported_kind is None:
+        exported_kind = manifest.get("model_kind", model_id)
 
     exported_target_mode = final_model.get("exported_model_target_mode")
     if exported_target_mode is None:
-        exported_target_mode = final_model.get(
-            "selected_variant_target_mode",
-            "log" if target_col.endswith("_log") else "raw",
-        )
+        exported_target_mode = final_model.get("selected_variant_target_mode")
+    if exported_target_mode is None:
+        exported_target_mode = manifest.get("target_mode")
+    if exported_target_mode is None:
+        exported_target_mode = "log" if target_col.endswith("_log") else "raw"
 
     selection_metric_name = final_model.get("exported_model_selection_metric_name")
     if selection_metric_name is None:
-        selection_metric_name = "lowest_cv_rmse" if manifest["model_id"] == "gam" else "best_cv_score"
+        selection_metric_name = manifest.get("selection_metric_name")
+    if selection_metric_name is None:
+        selection_metric_name = "lowest_cv_rmse" if is_gam_model else "best_cv_score"
 
     selection_metric_value = final_model.get("exported_model_selection_metric_value")
     if selection_metric_value is None:
         selection_metric_value = final_model.get("selected_cv_rmse", final_model.get("best_cv_score"))
+    if selection_metric_value is None:
+        selection_metric_value = manifest.get("selection_metric_value")
 
     return {
         "name": exported_name,
@@ -110,9 +121,12 @@ def load_run_context(model_id: str, run_name: str, target_col: str | None = None
     if manifest["model_id"] != model_id:
         raise ValueError(f"Manifest model_id={manifest['model_id']} does not match MODEL_ID={model_id}")
 
-    nested_resampling = manifest["nested_resampling"]
-    final_model = manifest["final_model"]
-    model_data_path = Path(nested_resampling["model_data_with_oof_path"])
+    nested_resampling = manifest.get("nested_resampling", {})
+    final_model = manifest.get("final_model", {})
+    model_data_path_value = nested_resampling.get("model_data_with_oof_path")
+    if model_data_path_value is None:
+        raise KeyError(f"Manifest is missing nested_resampling.model_data_with_oof_path: {manifest_path}")
+    model_data_path = Path(model_data_path_value)
     metrics_path_value = nested_resampling.get("oof_metrics_path")
     metrics_path = Path(metrics_path_value) if metrics_path_value else None
     tuning_summary_value = final_model.get("full_data_tuning_summary_path")
