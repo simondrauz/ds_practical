@@ -16,7 +16,12 @@ from data_modelling.prepared_data import (
     prepare_dual_target_model_data,
     prepare_single_target_model_data,
 )
-from data_modelling.run_context import load_run_context, resolve_manifest_path
+from data_modelling.run_context import (
+    format_exported_model_label,
+    get_exported_model_info,
+    load_run_context,
+    resolve_manifest_path,
+)
 from data_modelling.training_outputs import (
     build_oof_frame,
     build_oof_metrics_df,
@@ -131,6 +136,46 @@ def test_load_run_context_reads_optional_outputs(tmp_path, monkeypatch):
     assert ctx.metrics_path == metrics_path
     assert ctx.oof_metrics_df is not None
     assert ctx.full_data_tuning_summary == {"best_cv_score": 0.1}
+
+
+def test_get_exported_model_info_handles_gam_and_xgboost_fallbacks():
+    gam_info = get_exported_model_info(
+        {
+            "model_id": "gam",
+            "target_col": "ml_ade_log",
+            "final_model": {
+                "selected_variant_name": "LinearGAM (log)",
+                "selected_variant_model_kind": "linear",
+                "selected_variant_target_mode": "log",
+                "selected_cv_rmse": 0.123,
+            },
+        }
+    )
+    xgb_info = get_exported_model_info(
+        {
+            "model_id": "xgboost",
+            "target_col": "ml_ade_log",
+            "final_model": {
+                "best_cv_score": 0.456,
+            },
+        }
+    )
+
+    assert gam_info == {
+        "name": "LinearGAM (log)",
+        "kind": "linear",
+        "target_mode": "log",
+        "selection_metric_name": "lowest_cv_rmse",
+        "selection_metric_value": 0.123,
+    }
+    assert xgb_info == {
+        "name": "XGBoost",
+        "kind": "xgboost",
+        "target_mode": "log",
+        "selection_metric_name": "best_cv_score",
+        "selection_metric_value": 0.456,
+    }
+    assert format_exported_model_label(gam_info) == "LinearGAM (log) (linear, target_mode=log)"
 
 
 def test_summarize_nested_cv_preserves_expected_metrics():

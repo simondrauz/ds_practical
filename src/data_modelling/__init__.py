@@ -6,7 +6,13 @@ from .prepared_data import (
     prepare_dual_target_model_data,
     prepare_single_target_model_data,
 )
-from .run_context import RunContext, load_run_context, resolve_manifest_path
+from .run_context import (
+    RunContext,
+    format_exported_model_label,
+    get_exported_model_info,
+    load_run_context,
+    resolve_manifest_path,
+)
 from .training_outputs import (
     build_oof_frame,
     build_oof_metrics_df,
@@ -20,6 +26,8 @@ __all__ = [
     "build_oof_frame",
     "build_oof_metrics_df",
     "build_run_manifest",
+    "format_exported_model_label",
+    "get_exported_model_info",
     "is_log_target",
     "load_run_context",
     "load_prepared_data",

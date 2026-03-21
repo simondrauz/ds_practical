@@ -58,6 +58,51 @@ class RunContext:
     full_data_tuning_summary: dict[str, Any] | None = None
 
 
+def get_exported_model_info(manifest: dict[str, Any]) -> dict[str, Any]:
+    final_model = manifest["final_model"]
+    target_col = manifest["target_col"]
+
+    exported_name = final_model.get("exported_model_name")
+    if exported_name is None:
+        exported_name = final_model.get("selected_variant_name")
+    if exported_name is None:
+        exported_name = "XGBoost" if manifest["model_id"] == "xgboost" else manifest["model_id"]
+
+    exported_kind = final_model.get("exported_model_kind")
+    if exported_kind is None:
+        exported_kind = final_model.get("selected_variant_model_kind", manifest["model_id"])
+
+    exported_target_mode = final_model.get("exported_model_target_mode")
+    if exported_target_mode is None:
+        exported_target_mode = final_model.get(
+            "selected_variant_target_mode",
+            "log" if target_col.endswith("_log") else "raw",
+        )
+
+    selection_metric_name = final_model.get("exported_model_selection_metric_name")
+    if selection_metric_name is None:
+        selection_metric_name = "lowest_cv_rmse" if manifest["model_id"] == "gam" else "best_cv_score"
+
+    selection_metric_value = final_model.get("exported_model_selection_metric_value")
+    if selection_metric_value is None:
+        selection_metric_value = final_model.get("selected_cv_rmse", final_model.get("best_cv_score"))
+
+    return {
+        "name": exported_name,
+        "kind": exported_kind,
+        "target_mode": exported_target_mode,
+        "selection_metric_name": selection_metric_name,
+        "selection_metric_value": selection_metric_value,
+    }
+
+
+def format_exported_model_label(exported_model_info: dict[str, Any]) -> str:
+    return (
+        f"{exported_model_info['name']} "
+        f"({exported_model_info['kind']}, target_mode={exported_model_info['target_mode']})"
+    )
+
+
 def load_run_context(model_id: str, run_name: str, target_col: str | None = None) -> RunContext:
     manifest_path = resolve_manifest_path(model_id, run_name, target_col)
     manifest = json.loads(manifest_path.read_text())
