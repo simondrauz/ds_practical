@@ -178,6 +178,33 @@ def test_get_exported_model_info_handles_gam_and_xgboost_fallbacks():
     assert format_exported_model_label(gam_info) == "LinearGAM (log) (linear, target_mode=log)"
 
 
+def test_get_exported_model_info_prefers_explicit_export_fields():
+    manifest = {
+        "model_id": "gam",
+        "target_col": "ml_ade_log",
+        "variant_name": "Fallback Variant",
+        "selection_metric_name": "mean_outer_rmse",
+        "selection_metric_value": 0.4,
+        "final_model": {
+            "exported_model_name": "Published GAM",
+            "exported_model_kind": "linear",
+            "exported_model_target_mode": "raw",
+            "exported_model_selection_metric_name": "published_metric",
+            "exported_model_selection_metric_value": 0.2,
+            "selected_variant_name": "Ignored Variant",
+            "selected_variant_model_kind": "gamma",
+        },
+    }
+
+    assert get_exported_model_info(manifest) == {
+        "name": "Published GAM",
+        "kind": "linear",
+        "target_mode": "raw",
+        "selection_metric_name": "published_metric",
+        "selection_metric_value": 0.2,
+    }
+
+
 def test_summarize_nested_cv_preserves_expected_metrics():
     nested_cv_df = pd.DataFrame(
         {
@@ -192,6 +219,18 @@ def test_summarize_nested_cv_preserves_expected_metrics():
     assert summary["metric"].tolist() == ["outer_rmse", "outer_mae", "outer_r2"]
     assert summary.loc[0, "mean"] == pytest.approx(2.0)
     assert summary.loc[1, "mean"] == pytest.approx(1.0)
+
+
+def test_summarize_nested_cv_requires_shared_metric_columns():
+    nested_cv_df = pd.DataFrame(
+        {
+            "outer_rmse": [1.0],
+            "outer_mae": [0.5],
+        }
+    )
+
+    with pytest.raises(KeyError, match="outer_r2"):
+        summarize_nested_cv(nested_cv_df)
 
 
 def test_build_oof_frame_adds_shared_output_columns():
@@ -209,6 +248,20 @@ def test_build_oof_frame_adds_shared_output_columns():
     assert frame["outer_fold"].tolist() == [1, 2]
     np.testing.assert_allclose(frame["oof_pred_orig"], [0.5, 0.7])
     np.testing.assert_allclose(frame["target_orig"], [0.4, 0.8])
+
+
+def test_build_oof_frame_rejects_misaligned_arrays():
+    model_df = pd.DataFrame({"feature_a": [10, 20], "target": [0.1, 0.2]})
+
+    with pytest.raises(ValueError, match="row_ids"):
+        build_oof_frame(
+            model_df,
+            row_ids=np.array([5]),
+            oof_pred=np.log1p(np.array([0.5, 0.7])),
+            oof_fold=np.array([1, 2]),
+            target_orig=np.array([0.4, 0.8]),
+            pred_scale_kwargs={"target_mode": "log"},
+        )
 
 
 def test_build_oof_metrics_df_returns_expected_columns():
@@ -268,6 +321,20 @@ def test_load_prepared_data_includes_optional_summaries(tmp_path):
     assert len(displayed) == 3
 
 
+def test_prepare_single_target_model_data_falls_back_to_last_column():
+    df = pd.DataFrame(
+        {
+            "feature_a": [1.0, 2.0],
+            "custom_target": [0.1, 0.2],
+        }
+    )
+
+    prepared = prepare_single_target_model_data(df, default_target="missing_target")
+
+    assert prepared["target_col"] == "custom_target"
+    assert prepared["feature_cols"] == ["feature_a"]
+
+
 def test_prepare_single_target_model_data_filters_non_numeric_and_resolves_target():
     df = pd.DataFrame(
         {
@@ -282,6 +349,20 @@ def test_prepare_single_target_model_data_filters_non_numeric_and_resolves_targe
     assert prepared["target_col"] == "ml_ade_log"
     assert prepared["feature_cols"] == ["feature_a"]
     assert prepared["model_df"].columns.tolist() == ["feature_a", "ml_ade_log"]
+
+
+def test_prepare_dual_target_model_data_derives_missing_raw_target():
+    df = pd.DataFrame(
+        {
+            "feature_a": [1.0, 2.0],
+            "ml_ade_log": np.log1p([1.0, 3.0]),
+        }
+    )
+
+    prepared = prepare_dual_target_model_data(df)
+
+    assert prepared["raw_target_col"] == "ml_ade"
+    np.testing.assert_allclose(prepared["y_raw"], [1.0, 3.0])
 
 
 def test_prepare_dual_target_model_data_derives_missing_log_target():
@@ -300,3 +381,29 @@ def test_prepare_dual_target_model_data_derives_missing_log_target():
     assert prepared["target_col"] == "ml_ade_log"
     assert prepared["feature_cols"] == ["feature_a"]
     np.testing.assert_allclose(prepared["y_log"], np.log1p([1.0, 3.0]))
+
+
+def test_load_run_context_requires_manifest_fields(tmp_path, monkeypatch):
+    repo_root = tmp_path
+    tables_dir = repo_root / "results" / "interpretable_model" / "gam" / "run_a" / "tables"
+    tables_dir.mkdir(parents=True)
+    model_data_path = tables_dir / "model_data_with_oof_ml_ade_log.csv"
+    pd.DataFrame({"speed": [1.0], "target_orig": [2.0], "oof_pred_orig": [1.9]}).to_csv(model_data_path, index=False)
+
+    manifest = {
+        "model_id": "gam",
+        "run_name": "run_a",
+        "target_col": "ml_ade_log",
+        "plots_dir": str(repo_root / "results" / "interpretable_model" / "gam" / "run_a" / "plots"),
+        "nested_resampling": {
+            "model_data_with_oof_path": str(model_data_path),
+        },
+        "final_model": {},
+        "analysis": {},
+    }
+    (tables_dir / "run_manifest_ml_ade_log.json").write_text(json.dumps(manifest))
+
+    monkeypatch.setattr("data_modelling.run_context._repo_root", lambda: repo_root)
+
+    with pytest.raises(KeyError, match="feature_cols"):
+        load_run_context("gam", "run_a", "ml_ade_log")

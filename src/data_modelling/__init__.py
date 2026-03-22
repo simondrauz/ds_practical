@@ -2,11 +2,14 @@
 
 from .common_metrics import is_log_target, regression_metrics, rmse, to_original_scale
 from .prepared_data import (
+    DualTargetModelData,
+    SingleTargetModelData,
     load_prepared_data,
     prepare_dual_target_model_data,
     prepare_single_target_model_data,
 )
 from .run_context import (
+    ExportedModelInfo,
     RunContext,
     format_exported_model_label,
     get_exported_model_info,
@@ -22,7 +25,10 @@ from .training_outputs import (
 )
 
 __all__ = [
+    "DualTargetModelData",
+    "ExportedModelInfo",
     "RunContext",
+    "SingleTargetModelData",
     "build_oof_frame",
     "build_oof_metrics_df",
     "build_run_manifest",
