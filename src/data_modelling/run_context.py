@@ -90,12 +90,31 @@ def _require_manifest_field(manifest: dict[str, Any], field_name: str) -> Any:
     return manifest[field_name]
 
 
+def _resolve_relative_manifest_path(raw_path: Path) -> Path:
+    if raw_path.is_absolute():
+        return raw_path
+
+    candidate_bases = [
+        _repo_root() / "src" / "data_modelling",
+        _repo_root(),
+        Path.cwd(),
+    ]
+    for base in candidate_bases:
+        candidate = (base / raw_path).resolve()
+        if candidate.exists():
+            return candidate
+
+    # Fall back to the notebook-source directory because the manifests are currently
+    # written from notebooks under `src/data_modelling` using paths like ../../results/...
+    return (candidate_bases[0] / raw_path).resolve()
+
+
 def _manifest_path(value: str | None, *, field_name: str) -> Path | None:
     if value is None:
         return None
     if not value:
         raise ValueError(f"Manifest field {field_name!r} must not be an empty path.")
-    return Path(value)
+    return _resolve_relative_manifest_path(Path(value))
 
 
 def _require_manifest_path(manifest: dict[str, Any], field_name: str) -> Path:
@@ -115,6 +134,19 @@ def _load_optional_json(path: Path | None) -> dict[str, Any] | None:
     if path is None or not path.exists():
         return None
     return json.loads(path.read_text())
+
+
+def _normalize_mapping_paths(mapping: dict[str, Any], *, field_prefix: str) -> dict[str, Any]:
+    normalized: dict[str, Any] = {}
+    for key, value in mapping.items():
+        field_name = f"{field_prefix}.{key}"
+        if isinstance(value, dict):
+            normalized[key] = _normalize_mapping_paths(value, field_prefix=field_name)
+        elif isinstance(value, str) and (key.endswith("_path") or key.endswith("_dir")):
+            normalized[key] = _resolve_relative_manifest_path(Path(value))
+        else:
+            normalized[key] = value
+    return normalized
 
 
 def get_exported_model_info(manifest: dict[str, Any]) -> ExportedModelInfo:
@@ -181,8 +213,14 @@ def load_run_context(model_id: str, run_name: str, target_col: str | None = None
         raise ValueError(f"Manifest model_id={manifest['model_id']} does not match MODEL_ID={model_id}")
 
     # Step 2: validate the fields the downstream notebooks assume are always present.
-    nested_resampling = manifest.get("nested_resampling", {})
-    final_model = manifest.get("final_model", {})
+    nested_resampling = _normalize_mapping_paths(
+        manifest.get("nested_resampling", {}),
+        field_prefix="nested_resampling",
+    )
+    final_model = _normalize_mapping_paths(
+        manifest.get("final_model", {}),
+        field_prefix="final_model",
+    )
     feature_cols = _require_manifest_field(manifest, "feature_cols")
     target_col_value = _require_manifest_field(manifest, "target_col")
     tables_dir = _require_manifest_path(manifest, "tables_dir")
