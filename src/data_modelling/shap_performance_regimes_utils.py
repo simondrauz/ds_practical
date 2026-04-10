@@ -309,7 +309,9 @@ def _compute_dbcv_score(validity_index_fn, X: np.ndarray, labels: np.ndarray) ->
     if len(non_noise_clusters) < 2:
         return float("nan"), False
     try:
-        return float(validity_index_fn(X, labels)), True
+        # hdbscan.validity.validity_index expects a float64 buffer; UMAP embeddings are float32 by default.
+        X_for_dbcv = np.ascontiguousarray(X, dtype=np.float64)
+        return float(validity_index_fn(X_for_dbcv, labels)), True
     except Exception:
         return float("nan"), False
 
