@@ -311,6 +311,41 @@ def _resolve_manual_umap_dim_selection(
     return int(selection_config)
 
 
+def _resolve_cluster_umap_n_neighbors(cluster_spec: dict[str, Any]) -> int:
+    return int(cluster_spec.get("cluster_umap_n_neighbors", cluster_spec.get("umap_n_neighbors", 15)))
+
+
+def _resolve_cluster_umap_min_dist(cluster_spec: dict[str, Any]) -> float:
+    return float(cluster_spec.get("cluster_umap_min_dist", cluster_spec.get("umap_min_dist", 0.1)))
+
+
+def _resolve_viz_umap_n_neighbors(cluster_spec: dict[str, Any]) -> int:
+    if "viz_umap_n_neighbors" in cluster_spec:
+        return int(cluster_spec["viz_umap_n_neighbors"])
+    if "umap_n_neighbors" in cluster_spec:
+        return int(cluster_spec["umap_n_neighbors"])
+    return _resolve_cluster_umap_n_neighbors(cluster_spec)
+
+
+def _resolve_viz_umap_min_dist(cluster_spec: dict[str, Any]) -> float:
+    if "viz_umap_min_dist" in cluster_spec:
+        return float(cluster_spec["viz_umap_min_dist"])
+    if "umap_min_dist" in cluster_spec:
+        return float(cluster_spec["umap_min_dist"])
+    return _resolve_cluster_umap_min_dist(cluster_spec)
+
+
+def _resolve_trustworthiness_neighbor_values(cluster_spec: dict[str, Any]) -> list[int]:
+    requested_values = cluster_spec.get("trustworthiness_neighbor_values")
+    if requested_values is None:
+        requested_values = [cluster_spec.get("trustworthiness_n_neighbors", _resolve_cluster_umap_n_neighbors(cluster_spec))]
+    return [int(value) for value in requested_values]
+
+
+def _trustworthiness_mean_view_name(trustworthiness_neighbor_values: list[int]) -> str:
+    return "mean_" + "_".join(str(int(value)) for value in trustworthiness_neighbor_values)
+
+
 def evaluate_umap_dimensions(
     X: np.ndarray,
     *,
@@ -327,11 +362,9 @@ def evaluate_umap_dimensions(
     if not candidate_dims:
         return pd.DataFrame(), {}
 
-    n_neighbors = _effective_neighbor_count(cluster_spec["umap_n_neighbors"], len(X))
-    trust_neighbors = _effective_neighbor_count(
-        cluster_spec.get("trustworthiness_n_neighbors", cluster_spec["umap_n_neighbors"]),
-        len(X),
-    )
+    n_neighbors = _effective_neighbor_count(_resolve_cluster_umap_n_neighbors(cluster_spec), len(X))
+    trustworthiness_neighbor_values = _resolve_trustworthiness_neighbor_values(cluster_spec)
+    mean_view_name = _trustworthiness_mean_view_name(trustworthiness_neighbor_values)
 
     trust_rows: list[dict[str, Any]] = []
     embeddings: dict[int, np.ndarray] = {}
@@ -344,22 +377,41 @@ def evaluate_umap_dimensions(
         umap_model = umap_module.UMAP(
             n_components=n_components,
             n_neighbors=n_neighbors,
-            min_dist=cluster_spec["umap_min_dist"],
+            min_dist=_resolve_cluster_umap_min_dist(cluster_spec),
             random_state=cluster_spec["random_state"],
         )
         embedding = umap_model.fit_transform(X)
         embeddings[n_components] = embedding
-        trust_score = float(trustworthiness_fn(X, embedding, n_neighbors=trust_neighbors))
-        trust_rows.append(
-            {
-                "performance_group": performance_group,
-                "n_components": n_components,
-                "trustworthiness": trust_score,
-                "selected_for_clustering": False,
-            }
-        )
+        trust_scores: list[float] = []
+        for trust_neighbors in trustworthiness_neighbor_values:
+            effective_trust_neighbors = _effective_neighbor_count(trust_neighbors, len(X))
+            trust_score = float(trustworthiness_fn(X, embedding, n_neighbors=effective_trust_neighbors))
+            trust_scores.append(trust_score)
+            trust_rows.append(
+                {
+                    "performance_group": performance_group,
+                    "n_components": n_components,
+                    "trustworthiness_view": f"nn_{int(trust_neighbors)}",
+                    "trustworthiness_n_neighbors": int(trust_neighbors),
+                    "trustworthiness": trust_score,
+                    "selected_for_clustering": False,
+                }
+            )
+        if trust_scores:
+            trust_rows.append(
+                {
+                    "performance_group": performance_group,
+                    "n_components": n_components,
+                    "trustworthiness_view": mean_view_name,
+                    "trustworthiness_n_neighbors": pd.NA,
+                    "trustworthiness": float(np.mean(trust_scores)),
+                    "selected_for_clustering": False,
+                }
+            )
 
     trust_df = pd.DataFrame(trust_rows)
+    if not trust_df.empty:
+        trust_df["trustworthiness_n_neighbors"] = pd.array(trust_df["trustworthiness_n_neighbors"], dtype="Int64")
     if selected_umap_dim is not None:
         if selected_umap_dim not in candidate_dims:
             raise ValueError(
@@ -376,11 +428,11 @@ def _compute_visual_umap_embedding(
     cluster_spec: dict[str, Any],
     umap_module,
 ) -> np.ndarray:
-    n_neighbors = _effective_neighbor_count(cluster_spec["umap_n_neighbors"], len(X))
+    n_neighbors = _effective_neighbor_count(_resolve_viz_umap_n_neighbors(cluster_spec), len(X))
     umap_model = umap_module.UMAP(
         n_components=2,
         n_neighbors=n_neighbors,
-        min_dist=cluster_spec["umap_min_dist"],
+        min_dist=_resolve_viz_umap_min_dist(cluster_spec),
         random_state=cluster_spec["random_state"],
     )
     return umap_model.fit_transform(X)
@@ -421,6 +473,8 @@ def evaluate_umap_trustworthiness_by_group(
             columns=[
                 "performance_group",
                 "n_components",
+                "trustworthiness_view",
+                "trustworthiness_n_neighbors",
                 "trustworthiness",
                 "selected_for_clustering",
             ]
@@ -788,10 +842,10 @@ def run_step2_clustering(
             columns=[
                 "performance_group",
                 "n_components",
+                "trustworthiness_view",
+                "trustworthiness_n_neighbors",
                 "trustworthiness",
-                "meets_threshold",
-                "selected",
-                "selection_reason",
+                "selected_for_clustering",
             ]
         )
     )

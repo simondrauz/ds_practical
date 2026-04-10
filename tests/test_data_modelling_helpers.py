@@ -11,6 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from data_modelling.common_metrics import is_log_target, regression_metrics, rmse, to_original_scale
+import data_modelling.shap_performance_regimes_utils as shap_performance_regimes_utils
 from data_modelling.prepared_data import (
     load_prepared_data,
     prepare_dual_target_model_data,
@@ -29,6 +30,56 @@ from data_modelling.training_outputs import (
     summarize_nested_cv,
     write_manifest,
 )
+
+
+def _patch_shap_regime_dependencies(monkeypatch: pytest.MonkeyPatch, umap_call_log: list[dict[str, float]]) -> None:
+    class DummyUMAP:
+        def __init__(self, *, n_components: int, n_neighbors: int, min_dist: float, random_state: int):
+            umap_call_log.append(
+                {
+                    "n_components": int(n_components),
+                    "n_neighbors": int(n_neighbors),
+                    "min_dist": float(min_dist),
+                    "random_state": int(random_state),
+                }
+            )
+            self.n_components = int(n_components)
+            self.n_neighbors = int(n_neighbors)
+            self.min_dist = float(min_dist)
+
+        def fit_transform(self, X: np.ndarray) -> np.ndarray:
+            base = np.arange(len(X) * self.n_components, dtype=float).reshape(len(X), self.n_components)
+            return base + float(self.n_neighbors) + self.min_dist
+
+    class DummyHDBSCAN:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def fit_predict(self, X: np.ndarray) -> np.ndarray:
+            midpoint = max(1, len(X) // 2)
+            return np.array([0 if idx < midpoint else 1 for idx in range(len(X))], dtype=int)
+
+    class DummyOPTICS:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def fit_predict(self, X: np.ndarray) -> np.ndarray:
+            midpoint = max(1, len(X) // 2)
+            return np.array([0 if idx < midpoint else 1 for idx in range(len(X))], dtype=int)
+
+    def dummy_trustworthiness(X: np.ndarray, embedding: np.ndarray, *, n_neighbors: int) -> float:
+        return float(n_neighbors) + (float(embedding.shape[1]) / 100.0)
+
+    def dummy_validity_index(X: np.ndarray, labels: np.ndarray) -> float:
+        return 0.42
+
+    dummy_umap_module = type("DummyUMAPModule", (), {"UMAP": DummyUMAP})
+    dummy_hdbscan_module = type("DummyHDBSCANModule", (), {"HDBSCAN": DummyHDBSCAN})
+    monkeypatch.setattr(
+        shap_performance_regimes_utils,
+        "_require_step2_dependencies",
+        lambda: (dummy_hdbscan_module, dummy_validity_index, dummy_umap_module, DummyOPTICS, dummy_trustworthiness),
+    )
 
 
 def test_is_log_target_prefers_explicit_target_mode():
@@ -407,3 +458,101 @@ def test_load_run_context_requires_manifest_fields(tmp_path, monkeypatch):
 
     with pytest.raises(KeyError, match="feature_cols"):
         load_run_context("gam", "run_a", "ml_ade_log")
+
+
+def test_evaluate_umap_trustworthiness_by_group_emits_neighbor_views_and_mean(monkeypatch):
+    umap_call_log: list[dict[str, float]] = []
+    _patch_shap_regime_dependencies(monkeypatch, umap_call_log)
+
+    n_rows = 40
+    analysis_df = pd.DataFrame(
+        {
+            "row_id": list(range(n_rows)),
+            "performance_group": ["easy"] * n_rows,
+            "shap__speed": np.linspace(0.1, 4.0, n_rows),
+            "shap__heading": np.linspace(1.0, 5.0, n_rows),
+            "shap__distance": np.linspace(2.0, 6.0, n_rows),
+        }
+    )
+    cluster_spec = {
+        "groups": ["easy"],
+        "umap_candidate_dims": [1, 2],
+        "umap_selected_n_components": {"easy": 2},
+        "cluster_umap_n_neighbors": 30,
+        "cluster_umap_min_dist": 0.0,
+        "trustworthiness_neighbor_values": [5, 10, 15],
+        "random_state": 42,
+    }
+
+    trustworthiness_df = shap_performance_regimes_utils.evaluate_umap_trustworthiness_by_group(
+        analysis_df,
+        cluster_spec=cluster_spec,
+        performance_group_col="performance_group",
+    )
+
+    assert set(trustworthiness_df["trustworthiness_view"]) == {"nn_5", "nn_10", "nn_15", "mean_5_10_15"}
+    assert trustworthiness_df.groupby("n_components").size().to_dict() == {1: 4, 2: 4}
+    assert trustworthiness_df.loc[trustworthiness_df["n_components"] == 2, "selected_for_clustering"].all()
+    assert not trustworthiness_df.loc[trustworthiness_df["n_components"] == 1, "selected_for_clustering"].any()
+
+    raw_df = trustworthiness_df.loc[trustworthiness_df["trustworthiness_n_neighbors"].notna()].copy()
+    mean_df = trustworthiness_df.loc[trustworthiness_df["trustworthiness_view"] == "mean_5_10_15"].copy()
+    expected_mean_by_dim = raw_df.groupby("n_components")["trustworthiness"].mean().to_dict()
+    actual_mean_by_dim = mean_df.set_index("n_components")["trustworthiness"].to_dict()
+    assert actual_mean_by_dim == pytest.approx(expected_mean_by_dim)
+    assert set(raw_df["trustworthiness_n_neighbors"].astype(int)) == {5, 10, 15}
+    assert len(umap_call_log) == 2
+    assert {(entry["n_neighbors"], entry["min_dist"]) for entry in umap_call_log} == {(30, 0.0)}
+
+
+def test_run_step2_clustering_separates_cluster_and_visual_umap_parameters(monkeypatch):
+    umap_call_log: list[dict[str, float]] = []
+    _patch_shap_regime_dependencies(monkeypatch, umap_call_log)
+
+    n_rows = 40
+    analysis_df = pd.DataFrame(
+        {
+            "row_id": list(range(n_rows)),
+            "performance_group": ["easy"] * n_rows,
+            "shap__speed": np.linspace(0.1, 4.0, n_rows),
+            "shap__heading": np.linspace(1.0, 5.0, n_rows),
+            "shap__distance": np.linspace(2.0, 6.0, n_rows),
+        }
+    )
+    cluster_spec = {
+        "groups": ["easy"],
+        "algorithms": ["hdbscan"],
+        "evaluate_umap_latent_space": True,
+        "umap_candidate_dims": [2],
+        "umap_selected_n_components": {"easy": 2},
+        "cluster_umap_n_neighbors": 30,
+        "cluster_umap_min_dist": 0.0,
+        "viz_umap_n_neighbors": 15,
+        "viz_umap_min_dist": 0.1,
+        "trustworthiness_neighbor_values": [5, 10, 15],
+        "random_state": 42,
+        "min_cluster_size_fraction": 0.25,
+        "min_cluster_size_min": 2,
+        "optics_cluster_method": "xi",
+        "optics_xi": 0.05,
+        "distance_metric": "euclidean",
+    }
+
+    clustering_results = shap_performance_regimes_utils.run_step2_clustering(
+        analysis_df,
+        cluster_spec=cluster_spec,
+        performance_group_col="performance_group",
+        row_id_col="row_id",
+    )
+
+    assert len(umap_call_log) == 2
+    assert {"n_components": 2, "n_neighbors": 30, "min_dist": 0.0, "random_state": 42} in umap_call_log
+    assert {"n_components": 2, "n_neighbors": 15, "min_dist": 0.1, "random_state": 42} in umap_call_log
+    assert clustering_results["clustered_df"].loc[0, "viz_umap_x"] == pytest.approx(15.1)
+    assert clustering_results["clustered_df"].loc[0, "viz_umap_y"] == pytest.approx(16.1)
+    assert set(clustering_results["trustworthiness_df"]["trustworthiness_view"]) == {
+        "nn_5",
+        "nn_10",
+        "nn_15",
+        "mean_5_10_15",
+    }

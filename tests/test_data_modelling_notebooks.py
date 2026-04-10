@@ -41,3 +41,15 @@ def test_data_modelling_notebooks_expose_workflow_structure():
             assert "**Purpose:** " in section and "<br>" in section, f"{notebook_name} should use inline <br> formatting."
             assert "**Inputs:** " in section and "<br>" in section, f"{notebook_name} should use inline <br> formatting."
             assert "**Outputs:** " in section and "<br>" in section, f"{notebook_name} should use inline <br> formatting."
+
+
+def test_shap_performance_regimes_notebook_references_split_umap_configuration():
+    notebook = json.loads((NOTEBOOK_DIR / "shap_performance_regimes.ipynb").read_text())
+    source = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+
+    assert "cluster_umap_n_neighbors" in source
+    assert "cluster_umap_min_dist" in source
+    assert "viz_umap_n_neighbors" in source
+    assert "viz_umap_min_dist" in source
+    assert "trustworthiness_neighbor_values" in source
+    assert "UMAP_TRUSTWORTHINESS_PLOT_PATHS" in source
