@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 """Helpers for assembling and clustering run-scoped SHAP regime analysis tables."""
-
-import math
 from typing import Any, Iterable
 
 import numpy as np
@@ -264,14 +262,32 @@ def _require_step2_dependencies() -> tuple[Any, Any, Any, Any, Any]:
 
     return hdbscan, validity_index, umap, OPTICS, trustworthiness
 
-
-def derive_min_cluster_size(
-    group_size: int,
+def _resolve_group_specific_int(
+    value: Any,
     *,
-    min_fraction: float,
-    min_size: int,
+    performance_group: str,
+    param_name: str,
 ) -> int:
-    return max(int(min_size), int(math.ceil(float(min_fraction) * int(group_size))))
+    if value is None:
+        raise ValueError(
+            f"Missing required CLUSTER_SPEC['{param_name}']. "
+            f"Set it at the top of shap_performance_regimes.ipynb for performance_group={performance_group!r}."
+        )
+    if isinstance(value, dict):
+        selected_value = value.get(performance_group)
+        if selected_value is None:
+            raise ValueError(
+                f"Missing CLUSTER_SPEC['{param_name}'][{performance_group!r}]. "
+                "Provide a value for each configured performance group."
+            )
+        value = selected_value
+
+    resolved_value = int(value)
+    if resolved_value < 1:
+        raise ValueError(
+            f"{param_name} must be >= 1 for performance_group={performance_group!r}, got {resolved_value}."
+        )
+    return resolved_value
 
 
 def _clip_umap_candidate_dims(candidate_dims: Iterable[int], *, n_features: int, n_rows: int) -> list[int]:
@@ -482,10 +498,17 @@ def evaluate_umap_trustworthiness_by_group(
     )
 
 
-def _fit_hdbscan_labels(X: np.ndarray, *, min_cluster_size: int, metric: str, hdbscan_module) -> np.ndarray:
+def _fit_hdbscan_labels(
+    X: np.ndarray,
+    *,
+    min_cluster_size: int,
+    min_samples: int,
+    metric: str,
+    hdbscan_module,
+) -> np.ndarray:
     clusterer = hdbscan_module.HDBSCAN(
         min_cluster_size=min_cluster_size,
-        min_samples=min_cluster_size,
+        min_samples=min_samples,
         metric=metric,
         cluster_selection_method="eom",
         allow_single_cluster=False,
@@ -714,15 +737,22 @@ def run_step2_clustering(
         X_raw = group_df[shap_cols].to_numpy(dtype=float)
         group_size = len(group_df)
 
-        min_cluster_size = derive_min_cluster_size(
-            group_size,
-            min_fraction=cluster_spec["min_cluster_size_fraction"],
-            min_size=cluster_spec["min_cluster_size_min"],
+        min_cluster_size = _resolve_group_specific_int(
+            cluster_spec.get("min_cluster_size"),
+            performance_group=performance_group,
+            param_name="min_cluster_size",
         )
-        if group_size < max(2, min_cluster_size):
+
+        min_samples = _resolve_group_specific_int(
+            cluster_spec.get("min_samples"),
+            performance_group=performance_group,
+            param_name="min_samples",
+        )
+
+        if group_size < max(2, min_cluster_size, min_samples):
             raise ValueError(
                 f"Performance group {performance_group!r} has too few rows for clustering. "
-                f"rows={group_size}, min_cluster_size={min_cluster_size}"
+                f"rows={group_size}, min_cluster_size={min_cluster_size}, min_samples={min_samples}"
             )
 
         viz_embedding = _compute_visual_umap_embedding(
@@ -763,21 +793,22 @@ def run_step2_clustering(
                     labels = _fit_hdbscan_labels(
                         X_space,
                         min_cluster_size=min_cluster_size,
+                        min_samples=min_samples,
                         metric=cluster_spec["distance_metric"],
                         hdbscan_module=hdbscan_module,
                     )
-                    min_samples_value = min_cluster_size
+                    min_samples_value = min_samples
                 elif algorithm == "optics":
                     labels = _fit_optics_labels(
                         X_space,
-                        min_samples=min_cluster_size,
+                        min_samples=min_samples,
                         min_cluster_size=min_cluster_size,
                         xi=cluster_spec["optics_xi"],
                         metric=cluster_spec["distance_metric"],
                         optics_cls=optics_cls,
                         cluster_method=cluster_spec["optics_cluster_method"],
                     )
-                    min_samples_value = min_cluster_size
+                    min_samples_value = min_samples
                 else:
                     raise ValueError(f"Unsupported clustering algorithm: {algorithm}")
 
