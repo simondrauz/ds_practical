@@ -75,10 +75,13 @@ def test_shap_cluster_inspection_notebook_references_exported_cluster_artifacts(
     assert "INSPECTION_CONFIG" in source
     assert "cluster_spec_manifest_path" in source
     assert "cluster_ids" in source
+    assert "distribution_matrix_max_columns" in source
     assert "resolve_cluster_inspection_config" in source
     assert "load_cluster_inspection_selection" in source
+    assert "build_subset_style_map" in source
     assert "build_cluster_inspection_export_layout" in source
     assert "plot_candidate_umap_scatter" in source
     assert "plot_cluster_profile_barplots" in source
     assert "plot_cluster_profile_heatmap" in source
     assert "plot_metric_distribution_panels" in source
+    assert "plot_metric_overview_matrix_pages" in source

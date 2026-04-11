@@ -1071,6 +1071,7 @@ def test_load_cluster_inspection_selection_supports_all_and_explicit_cluster_ids
             "cluster_ids": "all",
             "inspection_top_k_features": 8,
             "inspection_top_k_table": 3,
+            "distribution_matrix_max_columns": 6,
             "sort_cluster_profiles_by": "cluster_size",
         }
     )
@@ -1088,9 +1089,118 @@ def test_load_cluster_inspection_selection_supports_all_and_explicit_cluster_ids
             "cluster_ids": [1, -1],
             "inspection_top_k_features": 8,
             "inspection_top_k_table": 3,
+            "distribution_matrix_max_columns": 6,
             "sort_cluster_profiles_by": "cluster_size",
         }
     )
     explicit_bundle = shap_cluster_inspection.load_cluster_inspection_selection(explicit_config)
     assert explicit_bundle.ordered_cluster_ids == [1, -1]
     assert explicit_bundle.selected_catalog_df["cluster_id"].astype(int).tolist() == [1, -1]
+
+
+def test_resolve_metric_plot_type_distinguishes_continuous_and_discrete_series():
+    continuous_series = pd.Series(np.arange(12, dtype=float))
+    discrete_numeric_series = pd.Series([0, 1, 0, 1, 1, 0], dtype=int)
+    categorical_series = pd.Series(["sunny", "rain", "rain"], dtype="string")
+
+    assert shap_cluster_inspection.resolve_metric_plot_type(continuous_series) == "continuous"
+    assert shap_cluster_inspection.resolve_metric_plot_type(discrete_numeric_series) == "categorical"
+    assert shap_cluster_inspection.resolve_metric_plot_type(categorical_series) == "categorical"
+
+
+def test_chunk_metric_columns_splits_overview_pages_deterministically():
+    assert shap_cluster_inspection.chunk_metric_columns(
+        ["f1", "f2", "f3", "f4", "f5"],
+        max_columns=2,
+    ) == [["f1", "f2"], ["f3", "f4"], ["f5"]]
+
+
+def test_build_subset_style_map_assigns_noise_and_baseline_colors():
+    style_map = shap_cluster_inspection.build_subset_style_map(
+        ["Cluster 2", "Cluster 0", "Noise", shap_cluster_inspection.WHOLE_GROUP_LABEL]
+    )
+
+    assert set(style_map) == {"Cluster 2", "Cluster 0", "Noise", shap_cluster_inspection.WHOLE_GROUP_LABEL}
+    assert style_map["Noise"]["color"] == shap_cluster_inspection.DEFAULT_NOISE_COLOR
+    assert style_map[shap_cluster_inspection.WHOLE_GROUP_LABEL]["color"] == shap_cluster_inspection.DEFAULT_BASELINE_COLOR
+    assert style_map["Cluster 2"]["color"] != style_map["Cluster 0"]["color"]
+
+
+def test_load_cluster_inspection_selection_orders_trajectory_features_by_group_shap_importance(tmp_path):
+    clustered_df, cluster_scores_df = _sample_cluster_export_inputs()
+    export_layout = {
+        "cluster_spec_root": tmp_path,
+        "tables_dir": tmp_path / "tables",
+    }
+    export_layout["tables_dir"].mkdir(parents=True)
+    outputs = shap_cluster_exports.write_cluster_exports(
+        clustered_df,
+        cluster_scores_df,
+        export_layout=export_layout,
+        performance_metric_col="ml_ade",
+        performance_group_col="performance_group",
+        shap_cols=["shap__speed", "shap__acceleration"],
+    )
+    cluster_assignments_path = export_layout["tables_dir"] / "cluster_assignments.csv"
+    clustered_df.to_csv(cluster_assignments_path, index=False)
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "run_context": {"run_name": "run_a"},
+                "data_context": {"target_col": "ml_ade"},
+                "cluster_spec": {"hash": "abc123"},
+                "artifacts": [
+                    {
+                        "artifact_kind": "table",
+                        "artifact_type": "cluster_assignments",
+                        "relative_path": str(cluster_assignments_path.relative_to(tmp_path)),
+                        "absolute_path": str(cluster_assignments_path.resolve()),
+                    },
+                    *outputs["artifact_records"],
+                ],
+            }
+        )
+    )
+
+    bundle = shap_cluster_inspection.load_cluster_inspection_selection(
+        {
+            "cluster_spec_manifest_path": manifest_path,
+            "performance_group": "easy",
+            "inspection_algorithm": "hdbscan",
+            "inspection_cluster_space": "raw",
+            "cluster_ids": "all",
+            "inspection_top_k_features": 8,
+            "inspection_top_k_table": 3,
+            "distribution_matrix_max_columns": 6,
+            "sort_cluster_profiles_by": "cluster_size",
+        }
+    )
+
+    assert bundle.trajectory_feature_cols == ["speed", "acceleration"]
+
+
+def test_scene_metric_order_prefers_semantic_priority_then_alphabetical():
+    df = pd.DataFrame(
+        {
+            "performance_group": ["easy"],
+            "scene_weather": ["rain"],
+            "scene_num_agents": [5],
+            "scene_alpha": [1.0],
+            "scene_density_PEDESTRIAN": [0.4],
+            "scene_bbox_width": [12.0],
+            "scene_misc": [2.0],
+        }
+    )
+
+    ordered_cols = shap_cluster_inspection._resolve_scene_metric_cols(df)
+
+    assert ordered_cols == [
+        "scene_num_agents",
+        "scene_bbox_width",
+        "scene_density_PEDESTRIAN",
+        "scene_alpha",
+        "scene_misc",
+        "scene_weather",
+    ]
