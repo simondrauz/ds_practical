@@ -54,3 +54,9 @@ def test_shap_performance_regimes_notebook_references_split_umap_configuration()
     assert "viz_umap_min_dist" in source
     assert "trustworthiness_neighbor_values" in source
     assert "UMAP_TRUSTWORTHINESS_PLOT_PATHS" in source
+    assert "resolve_shap_regime_export_context" in source
+    assert "build_shap_regime_export_layout" in source
+    assert "build_shap_regime_artifact_names" in source
+    assert "load_or_initialize_shap_regime_manifest" in source
+    assert "merge_shap_regime_artifact_records" in source
+    assert "manifest.json" in source

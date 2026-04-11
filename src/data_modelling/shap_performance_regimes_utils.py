@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 """Helpers for assembling and clustering run-scoped SHAP regime analysis tables."""
+import hashlib
+import json
+import re
+from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 import numpy as np
@@ -186,6 +190,253 @@ def _resolve_non_empty_string(value: Any, *, config_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{config_name} must be a non-empty string, got {value!r}.")
     return value.strip()
+
+
+def _normalize_json_value(value: Any) -> Any:
+    """Convert notebook/runtime values into stable JSON-compatible primitives."""
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, Mapping):
+        return {str(key): _normalize_json_value(val) for key, val in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_normalize_json_value(item) for item in value]
+    return value
+
+
+def _stable_json_dumps(value: Any) -> str:
+    """Serialize one nested value deterministically for hashing and manifests."""
+    return json.dumps(_normalize_json_value(value), sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def _sanitize_slug_token(value: Any) -> str:
+    """Keep file and directory name fragments stable and portable."""
+    text = str(value).strip().lower()
+    text = re.sub(r"[^a-z0-9._-]+", "-", text)
+    text = re.sub(r"-{2,}", "-", text)
+    return text.strip("-") or "na"
+
+
+def _short_stable_hash(value: Any, *, length: int = 12) -> str:
+    serialized = _stable_json_dumps(value).encode("utf-8")
+    return hashlib.sha256(serialized).hexdigest()[:length]
+
+
+def _summarize_group_mapping(group_mapping: Mapping[str, Any]) -> str:
+    """Render one group->value mapping into a compact readable slug fragment."""
+    return "-".join(
+        f"{_sanitize_slug_token(group)}{_sanitize_slug_token(group_mapping[group])}"
+        for group in sorted(group_mapping)
+    )
+
+
+def _build_cluster_spec_readable_slug(cluster_spec: Mapping[str, Any]) -> str:
+    """Keep folder names human-readable while the hash guarantees uniqueness."""
+    selected_dims = cluster_spec.get("umap_selected_n_components", {})
+    return "__".join(
+        [
+            f"groups-{'-'.join(_sanitize_slug_token(group) for group in cluster_spec['groups'])}",
+            f"algs-{'-'.join(_sanitize_slug_token(algorithm) for algorithm in cluster_spec['algorithms'])}",
+            f"umap-{'on' if cluster_spec['evaluate_umap_latent_space'] else 'off'}",
+            f"dims-{_summarize_group_mapping(selected_dims) if selected_dims else 'none'}",
+        ]
+    )
+
+
+def _default_shap_regime_results_root() -> Path:
+    return Path(__file__).resolve().parents[2] / "results" / "interpretable_model" / "shap_performance_regimes"
+
+
+def resolve_shap_regime_export_context(
+    *,
+    model_id: str,
+    run_name: str,
+    target_col: str,
+    eval_csv_name: str,
+    lower_is_better: bool,
+    performance_group_col: str,
+    results_root: Path | None = None,
+) -> dict[str, Any]:
+    """Normalize the notebook inputs that change the underlying exported data."""
+    resolved_results_root = (results_root or _default_shap_regime_results_root()).resolve()
+    normalized_target_col = _resolve_non_empty_string(target_col, config_name="target_col")
+    normalized_eval_csv_name = _resolve_non_empty_string(eval_csv_name, config_name="eval_csv_name")
+    normalized_group_col = _resolve_non_empty_string(
+        performance_group_col,
+        config_name="performance_group_col",
+    )
+    data_context = {
+        "target_col": normalized_target_col,
+        "eval_csv_name": normalized_eval_csv_name,
+        "lower_is_better": _resolve_bool(lower_is_better, config_name="lower_is_better"),
+        "performance_group_col": normalized_group_col,
+    }
+    data_context_slug = "__".join(
+        [
+            f"target-{_sanitize_slug_token(data_context['target_col'])}",
+            f"eval-{_sanitize_slug_token(data_context['eval_csv_name'])}",
+            f"lower-is-better-{str(data_context['lower_is_better']).lower()}",
+            f"group-col-{_sanitize_slug_token(data_context['performance_group_col'])}",
+        ]
+    )
+    run_root = resolved_results_root / run_name
+    target_root = run_root / normalized_target_col
+    data_context_root = target_root / data_context_slug
+    return {
+        "model_id": _resolve_non_empty_string(model_id, config_name="model_id"),
+        "run_name": _resolve_non_empty_string(run_name, config_name="run_name"),
+        "target_col": normalized_target_col,
+        "eval_csv_name": normalized_eval_csv_name,
+        "lower_is_better": data_context["lower_is_better"],
+        "performance_group_col": normalized_group_col,
+        "results_root": resolved_results_root,
+        "run_root": run_root,
+        "target_root": target_root,
+        "data_context_slug": data_context_slug,
+        "data_context_root": data_context_root,
+    }
+
+
+def build_shap_regime_export_layout(
+    *,
+    export_context: Mapping[str, Any],
+    cluster_spec: Mapping[str, Any],
+    create_dirs: bool = True,
+) -> dict[str, Any]:
+    """Build the canonical cluster-spec-scoped export layout for one notebook run."""
+    cluster_spec_hash = _short_stable_hash(cluster_spec)
+    cluster_spec_readable_slug = _build_cluster_spec_readable_slug(cluster_spec)
+    cluster_spec_dirname = f"cluster_spec__{cluster_spec_readable_slug}__{cluster_spec_hash}"
+    cluster_spec_root = Path(export_context["data_context_root"]) / cluster_spec_dirname
+    tables_dir = cluster_spec_root / "tables"
+    plots_dir = cluster_spec_root / "plots"
+    manifest_path = cluster_spec_root / "manifest.json"
+    if create_dirs:
+        tables_dir.mkdir(parents=True, exist_ok=True)
+        plots_dir.mkdir(parents=True, exist_ok=True)
+    return {
+        "cluster_spec_hash": cluster_spec_hash,
+        "cluster_spec_readable_slug": cluster_spec_readable_slug,
+        "cluster_spec_dirname": cluster_spec_dirname,
+        "cluster_spec_root": cluster_spec_root,
+        "tables_dir": tables_dir,
+        "plots_dir": plots_dir,
+        "manifest_path": manifest_path,
+    }
+
+
+def _build_inspection_suffix(inspection_config: Mapping[str, Any]) -> str:
+    return "__".join(
+        [
+            f"alg-{_sanitize_slug_token(inspection_config['inspection_algorithm'])}",
+            f"space-{_sanitize_slug_token(inspection_config['inspection_cluster_space'])}",
+            f"topfeat-{int(inspection_config['inspection_top_k_features'])}",
+            f"toptable-{int(inspection_config['inspection_top_k_table'])}",
+            f"sort-{_sanitize_slug_token(inspection_config['sort_cluster_profiles_by'])}",
+        ]
+    )
+
+
+def build_shap_regime_artifact_names(
+    *,
+    cluster_spec: Mapping[str, Any],
+    inspection_config: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return stable filenames for every exported SHAP regime artifact."""
+    inspection_suffix = _build_inspection_suffix(inspection_config)
+    trustworthiness_views = [
+        *(f"nn_{int(value)}" for value in cluster_spec["trustworthiness_neighbor_values"]),
+        str(cluster_spec["trustworthiness_mean_view"]),
+    ]
+    barplot_names = {
+        performance_group: (
+            f"cluster_profile_barplot__group-{_sanitize_slug_token(performance_group)}__{inspection_suffix}.png"
+        )
+        for performance_group in cluster_spec["groups"]
+    }
+    heatmap_names = {
+        performance_group: (
+            f"cluster_profile_heatmap__group-{_sanitize_slug_token(performance_group)}__{inspection_suffix}.png"
+        )
+        for performance_group in cluster_spec["groups"]
+    }
+    return {
+        "inspection_suffix": inspection_suffix,
+        "tables": {
+            "regime_analysis": "regime_analysis.csv",
+            "performance_group_summary": "performance_group_summary.csv",
+            "umap_trustworthiness": "umap_trustworthiness.csv",
+            "cluster_scores": "cluster_scores.csv",
+            "cluster_assignments": "cluster_assignments.csv",
+            "cluster_shap_profiles": f"cluster_shap_profiles__{inspection_suffix}.csv",
+        },
+        "plots": {
+            "raw_algorithm_comparison_grid": "algorithm_comparison_grid__space-raw.png",
+            "umap_algorithm_comparison_grid": "algorithm_comparison_grid__space-umap.png",
+            "umap_trustworthiness_curves": {
+                trustworthiness_view: (
+                    f"umap_trustworthiness_curve__view-{_sanitize_slug_token(trustworthiness_view)}.png"
+                )
+                for trustworthiness_view in trustworthiness_views
+            },
+            "cluster_profile_barplots": barplot_names,
+            "cluster_profile_heatmaps": heatmap_names,
+        },
+    }
+
+
+def load_or_initialize_shap_regime_manifest(
+    manifest_path: Path,
+    *,
+    run_context: Mapping[str, Any] | None = None,
+    data_context: Mapping[str, Any] | None = None,
+    cluster_spec: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Load one cluster-spec manifest or return an initialized structure."""
+    manifest_data: dict[str, Any]
+    if manifest_path.exists():
+        manifest_data = json.loads(manifest_path.read_text())
+    else:
+        manifest_data = {}
+    manifest_data["schema_version"] = 1
+    manifest_data["run_context"] = _normalize_json_value(run_context or manifest_data.get("run_context", {}))
+    manifest_data["data_context"] = _normalize_json_value(data_context or manifest_data.get("data_context", {}))
+    manifest_data["cluster_spec"] = _normalize_json_value(cluster_spec or manifest_data.get("cluster_spec", {}))
+    existing_artifacts = manifest_data.get("artifacts", [])
+    manifest_data["artifacts"] = existing_artifacts if isinstance(existing_artifacts, list) else []
+    return manifest_data
+
+
+def merge_shap_regime_artifact_records(
+    manifest_data: Mapping[str, Any],
+    *,
+    artifact_records: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Upsert artifact rows by relative path while preserving older distinct exports."""
+    merged_manifest = {
+        "schema_version": manifest_data["schema_version"],
+        "run_context": _normalize_json_value(manifest_data.get("run_context", {})),
+        "data_context": _normalize_json_value(manifest_data.get("data_context", {})),
+        "cluster_spec": _normalize_json_value(manifest_data.get("cluster_spec", {})),
+    }
+    record_lookup: dict[str, dict[str, Any]] = {}
+    for artifact in manifest_data.get("artifacts", []):
+        normalized_artifact = _normalize_json_value(artifact)
+        relative_path = normalized_artifact.get("relative_path")
+        if relative_path:
+            record_lookup[str(relative_path)] = normalized_artifact
+    for artifact in artifact_records:
+        normalized_artifact = _normalize_json_value(artifact)
+        relative_path = normalized_artifact.get("relative_path")
+        if not relative_path:
+            raise ValueError("Each artifact record must include a non-empty 'relative_path'.")
+        record_lookup[str(relative_path)] = normalized_artifact
+    merged_manifest["artifacts"] = [
+        record_lookup[key]
+        for key in sorted(record_lookup)
+    ]
+    return merged_manifest
 
 
 def _resolve_choice_sequence(

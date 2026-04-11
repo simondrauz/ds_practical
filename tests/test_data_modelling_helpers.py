@@ -82,6 +82,34 @@ def _patch_shap_regime_dependencies(monkeypatch: pytest.MonkeyPatch, umap_call_l
     )
 
 
+def _resolved_shap_regime_cluster_spec(raw_cluster_spec: dict[str, object]) -> dict[str, object]:
+    return shap_performance_regimes_utils.resolve_cluster_spec(
+        raw_cluster_spec,
+        shap_cols=["shap__speed", "shap__heading", "shap__distance", "shap__distance_to_goal"],
+    )
+
+
+def _resolved_shap_regime_inspection_config(
+    cluster_spec: dict[str, object],
+    *,
+    inspection_algorithm: str = "hdbscan",
+    inspection_cluster_space: str = "raw",
+    inspection_top_k_features: int = 8,
+    inspection_top_k_table: int = 3,
+    sort_cluster_profiles_by: str = "cluster_size",
+) -> dict[str, object]:
+    return shap_performance_regimes_utils.resolve_inspection_config(
+        {
+            "inspection_algorithm": inspection_algorithm,
+            "inspection_cluster_space": inspection_cluster_space,
+            "inspection_top_k_features": inspection_top_k_features,
+            "inspection_top_k_table": inspection_top_k_table,
+            "sort_cluster_profiles_by": sort_cluster_profiles_by,
+        },
+        cluster_spec=cluster_spec,
+    )
+
+
 def test_is_log_target_prefers_explicit_target_mode():
     assert is_log_target(target_col="ml_ade", target_mode="log") is True
     assert is_log_target(target_col="ml_ade_log", target_mode="raw") is False
@@ -642,3 +670,217 @@ def test_run_step2_clustering_separates_cluster_and_visual_umap_parameters(monke
         "nn_15",
         "mean_5_10_15",
     }
+
+
+def test_build_shap_regime_export_layout_is_stable_for_equivalent_resolved_cluster_spec(tmp_path):
+    cluster_spec_scalar = _resolved_shap_regime_cluster_spec(
+        {
+            "groups": ["easy", "medium"],
+            "algorithms": ["hdbscan", "optics"],
+            "evaluate_umap_latent_space": True,
+            "umap_selected_n_components": 2,
+            "trustworthiness_neighbor_values": [5, 10, 15],
+            "cluster_umap_n_neighbors": 30,
+            "cluster_umap_min_dist": 0.0,
+            "viz_umap_n_neighbors": 15,
+            "viz_umap_min_dist": 0.1,
+            "random_state": 42,
+            "min_cluster_size": 5,
+            "min_samples": 5,
+            "optics_cluster_method": "xi",
+            "optics_xi": 0.05,
+            "distance_metric": "euclidean",
+        }
+    )
+    cluster_spec_mapping = _resolved_shap_regime_cluster_spec(
+        {
+            "groups": ["easy", "medium"],
+            "algorithms": ["hdbscan", "optics"],
+            "evaluate_umap_latent_space": True,
+            "umap_selected_n_components": {"easy": 2, "medium": 2},
+            "trustworthiness_neighbor_values": [5, 10, 15],
+            "cluster_umap_n_neighbors": 30,
+            "cluster_umap_min_dist": 0.0,
+            "viz_umap_n_neighbors": 15,
+            "viz_umap_min_dist": 0.1,
+            "random_state": 42,
+            "min_cluster_size": {"easy": 5, "medium": 5},
+            "min_samples": {"easy": 5, "medium": 5},
+            "optics_cluster_method": "xi",
+            "optics_xi": 0.05,
+            "distance_metric": "euclidean",
+        }
+    )
+    export_context = shap_performance_regimes_utils.resolve_shap_regime_export_context(
+        model_id="xgboost",
+        run_name="run_a",
+        target_col="ml_ade_log",
+        eval_csv_name="eval_epoch_5.csv",
+        lower_is_better=True,
+        performance_group_col="performance_group",
+        results_root=tmp_path / "results",
+    )
+
+    scalar_layout = shap_performance_regimes_utils.build_shap_regime_export_layout(
+        export_context=export_context,
+        cluster_spec=cluster_spec_scalar,
+    )
+    mapping_layout = shap_performance_regimes_utils.build_shap_regime_export_layout(
+        export_context=export_context,
+        cluster_spec=cluster_spec_mapping,
+    )
+
+    assert scalar_layout["cluster_spec_hash"] == mapping_layout["cluster_spec_hash"]
+    assert scalar_layout["cluster_spec_dirname"] == mapping_layout["cluster_spec_dirname"]
+    assert scalar_layout["cluster_spec_root"] == mapping_layout["cluster_spec_root"]
+    assert scalar_layout["tables_dir"].is_dir()
+    assert scalar_layout["plots_dir"].is_dir()
+
+
+def test_resolve_shap_regime_export_context_splits_on_non_cluster_inputs(tmp_path):
+    base_kwargs = {
+        "model_id": "xgboost",
+        "run_name": "run_a",
+        "target_col": "ml_ade_log",
+        "eval_csv_name": "eval_epoch_5.csv",
+        "lower_is_better": True,
+        "performance_group_col": "performance_group",
+        "results_root": tmp_path / "results",
+    }
+    base_context = shap_performance_regimes_utils.resolve_shap_regime_export_context(**base_kwargs)
+    changed_eval_context = shap_performance_regimes_utils.resolve_shap_regime_export_context(
+        **(base_kwargs | {"eval_csv_name": "eval_epoch_10.csv"})
+    )
+    changed_lower_is_better_context = shap_performance_regimes_utils.resolve_shap_regime_export_context(
+        **(base_kwargs | {"lower_is_better": False})
+    )
+    changed_group_col_context = shap_performance_regimes_utils.resolve_shap_regime_export_context(
+        **(base_kwargs | {"performance_group_col": "difficulty_band"})
+    )
+    changed_target_context = shap_performance_regimes_utils.resolve_shap_regime_export_context(
+        **(base_kwargs | {"target_col": "ml_fde_log"})
+    )
+
+    assert base_context["data_context_root"] != changed_eval_context["data_context_root"]
+    assert base_context["data_context_root"] != changed_lower_is_better_context["data_context_root"]
+    assert base_context["data_context_root"] != changed_group_col_context["data_context_root"]
+    assert base_context["target_root"] != changed_target_context["target_root"]
+    assert "target-ml_ade_log" in base_context["data_context_slug"]
+
+
+def test_build_shap_regime_artifact_names_include_full_inspection_fields():
+    cluster_spec = _resolved_shap_regime_cluster_spec(
+        {
+            "groups": ["easy", "medium"],
+            "algorithms": ["hdbscan", "optics"],
+            "evaluate_umap_latent_space": True,
+            "umap_selected_n_components": {"easy": 2, "medium": 2},
+            "trustworthiness_neighbor_values": [5, 10, 15],
+            "cluster_umap_n_neighbors": 30,
+            "cluster_umap_min_dist": 0.0,
+            "viz_umap_n_neighbors": 15,
+            "viz_umap_min_dist": 0.1,
+            "random_state": 42,
+            "min_cluster_size": {"easy": 5, "medium": 5},
+            "min_samples": {"easy": 5, "medium": 5},
+            "optics_cluster_method": "xi",
+            "optics_xi": 0.05,
+            "distance_metric": "euclidean",
+        }
+    )
+    inspection_config = _resolved_shap_regime_inspection_config(
+        cluster_spec,
+        inspection_algorithm="optics",
+        inspection_cluster_space="umap",
+        inspection_top_k_features=6,
+        inspection_top_k_table=4,
+        sort_cluster_profiles_by="cluster_rank_by_size",
+    )
+
+    artifact_names = shap_performance_regimes_utils.build_shap_regime_artifact_names(
+        cluster_spec=cluster_spec,
+        inspection_config=inspection_config,
+    )
+
+    suffix = (
+        "alg-optics__space-umap__topfeat-6__toptable-4__sort-cluster_rank_by_size"
+    )
+    assert artifact_names["tables"]["regime_analysis"] == "regime_analysis.csv"
+    assert artifact_names["tables"]["cluster_shap_profiles"] == f"cluster_shap_profiles__{suffix}.csv"
+    assert (
+        artifact_names["plots"]["cluster_profile_barplots"]["easy"]
+        == f"cluster_profile_barplot__group-easy__{suffix}.png"
+    )
+    assert (
+        artifact_names["plots"]["cluster_profile_heatmaps"]["medium"]
+        == f"cluster_profile_heatmap__group-medium__{suffix}.png"
+    )
+    assert artifact_names["plots"]["raw_algorithm_comparison_grid"] == "algorithm_comparison_grid__space-raw.png"
+    assert (
+        artifact_names["plots"]["umap_trustworthiness_curves"]["mean_5_10_15"]
+        == "umap_trustworthiness_curve__view-mean_5_10_15.png"
+    )
+
+
+def test_merge_shap_regime_artifact_records_preserves_distinct_inspection_exports_and_upserts_existing(tmp_path):
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "run_context": {"run_name": "run_a"},
+                "data_context": {"target_col": "ml_ade_log"},
+                "cluster_spec": {"hash": "abc123"},
+                "artifacts": [
+                    {
+                        "artifact_kind": "table",
+                        "artifact_type": "cluster_scores",
+                        "relative_path": "tables/cluster_scores.csv",
+                        "absolute_path": "/old/tables/cluster_scores.csv",
+                    },
+                    {
+                        "artifact_kind": "plot",
+                        "artifact_type": "cluster_profile_barplot",
+                        "relative_path": "plots/cluster_profile_barplot__group-easy__alg-hdbscan__space-raw__topfeat-8__toptable-3__sort-cluster_size.png",
+                        "absolute_path": "/old/plots/easy_hdbscan.png",
+                    },
+                ],
+            }
+        )
+    )
+
+    manifest_data = shap_performance_regimes_utils.load_or_initialize_shap_regime_manifest(
+        manifest_path,
+        run_context={"run_name": "run_a"},
+        data_context={"target_col": "ml_ade_log"},
+        cluster_spec={"hash": "abc123"},
+    )
+    merged_manifest = shap_performance_regimes_utils.merge_shap_regime_artifact_records(
+        manifest_data,
+        artifact_records=[
+            {
+                "artifact_kind": "table",
+                "artifact_type": "cluster_scores",
+                "relative_path": "tables/cluster_scores.csv",
+                "absolute_path": "/new/tables/cluster_scores.csv",
+            },
+            {
+                "artifact_kind": "plot",
+                "artifact_type": "cluster_profile_barplot",
+                "relative_path": "plots/cluster_profile_barplot__group-easy__alg-optics__space-umap__topfeat-8__toptable-3__sort-cluster_size.png",
+                "absolute_path": "/new/plots/easy_optics.png",
+            },
+        ],
+    )
+
+    merged_artifacts = {artifact["relative_path"]: artifact for artifact in merged_manifest["artifacts"]}
+    assert len(merged_artifacts) == 3
+    assert merged_artifacts["tables/cluster_scores.csv"]["absolute_path"] == "/new/tables/cluster_scores.csv"
+    assert (
+        "plots/cluster_profile_barplot__group-easy__alg-hdbscan__space-raw__topfeat-8__toptable-3__sort-cluster_size.png"
+        in merged_artifacts
+    )
+    assert (
+        "plots/cluster_profile_barplot__group-easy__alg-optics__space-umap__topfeat-8__toptable-3__sort-cluster_size.png"
+        in merged_artifacts
+    )
