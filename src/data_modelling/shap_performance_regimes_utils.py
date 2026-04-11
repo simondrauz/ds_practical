@@ -546,7 +546,7 @@ def _select_best_group_run(group_scores_df: pd.DataFrame) -> int | None:
     valid_scores_df["cluster_space_priority"] = valid_scores_df["cluster_space"].map({"raw": 0, "umap": 1}).fillna(99)
     valid_scores_df["algorithm_priority"] = valid_scores_df["algorithm"].map({"hdbscan": 0, "optics": 1}).fillna(99)
     valid_scores_df = valid_scores_df.sort_values(
-        ["dbcv", "noise_fraction", "cluster_space_priority", "algorithm_priority"],
+        ["dbcv_cluster_space", "noise_fraction", "cluster_space_priority", "algorithm_priority"],
         ascending=[False, True, True, True],
     )
     return int(valid_scores_df.iloc[0]["score_row_id"])
@@ -821,7 +821,8 @@ def run_step2_clustering(
                 n_clusters = len(non_noise_cluster_ids)
                 noise_count = int((labels == -1).sum())
                 clustered_count = int((labels != -1).sum())
-                dbcv, valid_for_selection = _compute_dbcv_score(validity_index_fn, X_space, labels)
+                dbcv_cluster_space, valid_for_selection = _compute_dbcv_score(validity_index_fn, X_space, labels)
+                dbcv_raw_shap_space, valid_for_raw_shap_evaluation = _compute_dbcv_score(validity_index_fn, X_raw, labels)
                 group_score_row_ids.append(score_row_id)
                 score_rows.append(
                     {
@@ -842,8 +843,11 @@ def run_step2_clustering(
                         "noise_count": int(noise_count),
                         "noise_fraction": float(noise_count / group_size),
                         "clustered_fraction": float(clustered_count / group_size),
-                        "dbcv": dbcv,
+                        "dbcv": dbcv_cluster_space,
+                        "dbcv_cluster_space": dbcv_cluster_space,
+                        "dbcv_raw_shap_space": dbcv_raw_shap_space,
                         "valid_for_selection": bool(valid_for_selection),
+                        "valid_for_raw_shap_evaluation": bool(valid_for_raw_shap_evaluation),
                         "selected_for_group": False,
                     }
                 )
@@ -883,7 +887,7 @@ def run_step2_clustering(
         )
     )
     cluster_scores_df = pd.DataFrame(score_rows).sort_values(
-        ["performance_group", "selected_for_group", "dbcv", "algorithm", "cluster_space"],
+        ["performance_group", "selected_for_group", "dbcv_cluster_space", "algorithm", "cluster_space"],
         ascending=[True, False, False, True, True],
     )
     selected_cluster_runs_df = cluster_scores_df.loc[cluster_scores_df["selected_for_group"]].copy()
