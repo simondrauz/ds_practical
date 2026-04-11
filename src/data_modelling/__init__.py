@@ -8,6 +8,8 @@ from .prepared_data import (
     prepare_dual_target_model_data,
     prepare_single_target_model_data,
 )
+from .shap_cluster_exports import build_scene_step_key_frame, summarize_scene_steps, write_cluster_exports
+from .shap_cluster_inspection import load_cluster_inspection_selection, resolve_cluster_inspection_config
 from .run_context import (
     ExportedModelInfo,
     RunContext,
@@ -32,17 +34,22 @@ __all__ = [
     "build_oof_frame",
     "build_oof_metrics_df",
     "build_run_manifest",
+    "build_scene_step_key_frame",
     "format_exported_model_label",
     "get_exported_model_info",
     "is_log_target",
     "load_run_context",
+    "load_cluster_inspection_selection",
     "load_prepared_data",
     "prepare_dual_target_model_data",
     "prepare_single_target_model_data",
     "regression_metrics",
+    "resolve_cluster_inspection_config",
     "resolve_manifest_path",
     "rmse",
+    "summarize_scene_steps",
     "summarize_nested_cv",
     "to_original_scale",
+    "write_cluster_exports",
     "write_manifest",
 ]

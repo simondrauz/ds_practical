@@ -26,21 +26,15 @@ TRUSTWORTHINESS_COLUMNS = [
 ]
 CLUSTER_SHAP_PROFILE_PREFIX_COLUMNS = [
     "performance_group",
-    "selected_algorithm",
-    "selected_cluster_space",
+    "algorithm",
+    "cluster_space",
+    "candidate_label_col",
     "cluster_id",
+    "cluster_label",
+    "is_noise",
     "cluster_size",
     "cluster_size_share",
     "cluster_rank_by_size",
-    "dominant_feature_1",
-    "dominant_abs_shap_1",
-    "dominant_direction_1",
-    "dominant_feature_2",
-    "dominant_abs_shap_2",
-    "dominant_direction_2",
-    "dominant_feature_3",
-    "dominant_abs_shap_3",
-    "dominant_direction_3",
 ]
 CLUSTER_SCORE_REQUIRED_COLUMNS = [
     "performance_group",
@@ -326,50 +320,25 @@ def build_shap_regime_export_layout(
     }
 
 
-def _build_inspection_suffix(inspection_config: Mapping[str, Any]) -> str:
-    return "__".join(
-        [
-            f"alg-{_sanitize_slug_token(inspection_config['inspection_algorithm'])}",
-            f"space-{_sanitize_slug_token(inspection_config['inspection_cluster_space'])}",
-            f"topfeat-{int(inspection_config['inspection_top_k_features'])}",
-            f"toptable-{int(inspection_config['inspection_top_k_table'])}",
-            f"sort-{_sanitize_slug_token(inspection_config['sort_cluster_profiles_by'])}",
-        ]
-    )
-
-
 def build_shap_regime_artifact_names(
     *,
     cluster_spec: Mapping[str, Any],
-    inspection_config: Mapping[str, Any],
+    inspection_config: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return stable filenames for every exported SHAP regime artifact."""
-    inspection_suffix = _build_inspection_suffix(inspection_config)
     trustworthiness_views = [
         *(f"nn_{int(value)}" for value in cluster_spec["trustworthiness_neighbor_values"]),
         str(cluster_spec["trustworthiness_mean_view"]),
     ]
-    barplot_names = {
-        performance_group: (
-            f"cluster_profile_barplot__group-{_sanitize_slug_token(performance_group)}__{inspection_suffix}.png"
-        )
-        for performance_group in cluster_spec["groups"]
-    }
-    heatmap_names = {
-        performance_group: (
-            f"cluster_profile_heatmap__group-{_sanitize_slug_token(performance_group)}__{inspection_suffix}.png"
-        )
-        for performance_group in cluster_spec["groups"]
-    }
     return {
-        "inspection_suffix": inspection_suffix,
         "tables": {
             "regime_analysis": "regime_analysis.csv",
             "performance_group_summary": "performance_group_summary.csv",
             "umap_trustworthiness": "umap_trustworthiness.csv",
             "cluster_scores": "cluster_scores.csv",
             "cluster_assignments": "cluster_assignments.csv",
-            "cluster_shap_profiles": f"cluster_shap_profiles__{inspection_suffix}.csv",
+            "cluster_shap_profiles": "cluster_shap_profiles.csv",
+            "cluster_catalog": "cluster_catalog.csv",
         },
         "plots": {
             "raw_algorithm_comparison_grid": "algorithm_comparison_grid__space-raw.png",
@@ -380,8 +349,6 @@ def build_shap_regime_artifact_names(
                 )
                 for trustworthiness_view in trustworthiness_views
             },
-            "cluster_profile_barplots": barplot_names,
-            "cluster_profile_heatmaps": heatmap_names,
         },
     }
 
@@ -1212,63 +1179,57 @@ def _rank_cluster_profiles(summary_df: pd.DataFrame) -> pd.DataFrame:
     if summary_df.empty:
         return summary_df.copy()
 
-    ranked_df = summary_df.sort_values(["cluster_size", "cluster_id"], ascending=[False, True]).reset_index(drop=True)
-    ranked_df["cluster_rank_by_size"] = np.arange(1, len(ranked_df) + 1, dtype=int)
+    ranked_df = summary_df.copy()
+    ranked_df["cluster_rank_by_size"] = pd.Series([pd.NA] * len(ranked_df), dtype="Int64")
+    non_noise_mask = ~ranked_df["is_noise"].astype(bool)
+    if non_noise_mask.any():
+        ranked_non_noise_df = (
+            ranked_df.loc[non_noise_mask]
+            .sort_values(["cluster_size", "cluster_id"], ascending=[False, True])
+            .reset_index()
+        )
+        ranked_non_noise_df["cluster_rank_by_size"] = pd.array(
+            np.arange(1, len(ranked_non_noise_df) + 1, dtype=int),
+            dtype="Int64",
+        )
+        for row in ranked_non_noise_df.itertuples():
+            ranked_df.loc[row.index, "cluster_rank_by_size"] = row.cluster_rank_by_size
     return ranked_df
 
 
-def _append_dominant_feature_fields(summary_df: pd.DataFrame, *, shap_cols: list[str], top_k: int = 3) -> pd.DataFrame:
-    """Attach top absolute SHAP drivers so tables are readable without scanning all columns."""
-    if summary_df.empty:
-        return summary_df.copy()
-
-    enriched_df = summary_df.copy()
-    label_lookup = {shap_col: format_shap_feature_name(shap_col) for shap_col in shap_cols}
-
-    for row_idx, row in enriched_df.iterrows():
-        ordered_shap_cols = sorted(shap_cols, key=lambda shap_col: abs(float(row[shap_col])), reverse=True)
-        for rank in range(1, top_k + 1):
-            feature_col = f"dominant_feature_{rank}"
-            magnitude_col = f"dominant_abs_shap_{rank}"
-            direction_col = f"dominant_direction_{rank}"
-            if rank <= len(ordered_shap_cols):
-                shap_col = ordered_shap_cols[rank - 1]
-                shap_value = float(row[shap_col])
-                direction = "positive" if shap_value > 0 else "negative" if shap_value < 0 else "neutral"
-                enriched_df.loc[row_idx, feature_col] = label_lookup[shap_col]
-                enriched_df.loc[row_idx, magnitude_col] = abs(shap_value)
-                enriched_df.loc[row_idx, direction_col] = direction
-            else:
-                enriched_df.loc[row_idx, feature_col] = pd.NA
-                enriched_df.loc[row_idx, magnitude_col] = np.nan
-                enriched_df.loc[row_idx, direction_col] = pd.NA
-
-    return enriched_df
+def _cluster_label(cluster_id: int) -> str:
+    return "noise" if int(cluster_id) == -1 else f"cluster_{int(cluster_id)}"
 
 
-def _build_selected_cluster_shap_summary(
+def _build_cluster_shap_summary(
     group_df: pd.DataFrame,
     *,
     labels: np.ndarray,
     performance_group: str,
-    selected_algorithm: str,
-    selected_cluster_space: str,
+    algorithm: str,
+    cluster_space: str,
+    candidate_label_col: str,
     shap_cols: list[str],
+    include_noise: bool,
 ) -> pd.DataFrame:
-    """Summarize mean signed SHAP values for every non-noise cluster in one group."""
+    """Summarize mean signed SHAP values for every cluster in one candidate run."""
     summary_rows: list[dict[str, Any]] = []
-    cluster_ids = sorted({int(label) for label in labels if int(label) != -1})
+    cluster_ids = sorted({int(label) for label in labels if include_noise or int(label) != -1})
     group_size = int(len(group_df))
     for cluster_id in cluster_ids:
         cluster_rows = group_df.loc[labels == cluster_id]
         if cluster_rows.empty:
             continue
+        is_noise = int(cluster_id) == -1
         cluster_size = int(len(cluster_rows))
         row: dict[str, Any] = {
             "performance_group": performance_group,
-            "selected_algorithm": selected_algorithm,
-            "selected_cluster_space": selected_cluster_space,
+            "algorithm": algorithm,
+            "cluster_space": cluster_space,
+            "candidate_label_col": candidate_label_col,
             "cluster_id": cluster_id,
+            "cluster_label": _cluster_label(cluster_id),
+            "is_noise": is_noise,
             "cluster_size": cluster_size,
             "cluster_size_share": float(cluster_size / group_size),
         }
@@ -1280,8 +1241,11 @@ def _build_selected_cluster_shap_summary(
     if summary_df.empty:
         return summary_df
     summary_df = _rank_cluster_profiles(summary_df)
-    summary_df = _append_dominant_feature_fields(summary_df, shap_cols=shap_cols, top_k=3)
-    return summary_df
+    return summary_df.sort_values(
+        ["is_noise", "cluster_rank_by_size", "cluster_id"],
+        ascending=[True, True, True],
+        na_position="last",
+    ).reset_index(drop=True)
 
 
 def build_cluster_shap_profiles(
@@ -1290,8 +1254,9 @@ def build_cluster_shap_profiles(
     *,
     performance_group_col: str = "performance_group",
     shap_cols: list[str] | None = None,
+    include_noise: bool = False,
 ) -> pd.DataFrame:
-    """Build mean signed SHAP profiles for the selected cluster run in each group."""
+    """Build mean signed SHAP profiles for one or more candidate cluster runs."""
     shap_cols = shap_cols or get_shap_cols(clustered_df)
     assert_columns_present(
         clustered_df,
@@ -1313,19 +1278,25 @@ def build_cluster_shap_profiles(
 
         group_df = clustered_df.loc[clustered_df[performance_group_col] == performance_group].copy()
         labels = group_df[label_col].to_numpy(dtype="int64")
-        summary_df = _build_selected_cluster_shap_summary(
+        summary_df = _build_cluster_shap_summary(
             group_df,
             labels=labels,
             performance_group=performance_group,
-            selected_algorithm=str(cluster_run["algorithm"]),
-            selected_cluster_space=str(cluster_run["cluster_space"]),
+            algorithm=str(cluster_run["algorithm"]),
+            cluster_space=str(cluster_run["cluster_space"]),
+            candidate_label_col=label_col,
             shap_cols=shap_cols,
+            include_noise=include_noise,
         )
         if not summary_df.empty:
             summary_frames.append(summary_df)
 
     if summary_frames:
-        return pd.concat(summary_frames, ignore_index=True)
+        return pd.concat(summary_frames, ignore_index=True).sort_values(
+            ["performance_group", "algorithm", "cluster_space", "is_noise", "cluster_rank_by_size", "cluster_id"],
+            ascending=[True, True, True, True, True, True],
+            na_position="last",
+        ).reset_index(drop=True)
 
     return _empty_cluster_shap_profiles_df(shap_cols)
 
@@ -1356,10 +1327,6 @@ def run_step2_clustering(
             cluster_col = f"cluster_{algorithm}_umap"
             clustered_df[cluster_col] = _coerce_label_series(len(clustered_df))
 
-    clustered_df["selected_cluster"] = _coerce_label_series(len(clustered_df))
-    clustered_df["selected_algorithm"] = pd.Series([pd.NA] * len(clustered_df), dtype="object")
-    clustered_df["selected_cluster_space"] = pd.Series([pd.NA] * len(clustered_df), dtype="object")
-    clustered_df["selected_noise"] = pd.Series([pd.NA] * len(clustered_df), dtype="boolean")
     clustered_df["viz_umap_x"] = np.nan
     clustered_df["viz_umap_y"] = np.nan
 
@@ -1496,16 +1463,9 @@ def run_step2_clustering(
         for row in score_rows:
             if row["score_row_id"] == best_score_row_id:
                 row["selected_for_group"] = True
-                best_row = row
                 break
         else:
             raise RuntimeError(f"Selected score_row_id={best_score_row_id} could not be found.")
-
-        selected_labels = clustered_df.loc[group_mask, best_row["candidate_label_col"]].to_numpy(dtype="int64")
-        clustered_df.loc[group_mask, "selected_cluster"] = pd.array(selected_labels, dtype="Int64")
-        clustered_df.loc[group_mask, "selected_algorithm"] = best_row["algorithm"]
-        clustered_df.loc[group_mask, "selected_cluster_space"] = best_row["cluster_space"]
-        clustered_df.loc[group_mask, "selected_noise"] = pd.array(selected_labels == -1, dtype="boolean")
 
     trustworthiness_df = (
         pd.concat(trustworthiness_rows, ignore_index=True)
@@ -1516,17 +1476,18 @@ def run_step2_clustering(
         ["performance_group", "selected_for_group", "dbcv_cluster_space", "algorithm", "cluster_space"],
         ascending=[True, False, False, True, True],
     )
-    selected_cluster_runs_df = cluster_scores_df.loc[cluster_scores_df["selected_for_group"]].copy()
-    cluster_shap_summary_df = build_cluster_shap_profiles(
+    cluster_shap_profiles_df = build_cluster_shap_profiles(
         clustered_df,
-        selected_cluster_runs_df,
+        cluster_scores_df,
         performance_group_col=performance_group_col,
         shap_cols=shap_cols,
+        include_noise=True,
     )
 
     return {
         "clustered_df": clustered_df,
         "trustworthiness_df": trustworthiness_df,
         "cluster_scores_df": cluster_scores_df,
-        "cluster_shap_summary_df": cluster_shap_summary_df,
+        "cluster_shap_summary_df": cluster_shap_profiles_df,
+        "cluster_shap_profiles_df": cluster_shap_profiles_df,
     }

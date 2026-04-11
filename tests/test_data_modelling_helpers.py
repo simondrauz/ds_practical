@@ -10,6 +10,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+import data_modelling.shap_cluster_exports as shap_cluster_exports
+import data_modelling.shap_cluster_inspection as shap_cluster_inspection
 from data_modelling.common_metrics import is_log_target, regression_metrics, rmse, to_original_scale
 import data_modelling.shap_performance_regimes_utils as shap_performance_regimes_utils
 from data_modelling.prepared_data import (
@@ -108,6 +110,65 @@ def _resolved_shap_regime_inspection_config(
         },
         cluster_spec=cluster_spec,
     )
+
+
+def _sample_cluster_export_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
+    clustered_df = pd.DataFrame(
+        {
+            "row_id": [0, 1, 2, 3, 4],
+            "data_idx": [10, 11, 12, 13, 14],
+            "outer_fold": [0, 0, 0, 0, 0],
+            "performance_group": ["easy"] * 5,
+            "ml_ade": [0.11, 0.12, 0.31, 0.32, 0.9],
+            "target_orig": [0.11, 0.12, 0.31, 0.32, 0.9],
+            "oof_pred_orig": [0.10, 0.14, 0.33, 0.30, 0.85],
+            "scene_id": ["scene_a", "scene_a", "scene_a", "scene_b", "scene_b"],
+            "scene_path": [
+                "/tmp/scene_a/frame.json",
+                "/tmp/scene_a/frame.json",
+                "/tmp/scene_a/frame.json",
+                "/tmp/scene_b/frame.json",
+                "/tmp/scene_b/frame.json",
+            ],
+            "scene_ts": [0, 0, 1, 0, 0],
+            "agent_type": ["pedestrian"] * 5,
+            "speed": [1.0, 1.1, 2.2, 2.3, 0.4],
+            "acceleration": [0.2, 0.25, 0.4, 0.35, 0.05],
+            "scene_density": [3, 3, 4, 2, 2],
+            "scene_weather": ["sunny", "sunny", "rain", "rain", "rain"],
+            "shap__speed": [0.8, 0.6, -0.4, -0.5, 0.1],
+            "shap__acceleration": [0.2, 0.1, -0.3, -0.2, 0.05],
+            "cluster_hdbscan_raw": [0, 0, 1, 1, -1],
+        }
+    )
+    cluster_scores_df = pd.DataFrame(
+        [
+            {
+                "score_row_id": 0,
+                "performance_group": "easy",
+                "algorithm": "hdbscan",
+                "cluster_space": "raw",
+                "candidate_label_col": "cluster_hdbscan_raw",
+                "input_dim": 2,
+                "group_size": 5,
+                "min_cluster_size": 2,
+                "min_samples": 2,
+                "optics_xi": np.nan,
+                "umap_selected_n_components": np.nan,
+                "n_clusters": 2,
+                "noise_count": 1,
+                "noise_fraction": 0.2,
+                "clustered_fraction": 0.8,
+                "dbcv": 0.42,
+                "dbcv_cluster_space": 0.42,
+                "dbcv_raw_shap_space": 0.42,
+                "valid_for_selection": True,
+                "valid_for_raw_shap_evaluation": True,
+                "selected_for_group": True,
+            }
+        ]
+    )
+    return clustered_df, cluster_scores_df
 
 
 def test_is_log_target_prefers_explicit_target_mode():
@@ -768,7 +829,7 @@ def test_resolve_shap_regime_export_context_splits_on_non_cluster_inputs(tmp_pat
     assert "target-ml_ade_log" in base_context["data_context_slug"]
 
 
-def test_build_shap_regime_artifact_names_include_full_inspection_fields():
+def test_build_shap_regime_artifact_names_return_candidate_wide_export_targets():
     cluster_spec = _resolved_shap_regime_cluster_spec(
         {
             "groups": ["easy", "medium"],
@@ -788,33 +849,14 @@ def test_build_shap_regime_artifact_names_include_full_inspection_fields():
             "distance_metric": "euclidean",
         }
     )
-    inspection_config = _resolved_shap_regime_inspection_config(
-        cluster_spec,
-        inspection_algorithm="optics",
-        inspection_cluster_space="umap",
-        inspection_top_k_features=6,
-        inspection_top_k_table=4,
-        sort_cluster_profiles_by="cluster_rank_by_size",
-    )
+    artifact_names = shap_performance_regimes_utils.build_shap_regime_artifact_names(cluster_spec=cluster_spec)
 
-    artifact_names = shap_performance_regimes_utils.build_shap_regime_artifact_names(
-        cluster_spec=cluster_spec,
-        inspection_config=inspection_config,
-    )
-
-    suffix = (
-        "alg-optics__space-umap__topfeat-6__toptable-4__sort-cluster_rank_by_size"
-    )
     assert artifact_names["tables"]["regime_analysis"] == "regime_analysis.csv"
-    assert artifact_names["tables"]["cluster_shap_profiles"] == f"cluster_shap_profiles__{suffix}.csv"
-    assert (
-        artifact_names["plots"]["cluster_profile_barplots"]["easy"]
-        == f"cluster_profile_barplot__group-easy__{suffix}.png"
-    )
-    assert (
-        artifact_names["plots"]["cluster_profile_heatmaps"]["medium"]
-        == f"cluster_profile_heatmap__group-medium__{suffix}.png"
-    )
+    assert artifact_names["tables"]["cluster_assignments"] == "cluster_assignments.csv"
+    assert artifact_names["tables"]["cluster_shap_profiles"] == "cluster_shap_profiles.csv"
+    assert artifact_names["tables"]["cluster_catalog"] == "cluster_catalog.csv"
+    assert "cluster_profile_barplots" not in artifact_names["plots"]
+    assert "cluster_profile_heatmaps" not in artifact_names["plots"]
     assert artifact_names["plots"]["raw_algorithm_comparison_grid"] == "algorithm_comparison_grid__space-raw.png"
     assert (
         artifact_names["plots"]["umap_trustworthiness_curves"]["mean_5_10_15"]
@@ -822,7 +864,7 @@ def test_build_shap_regime_artifact_names_include_full_inspection_fields():
     )
 
 
-def test_merge_shap_regime_artifact_records_preserves_distinct_inspection_exports_and_upserts_existing(tmp_path):
+def test_merge_shap_regime_artifact_records_upserts_tables_and_preserves_distinct_member_exports(tmp_path):
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(
         json.dumps(
@@ -839,10 +881,10 @@ def test_merge_shap_regime_artifact_records_preserves_distinct_inspection_export
                         "absolute_path": "/old/tables/cluster_scores.csv",
                     },
                     {
-                        "artifact_kind": "plot",
-                        "artifact_type": "cluster_profile_barplot",
-                        "relative_path": "plots/cluster_profile_barplot__group-easy__alg-hdbscan__space-raw__topfeat-8__toptable-3__sort-cluster_size.png",
-                        "absolute_path": "/old/plots/easy_hdbscan.png",
+                        "artifact_kind": "table",
+                        "artifact_type": "cluster_members",
+                        "relative_path": "tables/cluster_members__group-easy__alg-hdbscan__space-raw__label-cluster_0.csv",
+                        "absolute_path": "/old/tables/cluster_0.csv",
                     },
                 ],
             }
@@ -865,10 +907,10 @@ def test_merge_shap_regime_artifact_records_preserves_distinct_inspection_export
                 "absolute_path": "/new/tables/cluster_scores.csv",
             },
             {
-                "artifact_kind": "plot",
-                "artifact_type": "cluster_profile_barplot",
-                "relative_path": "plots/cluster_profile_barplot__group-easy__alg-optics__space-umap__topfeat-8__toptable-3__sort-cluster_size.png",
-                "absolute_path": "/new/plots/easy_optics.png",
+                "artifact_kind": "table",
+                "artifact_type": "cluster_members",
+                "relative_path": "tables/cluster_members__group-easy__alg-hdbscan__space-raw__label-noise.csv",
+                "absolute_path": "/new/tables/noise.csv",
             },
         ],
     )
@@ -877,10 +919,178 @@ def test_merge_shap_regime_artifact_records_preserves_distinct_inspection_export
     assert len(merged_artifacts) == 3
     assert merged_artifacts["tables/cluster_scores.csv"]["absolute_path"] == "/new/tables/cluster_scores.csv"
     assert (
-        "plots/cluster_profile_barplot__group-easy__alg-hdbscan__space-raw__topfeat-8__toptable-3__sort-cluster_size.png"
+        "tables/cluster_members__group-easy__alg-hdbscan__space-raw__label-cluster_0.csv"
         in merged_artifacts
     )
     assert (
-        "plots/cluster_profile_barplot__group-easy__alg-optics__space-umap__topfeat-8__toptable-3__sort-cluster_size.png"
+        "tables/cluster_members__group-easy__alg-hdbscan__space-raw__label-noise.csv"
         in merged_artifacts
     )
+
+
+def test_build_cluster_shap_profiles_include_noise_and_cluster_metadata():
+    clustered_df, cluster_scores_df = _sample_cluster_export_inputs()
+
+    profile_df = shap_performance_regimes_utils.build_cluster_shap_profiles(
+        clustered_df,
+        cluster_scores_df,
+        performance_group_col="performance_group",
+        shap_cols=["shap__speed", "shap__acceleration"],
+        include_noise=True,
+    )
+
+    assert profile_df["cluster_id"].astype(int).tolist() == [0, 1, -1]
+    assert profile_df["cluster_label"].tolist() == ["cluster_0", "cluster_1", "noise"]
+    assert profile_df["cluster_size"].tolist() == [2, 2, 1]
+    assert profile_df.loc[profile_df["cluster_id"] == 0, "cluster_rank_by_size"].iloc[0] == 1
+    assert profile_df.loc[profile_df["cluster_id"] == 1, "cluster_rank_by_size"].iloc[0] == 2
+    assert pd.isna(profile_df.loc[profile_df["cluster_id"] == -1, "cluster_rank_by_size"].iloc[0])
+    assert profile_df.loc[profile_df["cluster_id"] == 0, "shap__speed"].iloc[0] == pytest.approx(0.7)
+    assert profile_df.loc[profile_df["cluster_id"] == -1, "is_noise"].iloc[0]
+    assert "dominant_feature_name" not in profile_df.columns
+
+
+def test_write_cluster_exports_generates_catalog_member_files_and_artifact_records(tmp_path):
+    clustered_df, cluster_scores_df = _sample_cluster_export_inputs()
+    export_layout = {
+        "cluster_spec_root": tmp_path,
+        "tables_dir": tmp_path / "tables",
+    }
+    export_layout["tables_dir"].mkdir(parents=True)
+
+    outputs = shap_cluster_exports.write_cluster_exports(
+        clustered_df,
+        cluster_scores_df,
+        export_layout=export_layout,
+        performance_metric_col="ml_ade",
+        performance_group_col="performance_group",
+        shap_cols=["shap__speed", "shap__acceleration"],
+    )
+
+    catalog_df = outputs["cluster_catalog_df"]
+    assert catalog_df["cluster_id"].astype(int).tolist() == [0, 1, -1]
+    assert catalog_df["cluster_label"].tolist() == ["cluster_0", "cluster_1", "noise"]
+    assert catalog_df["unique_scene_step_count"].tolist() == [1, 2, 1]
+    assert catalog_df["unique_scene_count"].tolist() == [1, 2, 1]
+
+    member_paths = catalog_df["members_relative_path"].tolist()
+    assert member_paths == [
+        "tables/cluster_members__group-easy__alg-hdbscan__space-raw__label-cluster_0.csv",
+        "tables/cluster_members__group-easy__alg-hdbscan__space-raw__label-cluster_1.csv",
+        "tables/cluster_members__group-easy__alg-hdbscan__space-raw__label-noise.csv",
+    ]
+
+    member_df = pd.read_csv(tmp_path / member_paths[0])
+    assert member_df.columns.tolist() == [
+        "row_id",
+        "data_idx",
+        "outer_fold",
+        "performance_group",
+        "ml_ade",
+        "target_orig",
+        "oof_pred_orig",
+        "scene_id",
+        "scene_path",
+        "scene_ts",
+        "agent_type",
+    ]
+    assert "shap__speed" not in member_df.columns
+    assert "speed" not in member_df.columns
+
+    artifact_types = [artifact["artifact_type"] for artifact in outputs["artifact_records"]]
+    assert artifact_types.count("cluster_catalog") == 1
+    assert artifact_types.count("cluster_shap_profiles") == 1
+    assert artifact_types.count("cluster_members") == 3
+
+
+def test_build_scene_step_key_frame_dedupes_scene_steps_and_falls_back_to_scene_id():
+    scene_df = pd.DataFrame(
+        {
+            "scene_id": ["scene_a", "scene_a", "scene_b", "scene_b"],
+            "scene_ts": [0, 0, 1, 2],
+        }
+    )
+
+    scene_steps_df = shap_cluster_exports.build_scene_step_key_frame(scene_df)
+
+    assert scene_steps_df.to_dict(orient="records") == [
+        {"scene_key": "scene_a", "scene_id": "scene_a", "scene_ts": 0},
+        {"scene_key": "scene_b", "scene_id": "scene_b", "scene_ts": 1},
+        {"scene_key": "scene_b", "scene_id": "scene_b", "scene_ts": 2},
+    ]
+    assert shap_cluster_exports.summarize_scene_steps(scene_df) == {
+        "unique_scene_step_count": 3,
+        "unique_scene_count": 2,
+    }
+
+
+def test_load_cluster_inspection_selection_supports_all_and_explicit_cluster_ids(tmp_path):
+    clustered_df, cluster_scores_df = _sample_cluster_export_inputs()
+    export_layout = {
+        "cluster_spec_root": tmp_path,
+        "tables_dir": tmp_path / "tables",
+    }
+    export_layout["tables_dir"].mkdir(parents=True)
+    outputs = shap_cluster_exports.write_cluster_exports(
+        clustered_df,
+        cluster_scores_df,
+        export_layout=export_layout,
+        performance_metric_col="ml_ade",
+        performance_group_col="performance_group",
+        shap_cols=["shap__speed", "shap__acceleration"],
+    )
+    cluster_assignments_path = export_layout["tables_dir"] / "cluster_assignments.csv"
+    clustered_df.to_csv(cluster_assignments_path, index=False)
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "run_context": {"run_name": "run_a"},
+                "data_context": {"target_col": "ml_ade"},
+                "cluster_spec": {"hash": "abc123"},
+                "artifacts": [
+                    {
+                        "artifact_kind": "table",
+                        "artifact_type": "cluster_assignments",
+                        "relative_path": str(cluster_assignments_path.relative_to(tmp_path)),
+                        "absolute_path": str(cluster_assignments_path.resolve()),
+                    },
+                    *outputs["artifact_records"],
+                ],
+            }
+        )
+    )
+
+    resolved_config = shap_cluster_inspection.resolve_cluster_inspection_config(
+        {
+            "cluster_spec_manifest_path": manifest_path,
+            "performance_group": "easy",
+            "inspection_algorithm": "hdbscan",
+            "inspection_cluster_space": "raw",
+            "cluster_ids": "all",
+            "inspection_top_k_features": 8,
+            "inspection_top_k_table": 3,
+            "sort_cluster_profiles_by": "cluster_size",
+        }
+    )
+    bundle = shap_cluster_inspection.load_cluster_inspection_selection(resolved_config)
+    assert bundle.ordered_cluster_ids == [0, 1, -1]
+    assert bundle.trajectory_feature_cols == ["speed", "acceleration"]
+    assert bundle.scene_metric_cols == ["scene_density", "scene_weather"]
+
+    explicit_config = shap_cluster_inspection.resolve_cluster_inspection_config(
+        {
+            "cluster_spec_manifest_path": manifest_path,
+            "performance_group": "easy",
+            "inspection_algorithm": "hdbscan",
+            "inspection_cluster_space": "raw",
+            "cluster_ids": [1, -1],
+            "inspection_top_k_features": 8,
+            "inspection_top_k_table": 3,
+            "sort_cluster_profiles_by": "cluster_size",
+        }
+    )
+    explicit_bundle = shap_cluster_inspection.load_cluster_inspection_selection(explicit_config)
+    assert explicit_bundle.ordered_cluster_ids == [1, -1]
+    assert explicit_bundle.selected_catalog_df["cluster_id"].astype(int).tolist() == [1, -1]

@@ -10,6 +10,7 @@ NOTEBOOK_NAMES = [
     "interpretable_model_data_preparation.ipynb",
     "model_inference_analysis.ipynb",
     "oof_evaluation.ipynb",
+    "shap_cluster_inspection.ipynb",
     "shap_performance_regimes.ipynb",
     "xgboost.ipynb",
 ]
@@ -44,7 +45,7 @@ def test_data_modelling_notebooks_expose_workflow_structure():
             assert "**Outputs:** " in section and "<br>" in section, f"{notebook_name} should use inline <br> formatting."
 
 
-def test_shap_performance_regimes_notebook_references_split_umap_configuration():
+def test_shap_performance_regimes_notebook_references_export_first_cluster_workflow():
     notebook = json.loads((NOTEBOOK_DIR / "shap_performance_regimes.ipynb").read_text())
     source = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
 
@@ -57,6 +58,27 @@ def test_shap_performance_regimes_notebook_references_split_umap_configuration()
     assert "resolve_shap_regime_export_context" in source
     assert "build_shap_regime_export_layout" in source
     assert "build_shap_regime_artifact_names" in source
+    assert "write_cluster_exports" in source
+    assert "cluster_shap_profiles" in source
+    assert "cluster_catalog" in source
     assert "load_or_initialize_shap_regime_manifest" in source
     assert "merge_shap_regime_artifact_records" in source
     assert "manifest.json" in source
+    assert "INSPECTION_CONFIG" not in source
+    assert "selected_cluster" not in source
+
+
+def test_shap_cluster_inspection_notebook_references_exported_cluster_artifacts():
+    notebook = json.loads((NOTEBOOK_DIR / "shap_cluster_inspection.ipynb").read_text())
+    source = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+
+    assert "INSPECTION_CONFIG" in source
+    assert "cluster_spec_manifest_path" in source
+    assert "cluster_ids" in source
+    assert "resolve_cluster_inspection_config" in source
+    assert "load_cluster_inspection_selection" in source
+    assert "build_cluster_inspection_export_layout" in source
+    assert "plot_candidate_umap_scatter" in source
+    assert "plot_cluster_profile_barplots" in source
+    assert "plot_cluster_profile_heatmap" in source
+    assert "plot_metric_distribution_panels" in source
