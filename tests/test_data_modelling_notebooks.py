@@ -10,6 +10,7 @@ NOTEBOOK_NAMES = [
     "interpretable_model_data_preparation.ipynb",
     "model_inference_analysis.ipynb",
     "oof_evaluation.ipynb",
+    "shap_performance_regimes.ipynb",
     "xgboost.ipynb",
 ]
 SECTION_MARKERS = (

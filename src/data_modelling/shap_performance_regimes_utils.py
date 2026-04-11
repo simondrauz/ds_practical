@@ -1,12 +1,82 @@
 from __future__ import annotations
 
 """Helpers for assembling and clustering run-scoped SHAP regime analysis tables."""
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 import numpy as np
 import pandas as pd
 
 SHAP_PREFIX = "shap__"
+VALID_PERFORMANCE_GROUPS = ("easy", "medium", "hard")
+VALID_CLUSTER_ALGORITHMS = ("hdbscan", "optics")
+VALID_CLUSTER_SPACES = ("raw", "umap")
+VALID_CLUSTER_PROFILE_SORT_KEYS = ("cluster_size", "cluster_rank_by_size")
+
+TRUSTWORTHINESS_COLUMNS = [
+    "performance_group",
+    "n_components",
+    "trustworthiness_view",
+    "trustworthiness_n_neighbors",
+    "trustworthiness",
+    "selected_for_clustering",
+]
+CLUSTER_SHAP_PROFILE_PREFIX_COLUMNS = [
+    "performance_group",
+    "selected_algorithm",
+    "selected_cluster_space",
+    "cluster_id",
+    "cluster_size",
+    "cluster_size_share",
+    "cluster_rank_by_size",
+    "dominant_feature_1",
+    "dominant_abs_shap_1",
+    "dominant_direction_1",
+    "dominant_feature_2",
+    "dominant_abs_shap_2",
+    "dominant_direction_2",
+    "dominant_feature_3",
+    "dominant_abs_shap_3",
+    "dominant_direction_3",
+]
+CLUSTER_SCORE_REQUIRED_COLUMNS = [
+    "performance_group",
+    "algorithm",
+    "cluster_space",
+    "candidate_label_col",
+]
+
+_CLUSTER_SPEC_REQUIRED_KEYS = {
+    "groups",
+    "algorithms",
+    "evaluate_umap_latent_space",
+    "umap_selected_n_components",
+    "trustworthiness_neighbor_values",
+    "cluster_umap_n_neighbors",
+    "cluster_umap_min_dist",
+    "viz_umap_n_neighbors",
+    "viz_umap_min_dist",
+    "random_state",
+    "min_cluster_size",
+    "min_samples",
+    "optics_cluster_method",
+    "optics_xi",
+    "distance_metric",
+}
+_CLUSTER_SPEC_FORBIDDEN_KEYS = {
+    "umap_candidate_dims": "Remove CLUSTER_SPEC['umap_candidate_dims']; the notebook derives candidate dimensions from the SHAP feature count.",
+    "umap_n_neighbors": "Replace CLUSTER_SPEC['umap_n_neighbors'] with explicit 'cluster_umap_n_neighbors' and 'viz_umap_n_neighbors' values.",
+    "umap_min_dist": "Replace CLUSTER_SPEC['umap_min_dist'] with explicit 'cluster_umap_min_dist' and 'viz_umap_min_dist' values.",
+    "trustworthiness_n_neighbors": "Replace CLUSTER_SPEC['trustworthiness_n_neighbors'] with CLUSTER_SPEC['trustworthiness_neighbor_values'].",
+    "min_cluster_size_fraction": "Replace CLUSTER_SPEC['min_cluster_size_fraction'] with an explicit integer CLUSTER_SPEC['min_cluster_size'].",
+    "min_cluster_size_min": "Replace CLUSTER_SPEC['min_cluster_size_min'] with an explicit integer CLUSTER_SPEC['min_cluster_size'].",
+}
+_INSPECTION_CONFIG_REQUIRED_KEYS = {
+    "inspection_algorithm",
+    "inspection_cluster_space",
+    "inspection_top_k_features",
+    "inspection_top_k_table",
+    "sort_cluster_profiles_by",
+}
 
 
 def resolve_raw_metric_col(manifest: dict, target_col: str) -> str:
@@ -20,17 +90,395 @@ def resolve_raw_metric_col(manifest: dict, target_col: str) -> str:
 
 
 def assert_columns_present(df: pd.DataFrame, required_cols: Iterable[str], *, df_name: str) -> None:
+    """Raise a descriptive error when a dataframe misses required columns."""
     missing_cols = [col for col in required_cols if col not in df.columns]
     if missing_cols:
         raise KeyError(f"{df_name} is missing required columns: {missing_cols}")
 
 
 def assert_unique_key(df: pd.DataFrame, key_cols: list[str], *, df_name: str) -> None:
+    """Raise when a dataframe is not unique on the expected merge key."""
     duplicate_count = int(df.duplicated(subset=key_cols).sum())
     if duplicate_count:
         raise ValueError(
             f"{df_name} is not unique on the feature key. Duplicate rows found: {duplicate_count}"
         )
+
+
+def _empty_trustworthiness_df() -> pd.DataFrame:
+    """Return the standard empty trustworthiness table used by the notebook."""
+    return pd.DataFrame(columns=TRUSTWORTHINESS_COLUMNS)
+
+
+def _empty_cluster_shap_profiles_df(shap_cols: list[str]) -> pd.DataFrame:
+    """Return the standard empty selected-cluster profile table."""
+    return pd.DataFrame(columns=CLUSTER_SHAP_PROFILE_PREFIX_COLUMNS + list(shap_cols))
+
+
+def _raise_missing_keys(config_name: str, missing_keys: set[str]) -> None:
+    missing = sorted(missing_keys)
+    raise ValueError(
+        f"{config_name} is missing required keys: {missing}. "
+        "Update the notebook input cell before rerunning."
+    )
+
+
+def _reject_forbidden_keys(config: Mapping[str, Any], *, config_name: str, forbidden_keys: Mapping[str, str]) -> None:
+    """Fail fast when the notebook still uses removed legacy config keys."""
+    for key, message in forbidden_keys.items():
+        if key in config:
+            raise ValueError(f"{config_name}['{key}'] is no longer supported. {message}")
+
+
+def _reject_unknown_keys(config: Mapping[str, Any], *, config_name: str, allowed_keys: set[str]) -> None:
+    """Keep notebook config blocks small and explicit by rejecting stray keys."""
+    unknown_keys = sorted(set(config) - allowed_keys)
+    if unknown_keys:
+        raise ValueError(
+            f"{config_name} contains unsupported keys: {unknown_keys}. "
+            "Keep only the documented notebook inputs."
+        )
+
+
+def _resolve_bool(value: Any, *, config_name: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{config_name} must be True or False, got {value!r}.")
+    return value
+
+
+def _resolve_int(value: Any, *, config_name: str) -> int:
+    if isinstance(value, bool):
+        raise ValueError(f"{config_name} must be an integer, got {value!r}.")
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{config_name} must be an integer, got {value!r}.") from exc
+
+
+def _resolve_positive_int(value: Any, *, config_name: str) -> int:
+    resolved_value = _resolve_int(value, config_name=config_name)
+    if resolved_value < 1:
+        raise ValueError(f"{config_name} must be >= 1, got {resolved_value}.")
+    return resolved_value
+
+
+def _resolve_non_negative_float(value: Any, *, config_name: str) -> float:
+    try:
+        resolved_value = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{config_name} must be a float, got {value!r}.") from exc
+    if resolved_value < 0:
+        raise ValueError(f"{config_name} must be >= 0, got {resolved_value}.")
+    return resolved_value
+
+
+def _resolve_fraction(value: Any, *, config_name: str) -> float:
+    try:
+        resolved_value = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{config_name} must be a float in the open interval (0, 1), got {value!r}.") from exc
+    if not 0 < resolved_value < 1:
+        raise ValueError(f"{config_name} must be in the open interval (0, 1), got {resolved_value}.")
+    return resolved_value
+
+
+def _resolve_non_empty_string(value: Any, *, config_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{config_name} must be a non-empty string, got {value!r}.")
+    return value.strip()
+
+
+def _resolve_choice_sequence(
+    value: Any,
+    *,
+    config_name: str,
+    allowed_values: tuple[str, ...],
+) -> list[str]:
+    if not isinstance(value, (list, tuple)) or not value:
+        raise ValueError(f"{config_name} must be a non-empty list, got {value!r}.")
+
+    resolved_values = [_resolve_non_empty_string(item, config_name=config_name) for item in value]
+    duplicate_values = sorted({item for item in resolved_values if resolved_values.count(item) > 1})
+    if duplicate_values:
+        raise ValueError(f"{config_name} contains duplicates: {duplicate_values}.")
+
+    invalid_values = [item for item in resolved_values if item not in allowed_values]
+    if invalid_values:
+        raise ValueError(
+            f"{config_name} contains unsupported values: {invalid_values}. "
+            f"Expected values drawn from {list(allowed_values)}."
+        )
+    return resolved_values
+
+
+def _resolve_group_specific_positive_ints(
+    value: Any,
+    *,
+    config_name: str,
+    groups: list[str],
+) -> dict[str, int]:
+    """Normalize one scalar-or-per-group notebook input into a full group mapping."""
+    if isinstance(value, Mapping):
+        missing_groups = sorted(set(groups) - set(value))
+        extra_groups = sorted(set(value) - set(groups))
+        if missing_groups:
+            raise ValueError(
+                f"{config_name} is missing per-group values for {missing_groups}. "
+                "Provide one value for every configured performance group."
+            )
+        if extra_groups:
+            raise ValueError(
+                f"{config_name} contains unexpected performance groups: {extra_groups}. "
+                f"Expected groups: {groups}."
+            )
+        return {
+            performance_group: _resolve_positive_int(
+                value[performance_group],
+                config_name=f"{config_name}[{performance_group!r}]",
+            )
+            for performance_group in groups
+        }
+
+    resolved_value = _resolve_positive_int(value, config_name=config_name)
+    return {performance_group: resolved_value for performance_group in groups}
+
+
+def resolve_cluster_spec(
+    cluster_spec: Mapping[str, Any],
+    *,
+    shap_cols: list[str],
+) -> dict[str, Any]:
+    """Validate notebook clustering inputs and derive the internal clustering config.
+
+    The notebook intentionally exposes one small user-editable configuration block.
+    This helper rejects legacy aliases, validates the documented keys, and derives
+    the candidate UMAP dimensions from the loaded SHAP feature columns so every
+    downstream step consumes one explicit, normalized contract.
+    """
+    _reject_forbidden_keys(cluster_spec, config_name="CLUSTER_SPEC", forbidden_keys=_CLUSTER_SPEC_FORBIDDEN_KEYS)
+    missing_keys = _CLUSTER_SPEC_REQUIRED_KEYS - set(cluster_spec)
+    if missing_keys:
+        _raise_missing_keys("CLUSTER_SPEC", missing_keys)
+    _reject_unknown_keys(
+        cluster_spec,
+        config_name="CLUSTER_SPEC",
+        allowed_keys=_CLUSTER_SPEC_REQUIRED_KEYS,
+    )
+
+    groups = _resolve_choice_sequence(
+        cluster_spec["groups"],
+        config_name="CLUSTER_SPEC['groups']",
+        allowed_values=VALID_PERFORMANCE_GROUPS,
+    )
+    algorithms = _resolve_choice_sequence(
+        cluster_spec["algorithms"],
+        config_name="CLUSTER_SPEC['algorithms']",
+        allowed_values=VALID_CLUSTER_ALGORITHMS,
+    )
+    evaluate_umap_latent_space = _resolve_bool(
+        cluster_spec["evaluate_umap_latent_space"],
+        config_name="CLUSTER_SPEC['evaluate_umap_latent_space']",
+    )
+
+    if not shap_cols:
+        raise ValueError("Cannot resolve CLUSTER_SPEC because no SHAP columns were detected in the analysis table.")
+    umap_candidate_dims = list(range(1, len(shap_cols)))
+    if evaluate_umap_latent_space and not umap_candidate_dims:
+        raise ValueError(
+            "CLUSTER_SPEC['evaluate_umap_latent_space']=True requires at least two SHAP feature columns. "
+            "Disable reduced-space clustering or rerun the upstream export with more features."
+        )
+
+    umap_selected_n_components = _resolve_group_specific_positive_ints(
+        cluster_spec["umap_selected_n_components"],
+        config_name="CLUSTER_SPEC['umap_selected_n_components']",
+        groups=groups,
+    )
+    if evaluate_umap_latent_space:
+        invalid_selected_dims = {
+            performance_group: selected_dim
+            for performance_group, selected_dim in umap_selected_n_components.items()
+            if selected_dim not in umap_candidate_dims
+        }
+        if invalid_selected_dims:
+            raise ValueError(
+                "CLUSTER_SPEC['umap_selected_n_components'] contains dimensions outside the derived candidate set. "
+                f"Invalid selections: {invalid_selected_dims}. Valid dims: {umap_candidate_dims}."
+            )
+
+    raw_trustworthiness_values = cluster_spec["trustworthiness_neighbor_values"]
+    if not isinstance(raw_trustworthiness_values, (list, tuple)):
+        raise ValueError(
+            "CLUSTER_SPEC['trustworthiness_neighbor_values'] must be a non-empty list of integers."
+        )
+    trustworthiness_neighbor_values = [
+        _resolve_positive_int(
+            value,
+            config_name=f"CLUSTER_SPEC['trustworthiness_neighbor_values'][{idx}]",
+        )
+        for idx, value in enumerate(raw_trustworthiness_values)
+    ]
+    if not trustworthiness_neighbor_values:
+        raise ValueError("CLUSTER_SPEC['trustworthiness_neighbor_values'] must contain at least one value.")
+
+    optics_cluster_method = _resolve_non_empty_string(
+        cluster_spec["optics_cluster_method"],
+        config_name="CLUSTER_SPEC['optics_cluster_method']",
+    )
+    if optics_cluster_method not in {"xi", "dbscan"}:
+        raise ValueError(
+            "CLUSTER_SPEC['optics_cluster_method'] must be 'xi' or 'dbscan', "
+            f"got {optics_cluster_method!r}."
+        )
+
+    resolved_cluster_spec = {
+        "groups": groups,
+        "algorithms": algorithms,
+        "evaluate_umap_latent_space": evaluate_umap_latent_space,
+        "umap_candidate_dims": umap_candidate_dims,
+        "umap_selected_n_components": umap_selected_n_components,
+        "trustworthiness_neighbor_values": trustworthiness_neighbor_values,
+        "trustworthiness_mean_view": _trustworthiness_mean_view_name(trustworthiness_neighbor_values),
+        "cluster_umap_n_neighbors": _resolve_positive_int(
+            cluster_spec["cluster_umap_n_neighbors"],
+            config_name="CLUSTER_SPEC['cluster_umap_n_neighbors']",
+        ),
+        "cluster_umap_min_dist": _resolve_non_negative_float(
+            cluster_spec["cluster_umap_min_dist"],
+            config_name="CLUSTER_SPEC['cluster_umap_min_dist']",
+        ),
+        "viz_umap_n_neighbors": _resolve_positive_int(
+            cluster_spec["viz_umap_n_neighbors"],
+            config_name="CLUSTER_SPEC['viz_umap_n_neighbors']",
+        ),
+        "viz_umap_min_dist": _resolve_non_negative_float(
+            cluster_spec["viz_umap_min_dist"],
+            config_name="CLUSTER_SPEC['viz_umap_min_dist']",
+        ),
+        "random_state": _resolve_int(
+            cluster_spec["random_state"],
+            config_name="CLUSTER_SPEC['random_state']",
+        ),
+        "min_cluster_size": _resolve_group_specific_positive_ints(
+            cluster_spec["min_cluster_size"],
+            config_name="CLUSTER_SPEC['min_cluster_size']",
+            groups=groups,
+        ),
+        "min_samples": _resolve_group_specific_positive_ints(
+            cluster_spec["min_samples"],
+            config_name="CLUSTER_SPEC['min_samples']",
+            groups=groups,
+        ),
+        "optics_cluster_method": optics_cluster_method,
+        "optics_xi": _resolve_fraction(
+            cluster_spec["optics_xi"],
+            config_name="CLUSTER_SPEC['optics_xi']",
+        ),
+        "distance_metric": _resolve_non_empty_string(
+            cluster_spec["distance_metric"],
+            config_name="CLUSTER_SPEC['distance_metric']",
+        ),
+    }
+    return resolved_cluster_spec
+
+
+def resolve_inspection_config(
+    inspection_config: Mapping[str, Any],
+    *,
+    cluster_spec: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate notebook inspection inputs against the resolved clustering config."""
+    missing_keys = _INSPECTION_CONFIG_REQUIRED_KEYS - set(inspection_config)
+    if missing_keys:
+        _raise_missing_keys("INSPECTION_CONFIG", missing_keys)
+    _reject_unknown_keys(
+        inspection_config,
+        config_name="INSPECTION_CONFIG",
+        allowed_keys=_INSPECTION_CONFIG_REQUIRED_KEYS,
+    )
+
+    inspection_algorithm = _resolve_non_empty_string(
+        inspection_config["inspection_algorithm"],
+        config_name="INSPECTION_CONFIG['inspection_algorithm']",
+    )
+    if inspection_algorithm not in cluster_spec["algorithms"]:
+        raise ValueError(
+            f"INSPECTION_CONFIG['inspection_algorithm']={inspection_algorithm!r} is not enabled in CLUSTER_SPEC['algorithms']={cluster_spec['algorithms']}."
+        )
+
+    inspection_cluster_space = _resolve_non_empty_string(
+        inspection_config["inspection_cluster_space"],
+        config_name="INSPECTION_CONFIG['inspection_cluster_space']",
+    )
+    if inspection_cluster_space not in VALID_CLUSTER_SPACES:
+        raise ValueError(
+            "INSPECTION_CONFIG['inspection_cluster_space'] must be 'raw' or 'umap', "
+            f"got {inspection_cluster_space!r}."
+        )
+    if inspection_cluster_space == "umap" and not cluster_spec["evaluate_umap_latent_space"]:
+        raise ValueError(
+            "INSPECTION_CONFIG['inspection_cluster_space']='umap' requires "
+            "CLUSTER_SPEC['evaluate_umap_latent_space']=True."
+        )
+
+    sort_cluster_profiles_by = _resolve_non_empty_string(
+        inspection_config["sort_cluster_profiles_by"],
+        config_name="INSPECTION_CONFIG['sort_cluster_profiles_by']",
+    )
+    if sort_cluster_profiles_by not in VALID_CLUSTER_PROFILE_SORT_KEYS:
+        raise ValueError(
+            "INSPECTION_CONFIG['sort_cluster_profiles_by'] must be one of "
+            f"{list(VALID_CLUSTER_PROFILE_SORT_KEYS)}, got {sort_cluster_profiles_by!r}."
+        )
+
+    return {
+        "inspection_algorithm": inspection_algorithm,
+        "inspection_cluster_space": inspection_cluster_space,
+        "inspection_top_k_features": _resolve_positive_int(
+            inspection_config["inspection_top_k_features"],
+            config_name="INSPECTION_CONFIG['inspection_top_k_features']",
+        ),
+        "inspection_top_k_table": _resolve_positive_int(
+            inspection_config["inspection_top_k_table"],
+            config_name="INSPECTION_CONFIG['inspection_top_k_table']",
+        ),
+        "sort_cluster_profiles_by": sort_cluster_profiles_by,
+    }
+
+
+def select_inspection_cluster_runs(
+    cluster_scores_df: pd.DataFrame,
+    *,
+    cluster_spec: Mapping[str, Any],
+    inspection_config: Mapping[str, Any],
+) -> pd.DataFrame:
+    """Return the cluster runs inspected in the notebook after validating coverage."""
+    assert_columns_present(
+        cluster_scores_df,
+        CLUSTER_SCORE_REQUIRED_COLUMNS,
+        df_name="cluster scores table",
+    )
+
+    inspected_cluster_runs_df = (
+        cluster_scores_df.loc[
+            (cluster_scores_df["algorithm"] == inspection_config["inspection_algorithm"])
+            & (cluster_scores_df["cluster_space"] == inspection_config["inspection_cluster_space"])
+        ]
+        .copy()
+        .sort_values("performance_group")
+    )
+    available_groups = set(cluster_scores_df["performance_group"])
+    expected_groups = [group for group in cluster_spec["groups"] if group in available_groups]
+    missing_groups = [
+        group for group in expected_groups
+        if group not in set(inspected_cluster_runs_df["performance_group"])
+    ]
+    if missing_groups:
+        raise ValueError(
+            "Inspection selection is missing clustering results for performance groups "
+            f"{missing_groups}. Update INSPECTION_CONFIG or rerun the clustering step."
+        )
+    return inspected_cluster_runs_df
 
 
 def prepare_shap_value_export(
@@ -40,7 +488,12 @@ def prepare_shap_value_export(
     shap_values: np.ndarray,
     base_values: np.ndarray | float | None = None,
 ) -> pd.DataFrame:
-    """Build a run-scoped per-row SHAP export with a stable column contract."""
+    """Build a run-scoped per-row SHAP export with a stable column contract.
+
+    SHAP explainers occasionally return `(n_rows, n_features, 1)` for single-output
+    models. The notebook works with a plain 2D table, so the helper normalizes that
+    edge shape once here and then enforces one row per OOF modelling row.
+    """
     required_cols = feature_cols + ["row_id", "outer_fold", "oof_pred_orig", "target_orig"]
     assert_columns_present(model_df_oof, required_cols, df_name="model_data_with_oof")
 
@@ -89,7 +542,12 @@ def assign_performance_groups(
     *,
     lower_is_better: bool = True,
 ) -> tuple[pd.Series, float, float]:
-    """Assign easy/medium/hard groups from quartile thresholds."""
+    """Assign easy/medium/hard groups from quartile thresholds.
+
+    The notebook defines regimes relative to the empirical performance distribution
+    within the selected run: the best quartile is `easy`, the worst quartile is
+    `hard`, and the middle half is `medium`.
+    """
     if metric_values.isna().any():
         missing_count = int(metric_values.isna().sum())
         raise ValueError(f"Performance metric contains missing values: {missing_count}")
@@ -223,6 +681,7 @@ def assemble_step1_analysis_table(
 
 
 def get_shap_cols(df: pd.DataFrame, *, prefix: str = SHAP_PREFIX) -> list[str]:
+    """Return SHAP columns in dataframe order and fail when none are present."""
     shap_cols = [col for col in df.columns if col.startswith(prefix)]
     if not shap_cols:
         raise ValueError(f"No SHAP columns found with prefix {prefix!r}.")
@@ -230,12 +689,14 @@ def get_shap_cols(df: pd.DataFrame, *, prefix: str = SHAP_PREFIX) -> list[str]:
 
 
 def format_shap_feature_name(shap_col: str, *, prefix: str = SHAP_PREFIX) -> str:
+    """Convert one SHAP column name back to its original feature name."""
     if shap_col.startswith(prefix):
         return shap_col[len(prefix) :]
     return shap_col
 
 
 def _require_step2_dependencies() -> tuple[Any, Any, Any, Any, Any]:
+    """Import clustering dependencies lazily so step 1 stays lightweight."""
     try:
         import hdbscan
         from hdbscan.validity import validity_index
@@ -262,49 +723,31 @@ def _require_step2_dependencies() -> tuple[Any, Any, Any, Any, Any]:
 
     return hdbscan, validity_index, umap, OPTICS, trustworthiness
 
-def _resolve_group_specific_int(
-    value: Any,
-    *,
-    performance_group: str,
-    param_name: str,
-) -> int:
-    if value is None:
-        raise ValueError(
-            f"Missing required CLUSTER_SPEC['{param_name}']. "
-            f"Set it at the top of shap_performance_regimes.ipynb for performance_group={performance_group!r}."
-        )
-    if isinstance(value, dict):
-        selected_value = value.get(performance_group)
-        if selected_value is None:
-            raise ValueError(
-                f"Missing CLUSTER_SPEC['{param_name}'][{performance_group!r}]. "
-                "Provide a value for each configured performance group."
-            )
-        value = selected_value
 
-    resolved_value = int(value)
-    if resolved_value < 1:
-        raise ValueError(
-            f"{param_name} must be >= 1 for performance_group={performance_group!r}, got {resolved_value}."
-        )
-    return resolved_value
+def _get_group_specific_int(cluster_spec: Mapping[str, Any], *, performance_group: str, param_name: str) -> int:
+    """Read a per-group integer from the resolved cluster spec."""
+    return int(cluster_spec[param_name][performance_group])
 
 
 def _clip_umap_candidate_dims(candidate_dims: Iterable[int], *, n_features: int, n_rows: int) -> list[int]:
+    """Keep only reduced dimensions that are mathematically valid for one group."""
     max_dim = min(int(n_features) - 1, int(n_rows) - 1)
     valid_dims = sorted({int(dim) for dim in candidate_dims if 1 <= int(dim) <= max_dim})
     return valid_dims
 
 
 def _effective_neighbor_count(requested_neighbors: int, n_rows: int) -> int:
+    """Clip neighbor counts to the valid range for the available group rows."""
     return max(2, min(int(requested_neighbors), int(n_rows) - 1))
 
 
 def _coerce_label_series(length: int) -> pd.Series:
+    """Create an empty nullable integer label column for cluster assignments."""
     return pd.Series(pd.array([pd.NA] * length, dtype="Int64"))
 
 
 def _compute_dbcv_score(validity_index_fn, X: np.ndarray, labels: np.ndarray) -> tuple[float, bool]:
+    """Compute DBCV and record whether the score is valid for model selection."""
     non_noise_clusters = sorted({int(label) for label in labels if int(label) != -1})
     if len(non_noise_clusters) < 2:
         return float("nan"), False
@@ -316,48 +759,9 @@ def _compute_dbcv_score(validity_index_fn, X: np.ndarray, labels: np.ndarray) ->
         return float("nan"), False
 
 
-def _resolve_manual_umap_dim_selection(
-    selection_config: Any,
-    *,
-    performance_group: str,
-) -> int | None:
-    if selection_config is None:
-        return None
-    if isinstance(selection_config, dict):
-        selected_value = selection_config.get(performance_group)
-        return None if selected_value is None else int(selected_value)
-    return int(selection_config)
-
-
-def _resolve_cluster_umap_n_neighbors(cluster_spec: dict[str, Any]) -> int:
-    return int(cluster_spec.get("cluster_umap_n_neighbors", cluster_spec.get("umap_n_neighbors", 15)))
-
-
-def _resolve_cluster_umap_min_dist(cluster_spec: dict[str, Any]) -> float:
-    return float(cluster_spec.get("cluster_umap_min_dist", cluster_spec.get("umap_min_dist", 0.1)))
-
-
-def _resolve_viz_umap_n_neighbors(cluster_spec: dict[str, Any]) -> int:
-    if "viz_umap_n_neighbors" in cluster_spec:
-        return int(cluster_spec["viz_umap_n_neighbors"])
-    if "umap_n_neighbors" in cluster_spec:
-        return int(cluster_spec["umap_n_neighbors"])
-    return _resolve_cluster_umap_n_neighbors(cluster_spec)
-
-
-def _resolve_viz_umap_min_dist(cluster_spec: dict[str, Any]) -> float:
-    if "viz_umap_min_dist" in cluster_spec:
-        return float(cluster_spec["viz_umap_min_dist"])
-    if "umap_min_dist" in cluster_spec:
-        return float(cluster_spec["umap_min_dist"])
-    return _resolve_cluster_umap_min_dist(cluster_spec)
-
-
 def _resolve_trustworthiness_neighbor_values(cluster_spec: dict[str, Any]) -> list[int]:
-    requested_values = cluster_spec.get("trustworthiness_neighbor_values")
-    if requested_values is None:
-        requested_values = [cluster_spec.get("trustworthiness_n_neighbors", _resolve_cluster_umap_n_neighbors(cluster_spec))]
-    return [int(value) for value in requested_values]
+    """Return the validated trustworthiness neighborhood values from the resolved config."""
+    return [int(value) for value in cluster_spec["trustworthiness_neighbor_values"]]
 
 
 def _trustworthiness_mean_view_name(trustworthiness_neighbor_values: list[int]) -> str:
@@ -372,30 +776,33 @@ def evaluate_umap_dimensions(
     trustworthiness_fn,
     umap_module,
 ) -> tuple[pd.DataFrame, dict[int, np.ndarray]]:
+    """Evaluate every valid reduced dimension for one performance group.
+
+    The same UMAP neighborhood parameters are reused across all candidate
+    dimensions so the trustworthiness curves isolate the effect of dimension
+    count rather than changing multiple hyperparameters at once.
+    """
     candidate_dims = _clip_umap_candidate_dims(
         cluster_spec["umap_candidate_dims"],
         n_features=X.shape[1],
         n_rows=len(X),
     )
     if not candidate_dims:
-        return pd.DataFrame(), {}
+        return _empty_trustworthiness_df(), {}
 
-    n_neighbors = _effective_neighbor_count(_resolve_cluster_umap_n_neighbors(cluster_spec), len(X))
+    n_neighbors = _effective_neighbor_count(cluster_spec["cluster_umap_n_neighbors"], len(X))
     trustworthiness_neighbor_values = _resolve_trustworthiness_neighbor_values(cluster_spec)
-    mean_view_name = _trustworthiness_mean_view_name(trustworthiness_neighbor_values)
+    mean_view_name = str(cluster_spec["trustworthiness_mean_view"])
 
     trust_rows: list[dict[str, Any]] = []
     embeddings: dict[int, np.ndarray] = {}
-    selected_umap_dim = _resolve_manual_umap_dim_selection(
-        cluster_spec.get("umap_selected_n_components"),
-        performance_group=performance_group,
-    )
+    selected_umap_dim = int(cluster_spec["umap_selected_n_components"][performance_group])
 
     for n_components in candidate_dims:
         umap_model = umap_module.UMAP(
             n_components=n_components,
             n_neighbors=n_neighbors,
-            min_dist=_resolve_cluster_umap_min_dist(cluster_spec),
+            min_dist=cluster_spec["cluster_umap_min_dist"],
             random_state=cluster_spec["random_state"],
         )
         embedding = umap_model.fit_transform(X)
@@ -446,11 +853,12 @@ def _compute_visual_umap_embedding(
     cluster_spec: dict[str, Any],
     umap_module,
 ) -> np.ndarray:
-    n_neighbors = _effective_neighbor_count(_resolve_viz_umap_n_neighbors(cluster_spec), len(X))
+    """Build the shared 2D visualization embedding used in notebook plots."""
+    n_neighbors = _effective_neighbor_count(cluster_spec["viz_umap_n_neighbors"], len(X))
     umap_model = umap_module.UMAP(
         n_components=2,
         n_neighbors=n_neighbors,
-        min_dist=_resolve_viz_umap_min_dist(cluster_spec),
+        min_dist=cluster_spec["viz_umap_min_dist"],
         random_state=cluster_spec["random_state"],
     )
     return umap_model.fit_transform(X)
@@ -487,16 +895,7 @@ def evaluate_umap_trustworthiness_by_group(
     return (
         pd.concat(trustworthiness_rows, ignore_index=True)
         if trustworthiness_rows
-        else pd.DataFrame(
-            columns=[
-                "performance_group",
-                "n_components",
-                "trustworthiness_view",
-                "trustworthiness_n_neighbors",
-                "trustworthiness",
-                "selected_for_clustering",
-            ]
-        )
+        else _empty_trustworthiness_df()
     )
 
 
@@ -508,6 +907,7 @@ def _fit_hdbscan_labels(
     metric: str,
     hdbscan_module,
 ) -> np.ndarray:
+    """Fit one HDBSCAN run and return the cluster labels."""
     clusterer = hdbscan_module.HDBSCAN(
         min_cluster_size=min_cluster_size,
         min_samples=min_samples,
@@ -528,6 +928,7 @@ def _fit_optics_labels(
     optics_cls,
     cluster_method: str,
 ) -> np.ndarray:
+    """Fit one OPTICS run and return the cluster labels."""
     clusterer = optics_cls(
         min_samples=min_samples,
         min_cluster_size=min_cluster_size,
@@ -539,10 +940,13 @@ def _fit_optics_labels(
 
 
 def _select_best_group_run(group_scores_df: pd.DataFrame) -> int | None:
+    """Select the best valid clustering run with deterministic tie-breakers."""
     valid_scores_df = group_scores_df.loc[group_scores_df["valid_for_selection"]].copy()
     if valid_scores_df.empty:
         return None
 
+    # Prefer stronger DBCV first, then less noise, then the notebook's fixed
+    # raw-before-UMAP and HDBSCAN-before-OPTICS tie-breakers for reproducibility.
     valid_scores_df["cluster_space_priority"] = valid_scores_df["cluster_space"].map({"raw": 0, "umap": 1}).fillna(99)
     valid_scores_df["algorithm_priority"] = valid_scores_df["algorithm"].map({"hdbscan": 0, "optics": 1}).fillna(99)
     valid_scores_df = valid_scores_df.sort_values(
@@ -553,6 +957,7 @@ def _select_best_group_run(group_scores_df: pd.DataFrame) -> int | None:
 
 
 def _rank_cluster_profiles(summary_df: pd.DataFrame) -> pd.DataFrame:
+    """Rank cluster summaries from largest to smallest cluster."""
     if summary_df.empty:
         return summary_df.copy()
 
@@ -562,6 +967,7 @@ def _rank_cluster_profiles(summary_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _append_dominant_feature_fields(summary_df: pd.DataFrame, *, shap_cols: list[str], top_k: int = 3) -> pd.DataFrame:
+    """Attach top absolute SHAP drivers so tables are readable without scanning all columns."""
     if summary_df.empty:
         return summary_df.copy()
 
@@ -598,6 +1004,7 @@ def _build_selected_cluster_shap_summary(
     selected_cluster_space: str,
     shap_cols: list[str],
 ) -> pd.DataFrame:
+    """Summarize mean signed SHAP values for every non-noise cluster in one group."""
     summary_rows: list[dict[str, Any]] = []
     cluster_ids = sorted({int(label) for label in labels if int(label) != -1})
     group_size = int(len(group_df))
@@ -633,7 +1040,7 @@ def build_cluster_shap_profiles(
     performance_group_col: str = "performance_group",
     shap_cols: list[str] | None = None,
 ) -> pd.DataFrame:
-    """Build cluster SHAP profiles for a user-selected set of cluster runs."""
+    """Build mean signed SHAP profiles for the selected cluster run in each group."""
     shap_cols = shap_cols or get_shap_cols(clustered_df)
     assert_columns_present(
         clustered_df,
@@ -642,7 +1049,7 @@ def build_cluster_shap_profiles(
     )
     assert_columns_present(
         cluster_runs_df,
-        ["performance_group", "algorithm", "cluster_space", "candidate_label_col"],
+        CLUSTER_SCORE_REQUIRED_COLUMNS,
         df_name="cluster run selection table",
     )
 
@@ -669,27 +1076,7 @@ def build_cluster_shap_profiles(
     if summary_frames:
         return pd.concat(summary_frames, ignore_index=True)
 
-    return pd.DataFrame(
-        columns=[
-            "performance_group",
-            "selected_algorithm",
-            "selected_cluster_space",
-            "cluster_id",
-            "cluster_size",
-            "cluster_size_share",
-            "cluster_rank_by_size",
-            "dominant_feature_1",
-            "dominant_abs_shap_1",
-            "dominant_direction_1",
-            "dominant_feature_2",
-            "dominant_abs_shap_2",
-            "dominant_direction_2",
-            "dominant_feature_3",
-            "dominant_abs_shap_3",
-            "dominant_direction_3",
-            *shap_cols,
-        ]
-    )
+    return _empty_cluster_shap_profiles_df(shap_cols)
 
 
 def run_step2_clustering(
@@ -711,15 +1098,12 @@ def run_step2_clustering(
         raise ValueError(f"Clustering cannot proceed with missing SHAP values. Missing cells: {missing_shap_count}")
 
     clustered_df = analysis_df.copy()
-    candidate_label_cols: list[str] = []
     for algorithm in cluster_spec["algorithms"]:
         cluster_col = f"cluster_{algorithm}_raw"
         clustered_df[cluster_col] = _coerce_label_series(len(clustered_df))
-        candidate_label_cols.append(cluster_col)
         if cluster_spec["evaluate_umap_latent_space"]:
             cluster_col = f"cluster_{algorithm}_umap"
             clustered_df[cluster_col] = _coerce_label_series(len(clustered_df))
-            candidate_label_cols.append(cluster_col)
 
     clustered_df["selected_cluster"] = _coerce_label_series(len(clustered_df))
     clustered_df["selected_algorithm"] = pd.Series([pd.NA] * len(clustered_df), dtype="object")
@@ -739,14 +1123,13 @@ def run_step2_clustering(
         X_raw = group_df[shap_cols].to_numpy(dtype=float)
         group_size = len(group_df)
 
-        min_cluster_size = _resolve_group_specific_int(
-            cluster_spec.get("min_cluster_size"),
+        min_cluster_size = _get_group_specific_int(
+            cluster_spec,
             performance_group=performance_group,
             param_name="min_cluster_size",
         )
-
-        min_samples = _resolve_group_specific_int(
-            cluster_spec.get("min_samples"),
+        min_samples = _get_group_specific_int(
+            cluster_spec,
             performance_group=performance_group,
             param_name="min_samples",
         )
@@ -767,9 +1150,10 @@ def run_step2_clustering(
 
         trust_df = pd.DataFrame()
         selected_umap_embedding = None
-        selected_umap_dim = _resolve_manual_umap_dim_selection(
-            cluster_spec.get("umap_selected_n_components"),
+        selected_umap_dim = _get_group_specific_int(
+            cluster_spec,
             performance_group=performance_group,
+            param_name="umap_selected_n_components",
         )
         if cluster_spec["evaluate_umap_latent_space"]:
             trust_df, umap_embeddings = evaluate_umap_dimensions(
@@ -875,16 +1259,7 @@ def run_step2_clustering(
     trustworthiness_df = (
         pd.concat(trustworthiness_rows, ignore_index=True)
         if trustworthiness_rows
-        else pd.DataFrame(
-            columns=[
-                "performance_group",
-                "n_components",
-                "trustworthiness_view",
-                "trustworthiness_n_neighbors",
-                "trustworthiness",
-                "selected_for_clustering",
-            ]
-        )
+        else _empty_trustworthiness_df()
     )
     cluster_scores_df = pd.DataFrame(score_rows).sort_values(
         ["performance_group", "selected_for_group", "dbcv_cluster_space", "algorithm", "cluster_space"],

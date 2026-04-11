@@ -476,13 +476,25 @@ def test_evaluate_umap_trustworthiness_by_group_emits_neighbor_views_and_mean(mo
     )
     cluster_spec = {
         "groups": ["easy"],
-        "umap_candidate_dims": [1, 2],
+        "algorithms": ["hdbscan"],
+        "evaluate_umap_latent_space": True,
         "umap_selected_n_components": {"easy": 2},
+        "trustworthiness_neighbor_values": [5, 10, 15],
         "cluster_umap_n_neighbors": 30,
         "cluster_umap_min_dist": 0.0,
-        "trustworthiness_neighbor_values": [5, 10, 15],
+        "viz_umap_n_neighbors": 15,
+        "viz_umap_min_dist": 0.1,
         "random_state": 42,
+        "min_cluster_size": 5,
+        "min_samples": 5,
+        "optics_cluster_method": "xi",
+        "optics_xi": 0.05,
+        "distance_metric": "euclidean",
     }
+    cluster_spec = shap_performance_regimes_utils.resolve_cluster_spec(
+        cluster_spec,
+        shap_cols=["shap__speed", "shap__heading", "shap__distance"],
+    )
 
     trustworthiness_df = shap_performance_regimes_utils.evaluate_umap_trustworthiness_by_group(
         analysis_df,
@@ -505,6 +517,76 @@ def test_evaluate_umap_trustworthiness_by_group_emits_neighbor_views_and_mean(mo
     assert {(entry["n_neighbors"], entry["min_dist"]) for entry in umap_call_log} == {(30, 0.0)}
 
 
+def test_resolve_cluster_spec_requires_documented_keys():
+    with pytest.raises(ValueError, match="missing required keys"):
+        shap_performance_regimes_utils.resolve_cluster_spec(
+            {
+                "groups": ["easy"],
+                "algorithms": ["hdbscan"],
+            },
+            shap_cols=["shap__speed", "shap__heading"],
+        )
+
+
+def test_resolve_cluster_spec_rejects_invalid_selected_umap_dim():
+    with pytest.raises(ValueError, match="umap_selected_n_components"):
+        shap_performance_regimes_utils.resolve_cluster_spec(
+            {
+                "groups": ["easy"],
+                "algorithms": ["hdbscan"],
+                "evaluate_umap_latent_space": True,
+                "umap_selected_n_components": {"easy": 5},
+                "trustworthiness_neighbor_values": [5, 10, 15],
+                "cluster_umap_n_neighbors": 30,
+                "cluster_umap_min_dist": 0.0,
+                "viz_umap_n_neighbors": 15,
+                "viz_umap_min_dist": 0.1,
+                "random_state": 42,
+                "min_cluster_size": 5,
+                "min_samples": 5,
+                "optics_cluster_method": "xi",
+                "optics_xi": 0.05,
+                "distance_metric": "euclidean",
+            },
+            shap_cols=["shap__speed", "shap__heading", "shap__distance"],
+        )
+
+
+def test_resolve_inspection_config_rejects_umap_space_when_disabled():
+    cluster_spec = shap_performance_regimes_utils.resolve_cluster_spec(
+        {
+            "groups": ["easy"],
+            "algorithms": ["hdbscan"],
+            "evaluate_umap_latent_space": False,
+            "umap_selected_n_components": {"easy": 1},
+            "trustworthiness_neighbor_values": [5, 10, 15],
+            "cluster_umap_n_neighbors": 30,
+            "cluster_umap_min_dist": 0.0,
+            "viz_umap_n_neighbors": 15,
+            "viz_umap_min_dist": 0.1,
+            "random_state": 42,
+            "min_cluster_size": 5,
+            "min_samples": 5,
+            "optics_cluster_method": "xi",
+            "optics_xi": 0.05,
+            "distance_metric": "euclidean",
+        },
+        shap_cols=["shap__speed", "shap__heading"],
+    )
+
+    with pytest.raises(ValueError, match="inspection_cluster_space"):
+        shap_performance_regimes_utils.resolve_inspection_config(
+            {
+                "inspection_algorithm": "hdbscan",
+                "inspection_cluster_space": "umap",
+                "inspection_top_k_features": 8,
+                "inspection_top_k_table": 3,
+                "sort_cluster_profiles_by": "cluster_size",
+            },
+            cluster_spec=cluster_spec,
+        )
+
+
 def test_run_step2_clustering_separates_cluster_and_visual_umap_parameters(monkeypatch):
     umap_call_log: list[dict[str, float]] = []
     _patch_shap_regime_dependencies(monkeypatch, umap_call_log)
@@ -523,20 +605,23 @@ def test_run_step2_clustering_separates_cluster_and_visual_umap_parameters(monke
         "groups": ["easy"],
         "algorithms": ["hdbscan"],
         "evaluate_umap_latent_space": True,
-        "umap_candidate_dims": [2],
         "umap_selected_n_components": {"easy": 2},
+        "trustworthiness_neighbor_values": [5, 10, 15],
         "cluster_umap_n_neighbors": 30,
         "cluster_umap_min_dist": 0.0,
         "viz_umap_n_neighbors": 15,
         "viz_umap_min_dist": 0.1,
-        "trustworthiness_neighbor_values": [5, 10, 15],
         "random_state": 42,
-        "min_cluster_size_fraction": 0.25,
-        "min_cluster_size_min": 2,
+        "min_cluster_size": 10,
+        "min_samples": 10,
         "optics_cluster_method": "xi",
         "optics_xi": 0.05,
         "distance_metric": "euclidean",
     }
+    cluster_spec = shap_performance_regimes_utils.resolve_cluster_spec(
+        cluster_spec,
+        shap_cols=["shap__speed", "shap__heading", "shap__distance"],
+    )
 
     clustering_results = shap_performance_regimes_utils.run_step2_clustering(
         analysis_df,
@@ -545,7 +630,8 @@ def test_run_step2_clustering_separates_cluster_and_visual_umap_parameters(monke
         row_id_col="row_id",
     )
 
-    assert len(umap_call_log) == 2
+    assert len(umap_call_log) == 3
+    assert {"n_components": 1, "n_neighbors": 30, "min_dist": 0.0, "random_state": 42} in umap_call_log
     assert {"n_components": 2, "n_neighbors": 30, "min_dist": 0.0, "random_state": 42} in umap_call_log
     assert {"n_components": 2, "n_neighbors": 15, "min_dist": 0.1, "random_state": 42} in umap_call_log
     assert clustering_results["clustered_df"].loc[0, "viz_umap_x"] == pytest.approx(15.1)
