@@ -8,8 +8,8 @@ from .prepared_data import (
     prepare_dual_target_model_data,
     prepare_single_target_model_data,
 )
-from .shap_cluster_exports import build_scene_step_key_frame, summarize_scene_steps, write_cluster_exports
-from .shap_cluster_inspection import load_cluster_inspection_selection, resolve_cluster_inspection_config
+from .feature_effect_cluster_exports import build_scene_step_key_frame, summarize_scene_steps, write_cluster_exports
+from .feature_effect_pr_cluster_inspection import load_cluster_inspection_selection, resolve_cluster_inspection_config
 from .run_context import (
     ExportedModelInfo,
     RunContext,

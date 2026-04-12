@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Helpers for assembling and clustering run-scoped SHAP regime analysis tables."""
+"""Helpers for assembling and clustering run-scoped feature-effect regime analysis tables."""
 import hashlib
 import json
 import re
@@ -10,7 +10,7 @@ from typing import Any, Iterable, Mapping
 import numpy as np
 import pandas as pd
 
-SHAP_PREFIX = "shap__"
+EFFECT_PREFIX = "effect__"
 VALID_PERFORMANCE_GROUPS = ("easy", "medium", "hard")
 VALID_CLUSTER_ALGORITHMS = ("hdbscan", "optics")
 VALID_CLUSTER_SPACES = ("raw", "umap")
@@ -24,7 +24,7 @@ TRUSTWORTHINESS_COLUMNS = [
     "trustworthiness",
     "selected_for_clustering",
 ]
-CLUSTER_SHAP_PROFILE_PREFIX_COLUMNS = [
+CLUSTER_FEATURE_EFFECT_PROFILE_PREFIX_COLUMNS = [
     "performance_group",
     "algorithm",
     "cluster_space",
@@ -61,7 +61,7 @@ _CLUSTER_SPEC_REQUIRED_KEYS = {
     "distance_metric",
 }
 _CLUSTER_SPEC_FORBIDDEN_KEYS = {
-    "umap_candidate_dims": "Remove CLUSTER_SPEC['umap_candidate_dims']; the notebook derives candidate dimensions from the SHAP feature count.",
+    "umap_candidate_dims": "Remove CLUSTER_SPEC['umap_candidate_dims']; the notebook derives candidate dimensions from the loaded feature-effect columns.",
     "umap_n_neighbors": "Replace CLUSTER_SPEC['umap_n_neighbors'] with explicit 'cluster_umap_n_neighbors' and 'viz_umap_n_neighbors' values.",
     "umap_min_dist": "Replace CLUSTER_SPEC['umap_min_dist'] with explicit 'cluster_umap_min_dist' and 'viz_umap_min_dist' values.",
     "trustworthiness_n_neighbors": "Replace CLUSTER_SPEC['trustworthiness_n_neighbors'] with CLUSTER_SPEC['trustworthiness_neighbor_values'].",
@@ -108,9 +108,9 @@ def _empty_trustworthiness_df() -> pd.DataFrame:
     return pd.DataFrame(columns=TRUSTWORTHINESS_COLUMNS)
 
 
-def _empty_cluster_shap_profiles_df(shap_cols: list[str]) -> pd.DataFrame:
+def _empty_cluster_feature_effect_profiles_df(effect_cols: list[str]) -> pd.DataFrame:
     """Return the standard empty selected-cluster profile table."""
-    return pd.DataFrame(columns=CLUSTER_SHAP_PROFILE_PREFIX_COLUMNS + list(shap_cols))
+    return pd.DataFrame(columns=CLUSTER_FEATURE_EFFECT_PROFILE_PREFIX_COLUMNS + list(effect_cols))
 
 
 def _raise_missing_keys(config_name: str, missing_keys: set[str]) -> None:
@@ -238,11 +238,11 @@ def _build_cluster_spec_readable_slug(cluster_spec: Mapping[str, Any]) -> str:
     )
 
 
-def _default_shap_regime_results_root() -> Path:
-    return Path(__file__).resolve().parents[2] / "results" / "interpretable_model" / "shap_performance_regimes"
+def _default_feature_effect_regime_results_root() -> Path:
+    return Path(__file__).resolve().parents[2] / "results" / "interpretable_model" / "feature_effect_performance_regimes"
 
 
-def resolve_shap_regime_export_context(
+def resolve_feature_effect_regime_export_context(
     *,
     model_id: str,
     run_name: str,
@@ -253,7 +253,7 @@ def resolve_shap_regime_export_context(
     results_root: Path | None = None,
 ) -> dict[str, Any]:
     """Normalize the notebook inputs that change the underlying exported data."""
-    resolved_results_root = (results_root or _default_shap_regime_results_root()).resolve()
+    resolved_results_root = (results_root or _default_feature_effect_regime_results_root()).resolve()
     normalized_target_col = _resolve_non_empty_string(target_col, config_name="target_col")
     normalized_eval_csv_name = _resolve_non_empty_string(eval_csv_name, config_name="eval_csv_name")
     normalized_group_col = _resolve_non_empty_string(
@@ -274,7 +274,8 @@ def resolve_shap_regime_export_context(
             f"group-col-{_sanitize_slug_token(data_context['performance_group_col'])}",
         ]
     )
-    run_root = resolved_results_root / run_name
+    model_root = resolved_results_root / _resolve_non_empty_string(model_id, config_name="model_id")
+    run_root = model_root / run_name
     target_root = run_root / normalized_target_col
     data_context_root = target_root / data_context_slug
     return {
@@ -285,6 +286,7 @@ def resolve_shap_regime_export_context(
         "lower_is_better": data_context["lower_is_better"],
         "performance_group_col": normalized_group_col,
         "results_root": resolved_results_root,
+        "model_root": model_root,
         "run_root": run_root,
         "target_root": target_root,
         "data_context_slug": data_context_slug,
@@ -292,7 +294,7 @@ def resolve_shap_regime_export_context(
     }
 
 
-def build_shap_regime_export_layout(
+def build_feature_effect_regime_export_layout(
     *,
     export_context: Mapping[str, Any],
     cluster_spec: Mapping[str, Any],
@@ -320,12 +322,12 @@ def build_shap_regime_export_layout(
     }
 
 
-def build_shap_regime_artifact_names(
+def build_feature_effect_regime_artifact_names(
     *,
     cluster_spec: Mapping[str, Any],
     inspection_config: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Return stable filenames for every exported SHAP regime artifact."""
+    """Return stable filenames for every exported feature-effect regime artifact."""
     trustworthiness_views = [
         *(f"nn_{int(value)}" for value in cluster_spec["trustworthiness_neighbor_values"]),
         str(cluster_spec["trustworthiness_mean_view"]),
@@ -337,8 +339,9 @@ def build_shap_regime_artifact_names(
             "umap_trustworthiness": "umap_trustworthiness.csv",
             "cluster_scores": "cluster_scores.csv",
             "cluster_assignments": "cluster_assignments.csv",
-            "cluster_shap_profiles": "cluster_shap_profiles.csv",
+            "cluster_feature_effect_profiles": "cluster_feature_effect_profiles.csv",
             "cluster_catalog": "cluster_catalog.csv",
+            "feature_effect_global_ranking": "feature_effect_global_ranking.csv",
         },
         "plots": {
             "raw_algorithm_comparison_grid": "algorithm_comparison_grid__space-raw.png",
@@ -353,7 +356,7 @@ def build_shap_regime_artifact_names(
     }
 
 
-def load_or_initialize_shap_regime_manifest(
+def load_or_initialize_feature_effect_regime_manifest(
     manifest_path: Path,
     *,
     run_context: Mapping[str, Any] | None = None,
@@ -375,7 +378,7 @@ def load_or_initialize_shap_regime_manifest(
     return manifest_data
 
 
-def merge_shap_regime_artifact_records(
+def merge_feature_effect_regime_artifact_records(
     manifest_data: Mapping[str, Any],
     *,
     artifact_records: Iterable[Mapping[str, Any]],
@@ -464,13 +467,13 @@ def _resolve_group_specific_positive_ints(
 def resolve_cluster_spec(
     cluster_spec: Mapping[str, Any],
     *,
-    shap_cols: list[str],
+    effect_cols: list[str],
 ) -> dict[str, Any]:
     """Validate notebook clustering inputs and derive the internal clustering config.
 
     The notebook intentionally exposes one small user-editable configuration block.
     This helper rejects legacy aliases, validates the documented keys, and derives
-    the candidate UMAP dimensions from the loaded SHAP feature columns so every
+    the candidate UMAP dimensions from the loaded feature-effect columns so every
     downstream step consumes one explicit, normalized contract.
     """
     _reject_forbidden_keys(cluster_spec, config_name="CLUSTER_SPEC", forbidden_keys=_CLUSTER_SPEC_FORBIDDEN_KEYS)
@@ -498,12 +501,14 @@ def resolve_cluster_spec(
         config_name="CLUSTER_SPEC['evaluate_umap_latent_space']",
     )
 
-    if not shap_cols:
-        raise ValueError("Cannot resolve CLUSTER_SPEC because no SHAP columns were detected in the analysis table.")
-    umap_candidate_dims = list(range(1, len(shap_cols)))
+    if not effect_cols:
+        raise ValueError(
+            "Cannot resolve CLUSTER_SPEC because no feature-effect columns were detected in the analysis table."
+        )
+    umap_candidate_dims = list(range(1, len(effect_cols)))
     if evaluate_umap_latent_space and not umap_candidate_dims:
         raise ValueError(
-            "CLUSTER_SPEC['evaluate_umap_latent_space']=True requires at least two SHAP feature columns. "
+            "CLUSTER_SPEC['evaluate_umap_latent_space']=True requires at least two feature-effect columns. "
             "Disable reduced-space clustering or rerun the upstream export with more features."
         )
 
@@ -699,42 +704,37 @@ def select_inspection_cluster_runs(
     return inspected_cluster_runs_df
 
 
-def prepare_shap_value_export(
+def prepare_feature_effect_export(
     *,
     model_df_oof: pd.DataFrame,
     feature_cols: list[str],
-    shap_values: np.ndarray,
+    effect_values: np.ndarray,
     base_values: np.ndarray | float | None = None,
 ) -> pd.DataFrame:
-    """Build a run-scoped per-row SHAP export with a stable column contract.
-
-    SHAP explainers occasionally return `(n_rows, n_features, 1)` for single-output
-    models. The notebook works with a plain 2D table, so the helper normalizes that
-    edge shape once here and then enforces one row per OOF modelling row.
-    """
+    """Build a run-scoped per-row feature-effect export with a stable column contract."""
     required_cols = feature_cols + ["row_id", "outer_fold", "oof_pred_orig", "target_orig"]
     assert_columns_present(model_df_oof, required_cols, df_name="model_data_with_oof")
 
-    shap_array = np.asarray(shap_values)
-    if shap_array.ndim == 3 and shap_array.shape[-1] == 1:
-        shap_array = shap_array[..., 0]
-    if shap_array.ndim != 2:
+    effect_array = np.asarray(effect_values)
+    if effect_array.ndim == 3 and effect_array.shape[-1] == 1:
+        effect_array = effect_array[..., 0]
+    if effect_array.ndim != 2:
         raise ValueError(
-            f"Expected SHAP values to be 2D after normalization, got shape={shap_array.shape}"
+            f"Expected feature effects to be 2D after normalization, got shape={effect_array.shape}"
         )
     expected_shape = (len(model_df_oof), len(feature_cols))
-    if shap_array.shape != expected_shape:
+    if effect_array.shape != expected_shape:
         raise ValueError(
-            "SHAP values shape does not match the OOF modelling table. "
-            f"expected={expected_shape}, actual={shap_array.shape}"
+            "Feature effects shape does not match the OOF modelling table. "
+            f"expected={expected_shape}, actual={effect_array.shape}"
         )
 
-    shap_col_names = [f"shap__{feature}" for feature in feature_cols]
-    shap_export_df = model_df_oof[feature_cols + ["row_id", "outer_fold", "oof_pred_orig", "target_orig"]].copy()
-    shap_export_df = pd.concat(
+    effect_col_names = [f"{EFFECT_PREFIX}{feature}" for feature in feature_cols]
+    effect_export_df = model_df_oof[feature_cols + ["row_id", "outer_fold", "oof_pred_orig", "target_orig"]].copy()
+    effect_export_df = pd.concat(
         [
-            shap_export_df.reset_index(drop=True),
-            pd.DataFrame(shap_array, columns=shap_col_names),
+            effect_export_df.reset_index(drop=True),
+            pd.DataFrame(effect_array, columns=effect_col_names),
         ],
         axis=1,
     )
@@ -742,17 +742,135 @@ def prepare_shap_value_export(
     if base_values is not None:
         base_array = np.asarray(base_values)
         if base_array.ndim == 0:
-            shap_export_df["shap_base_value"] = float(base_array)
+            effect_export_df["effect_base_value"] = float(base_array)
         else:
             base_array = base_array.reshape(-1)
             if len(base_array) != len(model_df_oof):
                 raise ValueError(
-                    "SHAP base values length does not match the OOF modelling table. "
+                    "Feature-effect base values length does not match the OOF modelling table. "
                     f"expected={len(model_df_oof)}, actual={len(base_array)}"
                 )
-            shap_export_df["shap_base_value"] = base_array
+            effect_export_df["effect_base_value"] = base_array
 
-    return shap_export_df
+    return effect_export_df
+
+
+def compute_gam_feature_effects(
+    *,
+    model: Any,
+    X_scaled: np.ndarray,
+    feature_cols: list[str],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return per-feature GAM term contributions and intercept/base values on the link scale."""
+    X_scaled_array = np.asarray(X_scaled, dtype=float)
+    if X_scaled_array.ndim != 2:
+        raise ValueError(f"Expected X_scaled to be 2D, got shape={X_scaled_array.shape}")
+    if X_scaled_array.shape[1] != len(feature_cols):
+        raise ValueError(
+            "Scaled feature matrix width does not match feature_cols. "
+            f"expected={len(feature_cols)}, actual={X_scaled_array.shape[1]}"
+        )
+
+    expected_term_count = len(feature_cols) + 1
+    if len(model.terms) != expected_term_count:
+        raise ValueError(
+            "Expected one GAM term per feature plus one intercept. "
+            f"expected={expected_term_count}, actual={len(model.terms)}"
+        )
+
+    model_matrix = model._modelmat(X_scaled_array)
+    effect_array = np.empty((len(X_scaled_array), len(feature_cols)), dtype=float)
+    for feature_idx, feature_name in enumerate(feature_cols):
+        term = model.terms[feature_idx]
+        if getattr(term, "isintercept", False):
+            raise ValueError(f"Unexpected intercept term at feature index {feature_idx}.")
+        term_feature = getattr(term, "feature", feature_idx)
+        if term_feature is not None and int(term_feature) != feature_idx:
+            raise ValueError(
+                "GAM term ordering no longer matches feature_cols. "
+                f"feature={feature_name!r}, expected_index={feature_idx}, term_feature={term_feature}"
+            )
+        coef_indices = model.terms.get_coef_indices(feature_idx)
+        effect_array[:, feature_idx] = np.asarray(
+            model_matrix[:, coef_indices].dot(model.coef_[coef_indices]),
+            dtype=float,
+        ).reshape(-1)
+
+    intercept_term_idx = len(feature_cols)
+    intercept_term = model.terms[intercept_term_idx]
+    if not getattr(intercept_term, "isintercept", False):
+        raise ValueError("Expected the final GAM term to be the intercept.")
+    intercept_coef_indices = model.terms.get_coef_indices(intercept_term_idx)
+    base_values = np.asarray(
+        model_matrix[:, intercept_coef_indices].dot(model.coef_[intercept_coef_indices]),
+        dtype=float,
+    ).reshape(-1)
+
+    linear_predictor = np.asarray(model._linear_predictor(X_scaled_array), dtype=float).reshape(-1)
+    reconstructed = base_values + effect_array.sum(axis=1)
+    if not np.allclose(reconstructed, linear_predictor, rtol=1e-9, atol=1e-9):
+        max_abs_error = float(np.max(np.abs(reconstructed - linear_predictor)))
+        raise ValueError(
+            "Computed GAM feature effects do not reconstruct the link-scale predictor. "
+            f"max_abs_error={max_abs_error}"
+        )
+
+    return effect_array, base_values
+
+
+def build_feature_effect_importance_table(
+    *,
+    model_id: str,
+    feature_cols: list[str],
+    effect_values: np.ndarray | None = None,
+    p_values: np.ndarray | None = None,
+) -> pd.DataFrame:
+    """Build the unified global feature-effect ranking table for one model family."""
+    if model_id == "xgboost":
+        if effect_values is None:
+            raise ValueError("XGBoost feature-effect importance requires effect_values.")
+        effect_array = np.asarray(effect_values, dtype=float)
+        expected_shape = (effect_array.shape[0], len(feature_cols))
+        if effect_array.ndim != 2 or effect_array.shape[1] != len(feature_cols):
+            raise ValueError(
+                "XGBoost effect_values must be a 2D array with one column per feature. "
+                f"expected second dimension={len(feature_cols)}, actual_shape={effect_array.shape}"
+            )
+        importance_df = pd.DataFrame(
+            {
+                "feature": feature_cols,
+                "mean_abs_shap": np.abs(effect_array).mean(axis=0),
+                "importance_metric": "mean_abs_shap",
+                "importance_value": np.abs(effect_array).mean(axis=0),
+                "importance_ascending": False,
+            }
+        ).sort_values(["importance_value", "feature"], ascending=[False, True]).reset_index(drop=True)
+    elif model_id == "gam":
+        if p_values is None:
+            raise ValueError("GAM feature-effect importance requires p_values.")
+        p_value_array = np.asarray(p_values, dtype=float).reshape(-1)
+        if len(p_value_array) != len(feature_cols):
+            raise ValueError(
+                "GAM p_values length does not match feature_cols. "
+                f"expected={len(feature_cols)}, actual={len(p_value_array)}"
+            )
+        bounded_p_values = np.maximum(p_value_array, 1e-300)
+        importance_df = pd.DataFrame(
+            {
+                "feature": feature_cols,
+                "p_value": p_value_array,
+                "neg_log10_p_value": -np.log10(bounded_p_values),
+                "significant_0_05": p_value_array < 0.05,
+                "importance_metric": "p_value",
+                "importance_value": p_value_array,
+                "importance_ascending": True,
+            }
+        ).sort_values(["importance_value", "feature"], ascending=[True, True]).reset_index(drop=True)
+    else:
+        raise NotImplementedError(f"Feature-effect importance is not implemented yet for model_id={model_id!r}.")
+
+    importance_df.insert(1, "global_rank", np.arange(1, len(importance_df) + 1, dtype=int))
+    return importance_df
 
 
 def assign_performance_groups(
@@ -819,26 +937,26 @@ def assemble_step1_analysis_table(
     *,
     prepared_model_df: pd.DataFrame,
     joined_metrics_df: pd.DataFrame,
-    shap_values_df: pd.DataFrame,
+    feature_effects_df: pd.DataFrame,
     feature_cols: list[str],
     target_col: str,
     performance_metric_col: str,
     lower_is_better: bool = True,
     performance_group_col: str = "performance_group",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Join prepared rows, run metrics, and SHAP exports into one analysis table."""
+    """Join prepared rows, run metrics, and feature-effect exports into one analysis table."""
     key_cols = list(feature_cols)
     assert_columns_present(prepared_model_df, key_cols + [target_col], df_name="prepared data")
     assert_columns_present(joined_metrics_df, key_cols + [performance_metric_col], df_name="joined metrics")
 
-    shap_required_cols = key_cols + ["row_id", "outer_fold", "oof_pred_orig", "target_orig"]
-    assert_columns_present(shap_values_df, shap_required_cols, df_name="SHAP export")
-    expected_shap_cols = [f"shap__{feature}" for feature in feature_cols]
-    assert_columns_present(shap_values_df, expected_shap_cols, df_name="SHAP export")
+    effect_required_cols = key_cols + ["row_id", "outer_fold", "oof_pred_orig", "target_orig"]
+    assert_columns_present(feature_effects_df, effect_required_cols, df_name="feature-effect export")
+    expected_effect_cols = [f"{EFFECT_PREFIX}{feature}" for feature in feature_cols]
+    assert_columns_present(feature_effects_df, expected_effect_cols, df_name="feature-effect export")
 
     assert_unique_key(prepared_model_df, key_cols, df_name="prepared data")
     assert_unique_key(joined_metrics_df, key_cols, df_name="joined metrics")
-    assert_unique_key(shap_values_df, key_cols, df_name="SHAP export")
+    assert_unique_key(feature_effects_df, key_cols, df_name="feature-effect export")
 
     joined_metric_cols = [col for col in joined_metrics_df.columns if col not in key_cols]
     analysis_df = prepared_model_df.merge(
@@ -857,29 +975,29 @@ def assemble_step1_analysis_table(
         )
     analysis_df = analysis_df.drop(columns=["_metrics_merge"])
 
-    shap_merge_cols = [col for col in shap_values_df.columns if col not in key_cols]
-    overlapping_cols = sorted(set(shap_merge_cols) & set(analysis_df.columns))
+    effect_merge_cols = [col for col in feature_effects_df.columns if col not in key_cols]
+    overlapping_cols = sorted(set(effect_merge_cols) & set(analysis_df.columns))
     if overlapping_cols:
         raise ValueError(
-            "SHAP export has overlapping non-key columns with the prepared/metrics merge. "
+            "Feature-effect export has overlapping non-key columns with the prepared/metrics merge. "
             f"Overlaps: {overlapping_cols}"
         )
 
     analysis_df = analysis_df.merge(
-        shap_values_df[key_cols + shap_merge_cols],
+        feature_effects_df[key_cols + effect_merge_cols],
         on=key_cols,
         how="left",
         validate="one_to_one",
-        indicator="_shap_merge",
+        indicator="_feature_effect_merge",
         sort=False,
     )
-    shap_mismatch_count = int((analysis_df["_shap_merge"] != "both").sum())
-    if shap_mismatch_count:
+    effect_mismatch_count = int((analysis_df["_feature_effect_merge"] != "both").sum())
+    if effect_mismatch_count:
         raise ValueError(
-            "Prepared rows could not be fully aligned back to the SHAP export. "
-            f"Unmatched rows: {shap_mismatch_count}"
+            "Prepared rows could not be fully aligned back to the feature-effect export. "
+            f"Unmatched rows: {effect_mismatch_count}"
         )
-    analysis_df = analysis_df.drop(columns=["_shap_merge"])
+    analysis_df = analysis_df.drop(columns=["_feature_effect_merge"])
 
     performance_groups, q25, q75 = assign_performance_groups(
         analysis_df[performance_metric_col],
@@ -898,19 +1016,19 @@ def assemble_step1_analysis_table(
     return analysis_df, group_summary_df
 
 
-def get_shap_cols(df: pd.DataFrame, *, prefix: str = SHAP_PREFIX) -> list[str]:
-    """Return SHAP columns in dataframe order and fail when none are present."""
-    shap_cols = [col for col in df.columns if col.startswith(prefix)]
-    if not shap_cols:
-        raise ValueError(f"No SHAP columns found with prefix {prefix!r}.")
-    return shap_cols
+def get_effect_cols(df: pd.DataFrame, *, prefix: str = EFFECT_PREFIX) -> list[str]:
+    """Return effect columns in dataframe order and fail when none are present."""
+    effect_cols = [col for col in df.columns if col.startswith(prefix)]
+    if not effect_cols:
+        raise ValueError(f"No feature-effect columns found with prefix {prefix!r}.")
+    return effect_cols
 
 
-def format_shap_feature_name(shap_col: str, *, prefix: str = SHAP_PREFIX) -> str:
-    """Convert one SHAP column name back to its original feature name."""
-    if shap_col.startswith(prefix):
-        return shap_col[len(prefix) :]
-    return shap_col
+def format_effect_feature_name(effect_col: str, *, prefix: str = EFFECT_PREFIX) -> str:
+    """Convert one effect column name back to its original feature name."""
+    if effect_col.startswith(prefix):
+        return effect_col[len(prefix) :]
+    return effect_col
 
 
 def _require_step2_dependencies() -> tuple[Any, Any, Any, Any, Any]:
@@ -1087,19 +1205,19 @@ def evaluate_umap_trustworthiness_by_group(
     *,
     cluster_spec: dict[str, Any],
     performance_group_col: str = "performance_group",
-    shap_cols: list[str] | None = None,
+    effect_cols: list[str] | None = None,
 ) -> pd.DataFrame:
     """Evaluate UMAP trustworthiness over candidate dimensions for each performance group."""
     _, _, umap_module, _, trustworthiness_fn = _require_step2_dependencies()
 
-    shap_cols = shap_cols or get_shap_cols(analysis_df)
-    assert_columns_present(analysis_df, [performance_group_col] + shap_cols, df_name="regime analysis table")
+    effect_cols = effect_cols or get_effect_cols(analysis_df)
+    assert_columns_present(analysis_df, [performance_group_col] + effect_cols, df_name="regime analysis table")
 
     trustworthiness_rows: list[pd.DataFrame] = []
     groups = [group for group in cluster_spec["groups"] if group in set(analysis_df[performance_group_col])]
     for performance_group in groups:
         group_df = analysis_df.loc[analysis_df[performance_group_col] == performance_group].copy()
-        X_raw = group_df[shap_cols].to_numpy(dtype=float)
+        X_raw = group_df[effect_cols].to_numpy(dtype=float)
         trust_df, _ = evaluate_umap_dimensions(
             X_raw,
             performance_group=performance_group,
@@ -1201,7 +1319,7 @@ def _cluster_label(cluster_id: int) -> str:
     return "noise" if int(cluster_id) == -1 else f"cluster_{int(cluster_id)}"
 
 
-def _build_cluster_shap_summary(
+def _build_cluster_feature_effect_summary(
     group_df: pd.DataFrame,
     *,
     labels: np.ndarray,
@@ -1209,10 +1327,10 @@ def _build_cluster_shap_summary(
     algorithm: str,
     cluster_space: str,
     candidate_label_col: str,
-    shap_cols: list[str],
+    effect_cols: list[str],
     include_noise: bool,
 ) -> pd.DataFrame:
-    """Summarize mean signed SHAP values for every cluster in one candidate run."""
+    """Summarize mean signed feature effects for every cluster in one candidate run."""
     summary_rows: list[dict[str, Any]] = []
     cluster_ids = sorted({int(label) for label in labels if include_noise or int(label) != -1})
     group_size = int(len(group_df))
@@ -1233,8 +1351,8 @@ def _build_cluster_shap_summary(
             "cluster_size": cluster_size,
             "cluster_size_share": float(cluster_size / group_size),
         }
-        for shap_col in shap_cols:
-            row[shap_col] = float(cluster_rows[shap_col].mean())
+        for effect_col in effect_cols:
+            row[effect_col] = float(cluster_rows[effect_col].mean())
         summary_rows.append(row)
 
     summary_df = pd.DataFrame(summary_rows)
@@ -1248,19 +1366,19 @@ def _build_cluster_shap_summary(
     ).reset_index(drop=True)
 
 
-def build_cluster_shap_profiles(
+def build_cluster_feature_effect_profiles(
     clustered_df: pd.DataFrame,
     cluster_runs_df: pd.DataFrame,
     *,
     performance_group_col: str = "performance_group",
-    shap_cols: list[str] | None = None,
+    effect_cols: list[str] | None = None,
     include_noise: bool = False,
 ) -> pd.DataFrame:
-    """Build mean signed SHAP profiles for one or more candidate cluster runs."""
-    shap_cols = shap_cols or get_shap_cols(clustered_df)
+    """Build mean signed feature-effect profiles for one or more candidate cluster runs."""
+    effect_cols = effect_cols or get_effect_cols(clustered_df)
     assert_columns_present(
         clustered_df,
-        [performance_group_col] + shap_cols,
+        [performance_group_col] + effect_cols,
         df_name="cluster assignment table",
     )
     assert_columns_present(
@@ -1278,14 +1396,14 @@ def build_cluster_shap_profiles(
 
         group_df = clustered_df.loc[clustered_df[performance_group_col] == performance_group].copy()
         labels = group_df[label_col].to_numpy(dtype="int64")
-        summary_df = _build_cluster_shap_summary(
+        summary_df = _build_cluster_feature_effect_summary(
             group_df,
             labels=labels,
             performance_group=performance_group,
             algorithm=str(cluster_run["algorithm"]),
             cluster_space=str(cluster_run["cluster_space"]),
             candidate_label_col=label_col,
-            shap_cols=shap_cols,
+            effect_cols=effect_cols,
             include_noise=include_noise,
         )
         if not summary_df.empty:
@@ -1298,7 +1416,7 @@ def build_cluster_shap_profiles(
             na_position="last",
         ).reset_index(drop=True)
 
-    return _empty_cluster_shap_profiles_df(shap_cols)
+    return _empty_cluster_feature_effect_profiles_df(effect_cols)
 
 
 def run_step2_clustering(
@@ -1307,17 +1425,23 @@ def run_step2_clustering(
     cluster_spec: dict[str, Any],
     performance_group_col: str = "performance_group",
     row_id_col: str = "row_id",
-    shap_cols: list[str] | None = None,
+    effect_cols: list[str] | None = None,
 ) -> dict[str, pd.DataFrame]:
-    """Cluster SHAP rows within each performance group and return notebook-friendly artifacts."""
+    """Cluster feature-effect rows within each performance group and return notebook-friendly artifacts."""
     hdbscan_module, validity_index_fn, umap_module, optics_cls, trustworthiness_fn = _require_step2_dependencies()
 
-    shap_cols = shap_cols or get_shap_cols(analysis_df)
-    assert_columns_present(analysis_df, [performance_group_col, row_id_col] + shap_cols, df_name="regime analysis table")
+    effect_cols = effect_cols or get_effect_cols(analysis_df)
+    assert_columns_present(
+        analysis_df,
+        [performance_group_col, row_id_col] + effect_cols,
+        df_name="regime analysis table",
+    )
 
-    missing_shap_count = int(analysis_df[shap_cols].isna().sum().sum())
-    if missing_shap_count:
-        raise ValueError(f"Clustering cannot proceed with missing SHAP values. Missing cells: {missing_shap_count}")
+    missing_effect_count = int(analysis_df[effect_cols].isna().sum().sum())
+    if missing_effect_count:
+        raise ValueError(
+            f"Clustering cannot proceed with missing feature effects. Missing cells: {missing_effect_count}"
+        )
 
     clustered_df = analysis_df.copy()
     for algorithm in cluster_spec["algorithms"]:
@@ -1338,7 +1462,7 @@ def run_step2_clustering(
     for performance_group in groups:
         group_mask = clustered_df[performance_group_col] == performance_group
         group_df = clustered_df.loc[group_mask].copy()
-        X_raw = group_df[shap_cols].to_numpy(dtype=float)
+        X_raw = group_df[effect_cols].to_numpy(dtype=float)
         group_size = len(group_df)
 
         min_cluster_size = _get_group_specific_int(
@@ -1424,7 +1548,7 @@ def run_step2_clustering(
                 noise_count = int((labels == -1).sum())
                 clustered_count = int((labels != -1).sum())
                 dbcv_cluster_space, valid_for_selection = _compute_dbcv_score(validity_index_fn, X_space, labels)
-                dbcv_raw_shap_space, valid_for_raw_shap_evaluation = _compute_dbcv_score(validity_index_fn, X_raw, labels)
+                dbcv_raw_effect_space, valid_for_raw_effect_evaluation = _compute_dbcv_score(validity_index_fn, X_raw, labels)
                 group_score_row_ids.append(score_row_id)
                 score_rows.append(
                     {
@@ -1447,9 +1571,9 @@ def run_step2_clustering(
                         "clustered_fraction": float(clustered_count / group_size),
                         "dbcv": dbcv_cluster_space,
                         "dbcv_cluster_space": dbcv_cluster_space,
-                        "dbcv_raw_shap_space": dbcv_raw_shap_space,
+                        "dbcv_raw_effect_space": dbcv_raw_effect_space,
                         "valid_for_selection": bool(valid_for_selection),
-                        "valid_for_raw_shap_evaluation": bool(valid_for_raw_shap_evaluation),
+                        "valid_for_raw_effect_evaluation": bool(valid_for_raw_effect_evaluation),
                         "selected_for_group": False,
                     }
                 )
@@ -1476,11 +1600,11 @@ def run_step2_clustering(
         ["performance_group", "selected_for_group", "dbcv_cluster_space", "algorithm", "cluster_space"],
         ascending=[True, False, False, True, True],
     )
-    cluster_shap_profiles_df = build_cluster_shap_profiles(
+    cluster_feature_effect_profiles_df = build_cluster_feature_effect_profiles(
         clustered_df,
         cluster_scores_df,
         performance_group_col=performance_group_col,
-        shap_cols=shap_cols,
+        effect_cols=effect_cols,
         include_noise=True,
     )
 
@@ -1488,6 +1612,6 @@ def run_step2_clustering(
         "clustered_df": clustered_df,
         "trustworthiness_df": trustworthiness_df,
         "cluster_scores_df": cluster_scores_df,
-        "cluster_shap_summary_df": cluster_shap_profiles_df,
-        "cluster_shap_profiles_df": cluster_shap_profiles_df,
+        "cluster_feature_effect_summary_df": cluster_feature_effect_profiles_df,
+        "cluster_feature_effect_profiles_df": cluster_feature_effect_profiles_df,
     }

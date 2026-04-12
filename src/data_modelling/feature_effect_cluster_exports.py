@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-"""Write lean per-cluster exports for downstream SHAP inspection notebooks.
+"""Write lean per-cluster exports for downstream feature-effect inspection notebooks.
 
 The full `cluster_assignments.csv` remains the authoritative export because it
-already contains the joined metrics, feature columns, SHAP columns, UMAP
+already contains the joined metrics, feature columns, effect columns, UMAP
 coordinates, and every candidate label column. Per-cluster member files are
 kept intentionally slim so candidate-wide exports stay readable and do not
 duplicate the full assignment table many times.
@@ -15,10 +15,13 @@ from typing import Any, Mapping
 
 import pandas as pd
 
-from data_modelling.shap_performance_regimes_utils import build_cluster_shap_profiles, get_shap_cols
+from data_modelling.feature_effect_performance_regimes_utils import (
+    build_cluster_feature_effect_profiles,
+    get_effect_cols,
+)
 
 CLUSTER_CATALOG_FILENAME = "cluster_catalog.csv"
-CLUSTER_SHAP_PROFILES_FILENAME = "cluster_shap_profiles.csv"
+CLUSTER_FEATURE_EFFECT_PROFILES_FILENAME = "cluster_feature_effect_profiles.csv"
 CLUSTER_MEMBER_FILENAME_TEMPLATE = (
     "cluster_members__group-{performance_group}__alg-{algorithm}__space-{cluster_space}__label-{cluster_label}.csv"
 )
@@ -134,24 +137,24 @@ def write_cluster_exports(
     export_layout: Mapping[str, Path],
     performance_metric_col: str,
     performance_group_col: str = "performance_group",
-    shap_cols: list[str] | None = None,
+    effect_cols: list[str] | None = None,
 ) -> dict[str, Any]:
     """Write candidate-wide cluster exports for downstream inspection notebooks."""
 
-    shap_cols = shap_cols or get_shap_cols(clustered_df)
+    effect_cols = effect_cols or get_effect_cols(clustered_df)
     tables_dir = Path(export_layout["tables_dir"])
     cluster_spec_root = Path(export_layout["cluster_spec_root"])
-    cluster_shap_profiles_path = tables_dir / CLUSTER_SHAP_PROFILES_FILENAME
+    cluster_feature_effect_profiles_path = tables_dir / CLUSTER_FEATURE_EFFECT_PROFILES_FILENAME
     cluster_catalog_path = tables_dir / CLUSTER_CATALOG_FILENAME
 
-    cluster_shap_profiles_df = build_cluster_shap_profiles(
+    cluster_feature_effect_profiles_df = build_cluster_feature_effect_profiles(
         clustered_df,
         cluster_scores_df,
         performance_group_col=performance_group_col,
-        shap_cols=shap_cols,
+        effect_cols=effect_cols,
         include_noise=True,
     )
-    cluster_shap_profiles_df.to_csv(cluster_shap_profiles_path, index=False)
+    cluster_feature_effect_profiles_df.to_csv(cluster_feature_effect_profiles_path, index=False)
 
     member_export_cols = resolve_member_export_columns(
         clustered_df,
@@ -162,13 +165,13 @@ def write_cluster_exports(
     artifact_records: list[dict[str, Any]] = [
         {
             "artifact_kind": "table",
-            "artifact_type": "cluster_shap_profiles",
-            "relative_path": str(cluster_shap_profiles_path.relative_to(cluster_spec_root)),
-            "absolute_path": str(cluster_shap_profiles_path.resolve()),
+            "artifact_type": "cluster_feature_effect_profiles",
+            "relative_path": str(cluster_feature_effect_profiles_path.relative_to(cluster_spec_root)),
+            "absolute_path": str(cluster_feature_effect_profiles_path.resolve()),
         }
     ]
 
-    for profile_row in cluster_shap_profiles_df.to_dict(orient="records"):
+    for profile_row in cluster_feature_effect_profiles_df.to_dict(orient="records"):
         performance_group = str(profile_row["performance_group"])
         algorithm = str(profile_row["algorithm"])
         cluster_space = str(profile_row["cluster_space"])
@@ -266,8 +269,8 @@ def write_cluster_exports(
     )
 
     return {
-        "cluster_shap_profiles_df": cluster_shap_profiles_df,
-        "cluster_shap_profiles_path": cluster_shap_profiles_path,
+        "cluster_feature_effect_profiles_df": cluster_feature_effect_profiles_df,
+        "cluster_feature_effect_profiles_path": cluster_feature_effect_profiles_path,
         "cluster_catalog_df": cluster_catalog_df,
         "cluster_catalog_path": cluster_catalog_path,
         "artifact_records": artifact_records,

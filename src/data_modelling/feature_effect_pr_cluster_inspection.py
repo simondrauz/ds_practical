@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Load and inspect exported SHAP cluster artifacts from one cluster-spec manifest."""
+"""Load and inspect exported feature-effect cluster artifacts from one cluster-spec manifest."""
 
 import json
 import re
@@ -14,12 +14,12 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from data_modelling.shap_cluster_exports import build_scene_step_key_frame
-from data_modelling.shap_performance_regimes_utils import (
+from data_modelling.feature_effect_cluster_exports import build_scene_step_key_frame
+from data_modelling.feature_effect_performance_regimes_utils import (
     VALID_CLUSTER_PROFILE_SORT_KEYS,
     VALID_CLUSTER_SPACES,
-    format_shap_feature_name,
-    get_shap_cols,
+    format_effect_feature_name,
+    get_effect_cols,
 )
 
 VALID_CLUSTER_ALGORITHMS = ("hdbscan", "optics")
@@ -69,12 +69,19 @@ class ClusterInspectionBundle:
     manifest_path: Path
     manifest: dict[str, Any]
     cluster_spec_root: Path
+    model_id: str
+    target_mode: str
+    effect_title_label: str
+    effect_value_axis_label: str
+    global_ranking_path: Path
+    global_ranking_df: pd.DataFrame
+    ordered_effect_cols: list[str]
     cluster_assignments_path: Path
     cluster_assignments_df: pd.DataFrame
     cluster_catalog_path: Path
     cluster_catalog_df: pd.DataFrame
-    cluster_shap_profiles_path: Path
-    cluster_shap_profiles_df: pd.DataFrame
+    cluster_feature_effect_profiles_path: Path
+    cluster_feature_effect_profiles_df: pd.DataFrame
     performance_group: str
     algorithm: str
     cluster_space: str
@@ -85,6 +92,32 @@ class ClusterInspectionBundle:
     group_assignments_df: pd.DataFrame
     trajectory_feature_cols: list[str]
     scene_metric_cols: list[str]
+
+
+def resolve_effect_display_context(model_id: str, target_mode: str) -> dict[str, str]:
+    """Return model-aware labels for feature-effect inspection plots."""
+    normalized_model_id = str(model_id).strip().lower()
+    normalized_target_mode = str(target_mode).strip().lower()
+    if normalized_model_id == "xgboost":
+        return {
+            "effect_title_label": "SHAP",
+            "effect_value_axis_label": "Mean SHAP value",
+            "effect_note": "Feature effects are SHAP contributions on the model prediction scale.",
+        }
+    if normalized_model_id == "gam":
+        scale_suffix = " (log scale)" if normalized_target_mode == "log" else ""
+        note_suffix = (
+            " These additive effects live on the link/log scale, so they imply multiplicative changes on the "
+            "original target scale."
+            if normalized_target_mode == "log"
+            else " These additive effects live on the GAM link scale."
+        )
+        return {
+            "effect_title_label": f"Additive effect{scale_suffix}",
+            "effect_value_axis_label": f"Mean additive effect{scale_suffix}",
+            "effect_note": f"Feature effects are GAM additive term contributions.{note_suffix}",
+        }
+    raise NotImplementedError(f"Feature-effect inspection is not implemented yet for model_id={model_id!r}.")
 
 
 def _sanitize_slug_token(value: Any) -> str:
@@ -428,20 +461,38 @@ def _ordered_frame_by_cluster_ids(df: pd.DataFrame, ordered_cluster_ids: list[in
     return ordered_df.reset_index(drop=True)
 
 
-def _resolve_trajectory_feature_cols(group_assignments_df: pd.DataFrame) -> list[str]:
-    shap_cols = get_shap_cols(group_assignments_df)
-    feature_rows: list[tuple[str, float]] = []
-    for shap_col in shap_cols:
-        feature_col = format_shap_feature_name(shap_col)
-        if feature_col.startswith("scene_") or feature_col not in group_assignments_df.columns:
-            continue
-        feature_rows.append((feature_col, float(group_assignments_df[shap_col].abs().mean())))
+def _resolve_ordered_effect_cols(
+    *,
+    group_assignments_df: pd.DataFrame,
+    global_ranking_df: pd.DataFrame,
+) -> list[str]:
+    ranking_required_cols = ["feature", "global_rank"]
+    missing_cols = [col for col in ranking_required_cols if col not in global_ranking_df.columns]
+    if missing_cols:
+        raise KeyError(f"Feature-effect global ranking is missing required columns: {missing_cols}")
+
+    available_effect_cols = set(get_effect_cols(group_assignments_df))
+    ordered_effect_cols: list[str] = []
+    ranking_df = global_ranking_df.sort_values(["global_rank", "feature"], ascending=[True, True]).reset_index(drop=True)
+    for feature_name in ranking_df["feature"].astype(str):
+        effect_col = f"effect__{feature_name}"
+        if effect_col in available_effect_cols:
+            ordered_effect_cols.append(effect_col)
+    if not ordered_effect_cols:
+        raise ValueError("Feature-effect global ranking does not map to any effect columns in cluster assignments.")
+    return ordered_effect_cols
+
+
+def _resolve_trajectory_feature_cols(
+    *,
+    group_assignments_df: pd.DataFrame,
+    ordered_effect_cols: list[str],
+) -> list[str]:
     ordered_feature_cols = [
-        feature_col
-        for feature_col, _ in sorted(
-            feature_rows,
-            key=lambda item: (-item[1], item[0]),
-        )
+        format_effect_feature_name(effect_col)
+        for effect_col in ordered_effect_cols
+        if not format_effect_feature_name(effect_col).startswith("scene_")
+        and format_effect_feature_name(effect_col) in group_assignments_df.columns
     ]
     # Keep the original-unit target as the leading trajectory metric so the
     # cluster-wise loss distribution stays visible alongside feature plots.
@@ -490,16 +541,30 @@ def load_cluster_inspection_selection(
         artifact_type="cluster_catalog",
         fallback_filename="cluster_catalog.csv",
     )
-    cluster_shap_profiles_path = _artifact_path_from_manifest(
+    global_ranking_path = _artifact_path_from_manifest(
         manifest_path,
         manifest_data,
-        artifact_type="cluster_shap_profiles",
-        fallback_filename="cluster_shap_profiles.csv",
+        artifact_type="feature_effect_global_ranking",
+        fallback_filename="feature_effect_global_ranking.csv",
+    )
+    cluster_feature_effect_profiles_path = _artifact_path_from_manifest(
+        manifest_path,
+        manifest_data,
+        artifact_type="cluster_feature_effect_profiles",
+        fallback_filename="cluster_feature_effect_profiles.csv",
     )
 
     cluster_assignments_df = pd.read_csv(cluster_assignments_path)
     cluster_catalog_df = pd.read_csv(cluster_catalog_path)
-    cluster_shap_profiles_df = pd.read_csv(cluster_shap_profiles_path)
+    global_ranking_df = pd.read_csv(global_ranking_path)
+    cluster_feature_effect_profiles_df = pd.read_csv(cluster_feature_effect_profiles_path)
+
+    run_context = manifest_data.get("run_context", {})
+    model_id = str(run_context.get("model_id", "")).strip()
+    target_mode = str(run_context.get("target_mode", "")).strip()
+    if not model_id or not target_mode:
+        raise KeyError("Cluster manifest run_context must include non-empty 'model_id' and 'target_mode'.")
+    effect_display_context = resolve_effect_display_context(model_id, target_mode)
 
     performance_group = str(resolved_config["performance_group"])
     algorithm = str(resolved_config["inspection_algorithm"])
@@ -518,14 +583,14 @@ def load_cluster_inspection_selection(
             f"Available groups: {available_groups}"
         )
 
-    candidate_profiles_df = cluster_shap_profiles_df.loc[
-        (cluster_shap_profiles_df["performance_group"].astype(str) == performance_group)
-        & (cluster_shap_profiles_df["algorithm"].astype(str).str.lower() == algorithm)
-        & (cluster_shap_profiles_df["cluster_space"].astype(str).str.lower() == cluster_space)
+    candidate_profiles_df = cluster_feature_effect_profiles_df.loc[
+        (cluster_feature_effect_profiles_df["performance_group"].astype(str) == performance_group)
+        & (cluster_feature_effect_profiles_df["algorithm"].astype(str).str.lower() == algorithm)
+        & (cluster_feature_effect_profiles_df["cluster_space"].astype(str).str.lower() == cluster_space)
     ].copy()
     if candidate_profiles_df.empty:
         raise ValueError(
-            "No cluster SHAP profiles were found for "
+            "No cluster feature-effect profiles were found for "
             f"group={performance_group!r}, algorithm={algorithm!r}, cluster_space={cluster_space!r}."
         )
 
@@ -540,6 +605,10 @@ def load_cluster_inspection_selection(
             f"group={performance_group!r}, algorithm={algorithm!r}, cluster_space={cluster_space!r}."
         )
 
+    ordered_effect_cols = _resolve_ordered_effect_cols(
+        group_assignments_df=group_assignments_df,
+        global_ranking_df=global_ranking_df,
+    )
     ordered_cluster_ids = _ordered_cluster_ids(candidate_profiles_df, resolved_config["cluster_ids"])
     selected_profiles_df = _ordered_frame_by_cluster_ids(candidate_profiles_df, ordered_cluster_ids)
     selected_catalog_df = _ordered_frame_by_cluster_ids(candidate_catalog_df, ordered_cluster_ids)
@@ -547,12 +616,19 @@ def load_cluster_inspection_selection(
         manifest_path=manifest_path,
         manifest=dict(manifest_data),
         cluster_spec_root=cluster_spec_root,
+        model_id=model_id,
+        target_mode=target_mode,
+        effect_title_label=effect_display_context["effect_title_label"],
+        effect_value_axis_label=effect_display_context["effect_value_axis_label"],
+        global_ranking_path=global_ranking_path,
+        global_ranking_df=global_ranking_df,
+        ordered_effect_cols=ordered_effect_cols,
         cluster_assignments_path=cluster_assignments_path,
         cluster_assignments_df=cluster_assignments_df,
         cluster_catalog_path=cluster_catalog_path,
         cluster_catalog_df=cluster_catalog_df,
-        cluster_shap_profiles_path=cluster_shap_profiles_path,
-        cluster_shap_profiles_df=cluster_shap_profiles_df,
+        cluster_feature_effect_profiles_path=cluster_feature_effect_profiles_path,
+        cluster_feature_effect_profiles_df=cluster_feature_effect_profiles_df,
         performance_group=performance_group,
         algorithm=algorithm,
         cluster_space=cluster_space,
@@ -561,7 +637,10 @@ def load_cluster_inspection_selection(
         selected_catalog_df=selected_catalog_df,
         selected_profiles_df=selected_profiles_df,
         group_assignments_df=group_assignments_df,
-        trajectory_feature_cols=_resolve_trajectory_feature_cols(group_assignments_df),
+        trajectory_feature_cols=_resolve_trajectory_feature_cols(
+            group_assignments_df=group_assignments_df,
+            ordered_effect_cols=ordered_effect_cols,
+        ),
         scene_metric_cols=_resolve_scene_metric_cols(group_assignments_df),
     )
 
@@ -600,10 +679,10 @@ def build_cluster_inspection_export_layout(
 def build_top_driver_table(
     profile_df: pd.DataFrame,
     *,
-    shap_cols: list[str],
+    effect_cols: list[str],
     top_k_table: int,
 ) -> pd.DataFrame:
-    """Build a compact per-subset SHAP driver table for notebook display."""
+    """Build a compact per-subset top-driver table for notebook display."""
 
     rows: list[dict[str, Any]] = []
     for profile_row in profile_df.to_dict(orient="records"):
@@ -614,22 +693,24 @@ def build_top_driver_table(
             "cluster_size": int(profile_row["cluster_size"]),
             "cluster_size_share": float(profile_row["cluster_size_share"]),
         }
-        ordered_shap_cols = sorted(
-            shap_cols,
-            key=lambda shap_col: abs(float(profile_row[shap_col])),
+        ordered_effect_cols = sorted(
+            effect_cols,
+            key=lambda effect_col: abs(float(profile_row[effect_col])),
             reverse=True,
         )
         for rank in range(1, top_k_table + 1):
-            if rank <= len(ordered_shap_cols):
-                shap_col = ordered_shap_cols[rank - 1]
-                shap_value = float(profile_row[shap_col])
-                row[f"top_feature_{rank}"] = format_shap_feature_name(shap_col)
-                row[f"top_direction_{rank}"] = "positive" if shap_value > 0 else "negative" if shap_value < 0 else "neutral"
-                row[f"top_abs_shap_{rank}"] = abs(shap_value)
+            if rank <= len(ordered_effect_cols):
+                effect_col = ordered_effect_cols[rank - 1]
+                effect_value = float(profile_row[effect_col])
+                row[f"top_feature_{rank}"] = format_effect_feature_name(effect_col)
+                row[f"top_direction_{rank}"] = (
+                    "positive" if effect_value > 0 else "negative" if effect_value < 0 else "neutral"
+                )
+                row[f"top_abs_effect_{rank}"] = abs(effect_value)
             else:
                 row[f"top_feature_{rank}"] = pd.NA
                 row[f"top_direction_{rank}"] = pd.NA
-                row[f"top_abs_shap_{rank}"] = np.nan
+                row[f"top_abs_effect_{rank}"] = np.nan
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -697,15 +778,17 @@ def plot_candidate_umap_scatter(
 def plot_cluster_profile_barplots(
     profile_df: pd.DataFrame,
     *,
-    shap_cols: list[str],
+    effect_cols: list[str],
     top_k_features: int,
     performance_group: str,
     algorithm: str,
     cluster_space: str,
     plot_path: Path,
+    effect_title_label: str,
+    effect_value_axis_label: str,
     subset_style_map: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> None:
-    """Plot signed SHAP bar charts for the selected cluster subsets."""
+    """Plot signed feature-effect bar charts for the selected cluster subsets."""
 
     subset_labels = [_cluster_display_label(int(cluster_id)) for cluster_id in profile_df["cluster_id"].astype(int)]
     subset_style_map = subset_style_map or build_subset_style_map(subset_labels + [WHOLE_GROUP_LABEL])
@@ -717,14 +800,14 @@ def plot_cluster_profile_barplots(
         subset_style = subset_style_map[subset_label]
         ax = axes[axis_idx][0]
         _apply_subset_axis_style(ax, subset_label=subset_label, subset_style_map=subset_style_map)
-        top_shap_cols = sorted(
-            shap_cols,
-            key=lambda shap_col: abs(float(profile_row[shap_col])),
+        top_effect_cols = sorted(
+            effect_cols,
+            key=lambda effect_col: abs(float(profile_row[effect_col])),
             reverse=True,
         )[:top_k_features]
-        top_shap_cols = list(reversed(top_shap_cols))
-        values = [float(profile_row[shap_col]) for shap_col in top_shap_cols]
-        labels = [format_shap_feature_name(shap_col) for shap_col in top_shap_cols]
+        top_effect_cols = list(reversed(top_effect_cols))
+        values = [float(profile_row[effect_col]) for effect_col in top_effect_cols]
+        labels = [format_effect_feature_name(effect_col) for effect_col in top_effect_cols]
         colors = ["#C44E52" if value > 0 else "#4C72B0" for value in values]
         ax.barh(labels, values, color=colors, edgecolor=subset_style["color"], linewidth=1.0, alpha=0.9)
         ax.axvline(0, color="#303030", linewidth=1.0)
@@ -734,11 +817,11 @@ def plot_cluster_profile_barplots(
             color=mcolors.to_hex(subset_style["color"]),
             fontweight="bold",
         )
-        ax.set_xlabel("Mean SHAP value")
+        ax.set_xlabel(effect_value_axis_label)
         ax.set_ylabel("Feature")
         ax.grid(axis="x", alpha=0.25)
     fig.suptitle(
-        f"SHAP cluster profiles\n{performance_group} ({algorithm}, space={cluster_space})",
+        f"{effect_title_label} cluster profiles\n{performance_group} ({algorithm}, space={cluster_space})",
         fontsize=15,
         fontweight="bold",
         y=1.01,
@@ -752,35 +835,32 @@ def plot_cluster_profile_barplots(
 def plot_cluster_profile_heatmap(
     profile_df: pd.DataFrame,
     *,
-    shap_cols: list[str],
+    ordered_effect_cols: list[str],
     performance_group: str,
     algorithm: str,
     cluster_space: str,
     plot_path: Path,
+    effect_title_label: str,
+    effect_value_axis_label: str,
 ) -> None:
-    """Plot a SHAP heatmap over the selected cluster subsets."""
+    """Plot a feature-effect heatmap over the selected cluster subsets."""
 
-    ordered_shap_cols = (
-        profile_df[shap_cols]
-        .abs()
-        .mean(axis=0)
-        .sort_values(ascending=False)
-        .index
-        .tolist()
-    )
-    heatmap_df = profile_df[ordered_shap_cols].copy()
-    heatmap_df.columns = [format_shap_feature_name(shap_col) for shap_col in ordered_shap_cols]
+    available_effect_cols = [effect_col for effect_col in ordered_effect_cols if effect_col in profile_df.columns]
+    if not available_effect_cols:
+        raise ValueError("Selected profiles do not contain any globally ranked feature-effect columns.")
+    heatmap_df = profile_df[available_effect_cols].copy()
+    heatmap_df.columns = [format_effect_feature_name(effect_col) for effect_col in available_effect_cols]
     heatmap_df.index = [
         f"{_cluster_display_label(int(cluster_id))} (n={int(cluster_size)})"
         for cluster_id, cluster_size in zip(profile_df["cluster_id"], profile_df["cluster_size"])
     ]
 
     fig, ax = plt.subplots(
-        figsize=(max(10, len(ordered_shap_cols) * 0.55), max(4.8, len(profile_df) * 0.95))
+        figsize=(max(10, len(available_effect_cols) * 0.55), max(4.8, len(profile_df) * 0.95))
     )
-    sns.heatmap(heatmap_df, cmap="coolwarm", center=0, ax=ax, cbar_kws={"label": "Mean SHAP value"})
+    sns.heatmap(heatmap_df, cmap="coolwarm", center=0, ax=ax, cbar_kws={"label": effect_value_axis_label})
     ax.set_title(
-        f"SHAP heatmap\n{performance_group} ({algorithm}, space={cluster_space})",
+        f"{effect_title_label} heatmap\n{performance_group} ({algorithm}, space={cluster_space})",
         fontsize=15,
         fontweight="bold",
     )

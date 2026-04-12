@@ -10,10 +10,10 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-import data_modelling.shap_cluster_exports as shap_cluster_exports
-import data_modelling.shap_cluster_inspection as shap_cluster_inspection
+import data_modelling.feature_effect_cluster_exports as feature_effect_cluster_exports
+import data_modelling.feature_effect_pr_cluster_inspection as feature_effect_pr_cluster_inspection
 from data_modelling.common_metrics import is_log_target, regression_metrics, rmse, to_original_scale
-import data_modelling.shap_performance_regimes_utils as shap_performance_regimes_utils
+import data_modelling.feature_effect_performance_regimes_utils as feature_effect_performance_regimes_utils
 from data_modelling.prepared_data import (
     load_prepared_data,
     prepare_dual_target_model_data,
@@ -34,7 +34,7 @@ from data_modelling.training_outputs import (
 )
 
 
-def _patch_shap_regime_dependencies(monkeypatch: pytest.MonkeyPatch, umap_call_log: list[dict[str, float]]) -> None:
+def _patch_feature_effect_regime_dependencies(monkeypatch: pytest.MonkeyPatch, umap_call_log: list[dict[str, float]]) -> None:
     class DummyUMAP:
         def __init__(self, *, n_components: int, n_neighbors: int, min_dist: float, random_state: int):
             umap_call_log.append(
@@ -78,20 +78,20 @@ def _patch_shap_regime_dependencies(monkeypatch: pytest.MonkeyPatch, umap_call_l
     dummy_umap_module = type("DummyUMAPModule", (), {"UMAP": DummyUMAP})
     dummy_hdbscan_module = type("DummyHDBSCANModule", (), {"HDBSCAN": DummyHDBSCAN})
     monkeypatch.setattr(
-        shap_performance_regimes_utils,
+        feature_effect_performance_regimes_utils,
         "_require_step2_dependencies",
         lambda: (dummy_hdbscan_module, dummy_validity_index, dummy_umap_module, DummyOPTICS, dummy_trustworthiness),
     )
 
 
-def _resolved_shap_regime_cluster_spec(raw_cluster_spec: dict[str, object]) -> dict[str, object]:
-    return shap_performance_regimes_utils.resolve_cluster_spec(
+def _resolved_feature_effect_regime_cluster_spec(raw_cluster_spec: dict[str, object]) -> dict[str, object]:
+    return feature_effect_performance_regimes_utils.resolve_cluster_spec(
         raw_cluster_spec,
-        shap_cols=["shap__speed", "shap__heading", "shap__distance", "shap__distance_to_goal"],
+        effect_cols=["effect__speed", "effect__heading", "effect__distance", "effect__distance_to_goal"],
     )
 
 
-def _resolved_shap_regime_inspection_config(
+def _resolved_feature_effect_regime_inspection_config(
     cluster_spec: dict[str, object],
     *,
     inspection_algorithm: str = "hdbscan",
@@ -100,7 +100,7 @@ def _resolved_shap_regime_inspection_config(
     inspection_top_k_table: int = 3,
     sort_cluster_profiles_by: str = "cluster_size",
 ) -> dict[str, object]:
-    return shap_performance_regimes_utils.resolve_inspection_config(
+    return feature_effect_performance_regimes_utils.resolve_inspection_config(
         {
             "inspection_algorithm": inspection_algorithm,
             "inspection_cluster_space": inspection_cluster_space,
@@ -136,8 +136,8 @@ def _sample_cluster_export_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
             "acceleration": [0.2, 0.25, 0.4, 0.35, 0.05],
             "scene_density": [3, 3, 4, 2, 2],
             "scene_weather": ["sunny", "sunny", "rain", "rain", "rain"],
-            "shap__speed": [0.8, 0.6, -0.4, -0.5, 0.1],
-            "shap__acceleration": [0.2, 0.1, -0.3, -0.2, 0.05],
+            "effect__speed": [0.8, 0.6, -0.4, -0.5, 0.1],
+            "effect__acceleration": [0.2, 0.1, -0.3, -0.2, 0.05],
             "cluster_hdbscan_raw": [0, 0, 1, 1, -1],
         }
     )
@@ -161,14 +161,29 @@ def _sample_cluster_export_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
                 "clustered_fraction": 0.8,
                 "dbcv": 0.42,
                 "dbcv_cluster_space": 0.42,
-                "dbcv_raw_shap_space": 0.42,
+                "dbcv_raw_effect_space": 0.42,
                 "valid_for_selection": True,
-                "valid_for_raw_shap_evaluation": True,
+                "valid_for_raw_effect_evaluation": True,
                 "selected_for_group": True,
             }
         ]
     )
     return clustered_df, cluster_scores_df
+
+
+def _sample_feature_effect_global_ranking_df(*, reverse_order: bool = False) -> pd.DataFrame:
+    feature_order = ["acceleration", "speed"] if reverse_order else ["speed", "acceleration"]
+    importance_values = [0.2, 0.7] if reverse_order else [0.7, 0.2]
+    return pd.DataFrame(
+        {
+            "feature": feature_order,
+            "global_rank": [1, 2],
+            "importance_metric": ["mean_abs_shap", "mean_abs_shap"],
+            "importance_value": importance_values,
+            "importance_ascending": [False, False],
+            "mean_abs_shap": importance_values,
+        }
+    )
 
 
 def test_is_log_target_prefers_explicit_target_mode():
@@ -549,18 +564,112 @@ def test_load_run_context_requires_manifest_fields(tmp_path, monkeypatch):
         load_run_context("gam", "run_a", "ml_ade_log")
 
 
+def test_prepare_feature_effect_export_names_effect_columns_and_base_value():
+    model_df_oof = pd.DataFrame(
+        {
+            "speed": [1.0, 2.0],
+            "acceleration": [0.2, 0.4],
+            "row_id": [0, 1],
+            "outer_fold": [1, 2],
+            "oof_pred_orig": [0.5, 0.7],
+            "target_orig": [0.4, 0.8],
+        }
+    )
+
+    export_df = feature_effect_performance_regimes_utils.prepare_feature_effect_export(
+        model_df_oof=model_df_oof,
+        feature_cols=["speed", "acceleration"],
+        effect_values=np.array([[0.3, -0.1], [0.4, -0.2]], dtype=float),
+        base_values=np.array([1.0, 1.0], dtype=float),
+    )
+
+    assert export_df.columns.tolist() == [
+        "speed",
+        "acceleration",
+        "row_id",
+        "outer_fold",
+        "oof_pred_orig",
+        "target_orig",
+        "effect__speed",
+        "effect__acceleration",
+        "effect_base_value",
+    ]
+
+
+def test_build_feature_effect_importance_table_orders_xgboost_and_gam():
+    xgboost_df = feature_effect_performance_regimes_utils.build_feature_effect_importance_table(
+        model_id="xgboost",
+        feature_cols=["speed", "acceleration"],
+        effect_values=np.array([[0.8, 0.1], [0.6, 0.2], [0.4, 0.3]], dtype=float),
+    )
+    assert xgboost_df["feature"].tolist() == ["speed", "acceleration"]
+    assert xgboost_df["global_rank"].tolist() == [1, 2]
+    assert xgboost_df["importance_metric"].tolist() == ["mean_abs_shap", "mean_abs_shap"]
+    assert not xgboost_df["importance_ascending"].any()
+
+    gam_df = feature_effect_performance_regimes_utils.build_feature_effect_importance_table(
+        model_id="gam",
+        feature_cols=["speed", "acceleration"],
+        p_values=np.array([0.20, 0.01], dtype=float),
+    )
+    assert gam_df["feature"].tolist() == ["acceleration", "speed"]
+    assert gam_df["global_rank"].tolist() == [1, 2]
+    assert gam_df["importance_metric"].tolist() == ["p_value", "p_value"]
+    assert gam_df["importance_ascending"].all()
+
+
+def test_compute_gam_feature_effects_reconstructs_link_predictor():
+    class DummyTerms:
+        def __init__(self):
+            self._terms = [
+                type("SplineTerm", (), {"isintercept": False, "feature": 0})(),
+                type("SplineTerm", (), {"isintercept": False, "feature": 1})(),
+                type("Intercept", (), {"isintercept": True, "feature": None})(),
+            ]
+
+        def __len__(self):
+            return len(self._terms)
+
+        def __getitem__(self, idx):
+            return self._terms[idx]
+
+        def get_coef_indices(self, idx):
+            return [idx]
+
+    class DummyModel:
+        def __init__(self):
+            self.terms = DummyTerms()
+            self.coef_ = np.array([0.3, -0.2, 1.1], dtype=float)
+
+        def _modelmat(self, X):
+            return np.column_stack([X[:, 0], X[:, 1], np.ones(len(X))])
+
+        def _linear_predictor(self, X):
+            return self._modelmat(X) @ self.coef_
+
+    X_scaled = np.array([[2.0, 1.0], [4.0, 3.0]], dtype=float)
+    effect_values, base_values = feature_effect_performance_regimes_utils.compute_gam_feature_effects(
+        model=DummyModel(),
+        X_scaled=X_scaled,
+        feature_cols=["speed", "acceleration"],
+    )
+
+    np.testing.assert_allclose(effect_values, np.array([[0.6, -0.2], [1.2, -0.6]], dtype=float))
+    np.testing.assert_allclose(base_values, np.array([1.1, 1.1], dtype=float))
+
+
 def test_evaluate_umap_trustworthiness_by_group_emits_neighbor_views_and_mean(monkeypatch):
     umap_call_log: list[dict[str, float]] = []
-    _patch_shap_regime_dependencies(monkeypatch, umap_call_log)
+    _patch_feature_effect_regime_dependencies(monkeypatch, umap_call_log)
 
     n_rows = 40
     analysis_df = pd.DataFrame(
         {
             "row_id": list(range(n_rows)),
             "performance_group": ["easy"] * n_rows,
-            "shap__speed": np.linspace(0.1, 4.0, n_rows),
-            "shap__heading": np.linspace(1.0, 5.0, n_rows),
-            "shap__distance": np.linspace(2.0, 6.0, n_rows),
+            "effect__speed": np.linspace(0.1, 4.0, n_rows),
+            "effect__heading": np.linspace(1.0, 5.0, n_rows),
+            "effect__distance": np.linspace(2.0, 6.0, n_rows),
         }
     )
     cluster_spec = {
@@ -580,12 +689,12 @@ def test_evaluate_umap_trustworthiness_by_group_emits_neighbor_views_and_mean(mo
         "optics_xi": 0.05,
         "distance_metric": "euclidean",
     }
-    cluster_spec = shap_performance_regimes_utils.resolve_cluster_spec(
+    cluster_spec = feature_effect_performance_regimes_utils.resolve_cluster_spec(
         cluster_spec,
-        shap_cols=["shap__speed", "shap__heading", "shap__distance"],
+        effect_cols=["effect__speed", "effect__heading", "effect__distance"],
     )
 
-    trustworthiness_df = shap_performance_regimes_utils.evaluate_umap_trustworthiness_by_group(
+    trustworthiness_df = feature_effect_performance_regimes_utils.evaluate_umap_trustworthiness_by_group(
         analysis_df,
         cluster_spec=cluster_spec,
         performance_group_col="performance_group",
@@ -608,18 +717,18 @@ def test_evaluate_umap_trustworthiness_by_group_emits_neighbor_views_and_mean(mo
 
 def test_resolve_cluster_spec_requires_documented_keys():
     with pytest.raises(ValueError, match="missing required keys"):
-        shap_performance_regimes_utils.resolve_cluster_spec(
+        feature_effect_performance_regimes_utils.resolve_cluster_spec(
             {
                 "groups": ["easy"],
                 "algorithms": ["hdbscan"],
             },
-            shap_cols=["shap__speed", "shap__heading"],
+            effect_cols=["effect__speed", "effect__heading"],
         )
 
 
 def test_resolve_cluster_spec_rejects_invalid_selected_umap_dim():
     with pytest.raises(ValueError, match="umap_selected_n_components"):
-        shap_performance_regimes_utils.resolve_cluster_spec(
+        feature_effect_performance_regimes_utils.resolve_cluster_spec(
             {
                 "groups": ["easy"],
                 "algorithms": ["hdbscan"],
@@ -637,12 +746,12 @@ def test_resolve_cluster_spec_rejects_invalid_selected_umap_dim():
                 "optics_xi": 0.05,
                 "distance_metric": "euclidean",
             },
-            shap_cols=["shap__speed", "shap__heading", "shap__distance"],
+            effect_cols=["effect__speed", "effect__heading", "effect__distance"],
         )
 
 
 def test_resolve_inspection_config_rejects_umap_space_when_disabled():
-    cluster_spec = shap_performance_regimes_utils.resolve_cluster_spec(
+    cluster_spec = feature_effect_performance_regimes_utils.resolve_cluster_spec(
         {
             "groups": ["easy"],
             "algorithms": ["hdbscan"],
@@ -660,11 +769,11 @@ def test_resolve_inspection_config_rejects_umap_space_when_disabled():
             "optics_xi": 0.05,
             "distance_metric": "euclidean",
         },
-        shap_cols=["shap__speed", "shap__heading"],
+        effect_cols=["effect__speed", "effect__heading"],
     )
 
     with pytest.raises(ValueError, match="inspection_cluster_space"):
-        shap_performance_regimes_utils.resolve_inspection_config(
+        feature_effect_performance_regimes_utils.resolve_inspection_config(
             {
                 "inspection_algorithm": "hdbscan",
                 "inspection_cluster_space": "umap",
@@ -678,16 +787,16 @@ def test_resolve_inspection_config_rejects_umap_space_when_disabled():
 
 def test_run_step2_clustering_separates_cluster_and_visual_umap_parameters(monkeypatch):
     umap_call_log: list[dict[str, float]] = []
-    _patch_shap_regime_dependencies(monkeypatch, umap_call_log)
+    _patch_feature_effect_regime_dependencies(monkeypatch, umap_call_log)
 
     n_rows = 40
     analysis_df = pd.DataFrame(
         {
             "row_id": list(range(n_rows)),
             "performance_group": ["easy"] * n_rows,
-            "shap__speed": np.linspace(0.1, 4.0, n_rows),
-            "shap__heading": np.linspace(1.0, 5.0, n_rows),
-            "shap__distance": np.linspace(2.0, 6.0, n_rows),
+            "effect__speed": np.linspace(0.1, 4.0, n_rows),
+            "effect__heading": np.linspace(1.0, 5.0, n_rows),
+            "effect__distance": np.linspace(2.0, 6.0, n_rows),
         }
     )
     cluster_spec = {
@@ -707,12 +816,12 @@ def test_run_step2_clustering_separates_cluster_and_visual_umap_parameters(monke
         "optics_xi": 0.05,
         "distance_metric": "euclidean",
     }
-    cluster_spec = shap_performance_regimes_utils.resolve_cluster_spec(
+    cluster_spec = feature_effect_performance_regimes_utils.resolve_cluster_spec(
         cluster_spec,
-        shap_cols=["shap__speed", "shap__heading", "shap__distance"],
+        effect_cols=["effect__speed", "effect__heading", "effect__distance"],
     )
 
-    clustering_results = shap_performance_regimes_utils.run_step2_clustering(
+    clustering_results = feature_effect_performance_regimes_utils.run_step2_clustering(
         analysis_df,
         cluster_spec=cluster_spec,
         performance_group_col="performance_group",
@@ -733,8 +842,8 @@ def test_run_step2_clustering_separates_cluster_and_visual_umap_parameters(monke
     }
 
 
-def test_build_shap_regime_export_layout_is_stable_for_equivalent_resolved_cluster_spec(tmp_path):
-    cluster_spec_scalar = _resolved_shap_regime_cluster_spec(
+def test_build_feature_effect_regime_export_layout_is_stable_for_equivalent_resolved_cluster_spec(tmp_path):
+    cluster_spec_scalar = _resolved_feature_effect_regime_cluster_spec(
         {
             "groups": ["easy", "medium"],
             "algorithms": ["hdbscan", "optics"],
@@ -753,7 +862,7 @@ def test_build_shap_regime_export_layout_is_stable_for_equivalent_resolved_clust
             "distance_metric": "euclidean",
         }
     )
-    cluster_spec_mapping = _resolved_shap_regime_cluster_spec(
+    cluster_spec_mapping = _resolved_feature_effect_regime_cluster_spec(
         {
             "groups": ["easy", "medium"],
             "algorithms": ["hdbscan", "optics"],
@@ -772,7 +881,7 @@ def test_build_shap_regime_export_layout_is_stable_for_equivalent_resolved_clust
             "distance_metric": "euclidean",
         }
     )
-    export_context = shap_performance_regimes_utils.resolve_shap_regime_export_context(
+    export_context = feature_effect_performance_regimes_utils.resolve_feature_effect_regime_export_context(
         model_id="xgboost",
         run_name="run_a",
         target_col="ml_ade_log",
@@ -782,11 +891,11 @@ def test_build_shap_regime_export_layout_is_stable_for_equivalent_resolved_clust
         results_root=tmp_path / "results",
     )
 
-    scalar_layout = shap_performance_regimes_utils.build_shap_regime_export_layout(
+    scalar_layout = feature_effect_performance_regimes_utils.build_feature_effect_regime_export_layout(
         export_context=export_context,
         cluster_spec=cluster_spec_scalar,
     )
-    mapping_layout = shap_performance_regimes_utils.build_shap_regime_export_layout(
+    mapping_layout = feature_effect_performance_regimes_utils.build_feature_effect_regime_export_layout(
         export_context=export_context,
         cluster_spec=cluster_spec_mapping,
     )
@@ -798,7 +907,7 @@ def test_build_shap_regime_export_layout_is_stable_for_equivalent_resolved_clust
     assert scalar_layout["plots_dir"].is_dir()
 
 
-def test_resolve_shap_regime_export_context_splits_on_non_cluster_inputs(tmp_path):
+def test_resolve_feature_effect_regime_export_context_splits_on_non_cluster_inputs(tmp_path):
     base_kwargs = {
         "model_id": "xgboost",
         "run_name": "run_a",
@@ -808,29 +917,34 @@ def test_resolve_shap_regime_export_context_splits_on_non_cluster_inputs(tmp_pat
         "performance_group_col": "performance_group",
         "results_root": tmp_path / "results",
     }
-    base_context = shap_performance_regimes_utils.resolve_shap_regime_export_context(**base_kwargs)
-    changed_eval_context = shap_performance_regimes_utils.resolve_shap_regime_export_context(
+    base_context = feature_effect_performance_regimes_utils.resolve_feature_effect_regime_export_context(**base_kwargs)
+    changed_eval_context = feature_effect_performance_regimes_utils.resolve_feature_effect_regime_export_context(
         **(base_kwargs | {"eval_csv_name": "eval_epoch_10.csv"})
     )
-    changed_lower_is_better_context = shap_performance_regimes_utils.resolve_shap_regime_export_context(
+    changed_lower_is_better_context = feature_effect_performance_regimes_utils.resolve_feature_effect_regime_export_context(
         **(base_kwargs | {"lower_is_better": False})
     )
-    changed_group_col_context = shap_performance_regimes_utils.resolve_shap_regime_export_context(
+    changed_group_col_context = feature_effect_performance_regimes_utils.resolve_feature_effect_regime_export_context(
         **(base_kwargs | {"performance_group_col": "difficulty_band"})
     )
-    changed_target_context = shap_performance_regimes_utils.resolve_shap_regime_export_context(
+    changed_target_context = feature_effect_performance_regimes_utils.resolve_feature_effect_regime_export_context(
         **(base_kwargs | {"target_col": "ml_fde_log"})
+    )
+    changed_model_context = feature_effect_performance_regimes_utils.resolve_feature_effect_regime_export_context(
+        **(base_kwargs | {"model_id": "gam"})
     )
 
     assert base_context["data_context_root"] != changed_eval_context["data_context_root"]
     assert base_context["data_context_root"] != changed_lower_is_better_context["data_context_root"]
     assert base_context["data_context_root"] != changed_group_col_context["data_context_root"]
     assert base_context["target_root"] != changed_target_context["target_root"]
+    assert base_context["model_root"] != changed_model_context["model_root"]
+    assert base_context["run_root"] != changed_model_context["run_root"]
     assert "target-ml_ade_log" in base_context["data_context_slug"]
 
 
-def test_build_shap_regime_artifact_names_return_candidate_wide_export_targets():
-    cluster_spec = _resolved_shap_regime_cluster_spec(
+def test_build_feature_effect_regime_artifact_names_return_candidate_wide_export_targets():
+    cluster_spec = _resolved_feature_effect_regime_cluster_spec(
         {
             "groups": ["easy", "medium"],
             "algorithms": ["hdbscan", "optics"],
@@ -849,11 +963,12 @@ def test_build_shap_regime_artifact_names_return_candidate_wide_export_targets()
             "distance_metric": "euclidean",
         }
     )
-    artifact_names = shap_performance_regimes_utils.build_shap_regime_artifact_names(cluster_spec=cluster_spec)
+    artifact_names = feature_effect_performance_regimes_utils.build_feature_effect_regime_artifact_names(cluster_spec=cluster_spec)
 
     assert artifact_names["tables"]["regime_analysis"] == "regime_analysis.csv"
     assert artifact_names["tables"]["cluster_assignments"] == "cluster_assignments.csv"
-    assert artifact_names["tables"]["cluster_shap_profiles"] == "cluster_shap_profiles.csv"
+    assert artifact_names["tables"]["cluster_feature_effect_profiles"] == "cluster_feature_effect_profiles.csv"
+    assert artifact_names["tables"]["feature_effect_global_ranking"] == "feature_effect_global_ranking.csv"
     assert artifact_names["tables"]["cluster_catalog"] == "cluster_catalog.csv"
     assert "cluster_profile_barplots" not in artifact_names["plots"]
     assert "cluster_profile_heatmaps" not in artifact_names["plots"]
@@ -864,7 +979,7 @@ def test_build_shap_regime_artifact_names_return_candidate_wide_export_targets()
     )
 
 
-def test_merge_shap_regime_artifact_records_upserts_tables_and_preserves_distinct_member_exports(tmp_path):
+def test_merge_feature_effect_regime_artifact_records_upserts_tables_and_preserves_distinct_member_exports(tmp_path):
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(
         json.dumps(
@@ -891,13 +1006,13 @@ def test_merge_shap_regime_artifact_records_upserts_tables_and_preserves_distinc
         )
     )
 
-    manifest_data = shap_performance_regimes_utils.load_or_initialize_shap_regime_manifest(
+    manifest_data = feature_effect_performance_regimes_utils.load_or_initialize_feature_effect_regime_manifest(
         manifest_path,
         run_context={"run_name": "run_a"},
         data_context={"target_col": "ml_ade_log"},
         cluster_spec={"hash": "abc123"},
     )
-    merged_manifest = shap_performance_regimes_utils.merge_shap_regime_artifact_records(
+    merged_manifest = feature_effect_performance_regimes_utils.merge_feature_effect_regime_artifact_records(
         manifest_data,
         artifact_records=[
             {
@@ -928,14 +1043,14 @@ def test_merge_shap_regime_artifact_records_upserts_tables_and_preserves_distinc
     )
 
 
-def test_build_cluster_shap_profiles_include_noise_and_cluster_metadata():
+def test_build_cluster_feature_effect_profiles_include_noise_and_cluster_metadata():
     clustered_df, cluster_scores_df = _sample_cluster_export_inputs()
 
-    profile_df = shap_performance_regimes_utils.build_cluster_shap_profiles(
+    profile_df = feature_effect_performance_regimes_utils.build_cluster_feature_effect_profiles(
         clustered_df,
         cluster_scores_df,
         performance_group_col="performance_group",
-        shap_cols=["shap__speed", "shap__acceleration"],
+        effect_cols=["effect__speed", "effect__acceleration"],
         include_noise=True,
     )
 
@@ -945,7 +1060,7 @@ def test_build_cluster_shap_profiles_include_noise_and_cluster_metadata():
     assert profile_df.loc[profile_df["cluster_id"] == 0, "cluster_rank_by_size"].iloc[0] == 1
     assert profile_df.loc[profile_df["cluster_id"] == 1, "cluster_rank_by_size"].iloc[0] == 2
     assert pd.isna(profile_df.loc[profile_df["cluster_id"] == -1, "cluster_rank_by_size"].iloc[0])
-    assert profile_df.loc[profile_df["cluster_id"] == 0, "shap__speed"].iloc[0] == pytest.approx(0.7)
+    assert profile_df.loc[profile_df["cluster_id"] == 0, "effect__speed"].iloc[0] == pytest.approx(0.7)
     assert profile_df.loc[profile_df["cluster_id"] == -1, "is_noise"].iloc[0]
     assert "dominant_feature_name" not in profile_df.columns
 
@@ -958,13 +1073,13 @@ def test_write_cluster_exports_generates_catalog_member_files_and_artifact_recor
     }
     export_layout["tables_dir"].mkdir(parents=True)
 
-    outputs = shap_cluster_exports.write_cluster_exports(
+    outputs = feature_effect_cluster_exports.write_cluster_exports(
         clustered_df,
         cluster_scores_df,
         export_layout=export_layout,
         performance_metric_col="ml_ade",
         performance_group_col="performance_group",
-        shap_cols=["shap__speed", "shap__acceleration"],
+        effect_cols=["effect__speed", "effect__acceleration"],
     )
 
     catalog_df = outputs["cluster_catalog_df"]
@@ -994,12 +1109,12 @@ def test_write_cluster_exports_generates_catalog_member_files_and_artifact_recor
         "scene_ts",
         "agent_type",
     ]
-    assert "shap__speed" not in member_df.columns
+    assert "effect__speed" not in member_df.columns
     assert "speed" not in member_df.columns
 
     artifact_types = [artifact["artifact_type"] for artifact in outputs["artifact_records"]]
     assert artifact_types.count("cluster_catalog") == 1
-    assert artifact_types.count("cluster_shap_profiles") == 1
+    assert artifact_types.count("cluster_feature_effect_profiles") == 1
     assert artifact_types.count("cluster_members") == 3
 
 
@@ -1011,14 +1126,14 @@ def test_build_scene_step_key_frame_dedupes_scene_steps_and_falls_back_to_scene_
         }
     )
 
-    scene_steps_df = shap_cluster_exports.build_scene_step_key_frame(scene_df)
+    scene_steps_df = feature_effect_cluster_exports.build_scene_step_key_frame(scene_df)
 
     assert scene_steps_df.to_dict(orient="records") == [
         {"scene_key": "scene_a", "scene_id": "scene_a", "scene_ts": 0},
         {"scene_key": "scene_b", "scene_id": "scene_b", "scene_ts": 1},
         {"scene_key": "scene_b", "scene_id": "scene_b", "scene_ts": 2},
     ]
-    assert shap_cluster_exports.summarize_scene_steps(scene_df) == {
+    assert feature_effect_cluster_exports.summarize_scene_steps(scene_df) == {
         "unique_scene_step_count": 3,
         "unique_scene_count": 2,
     }
@@ -1031,22 +1146,24 @@ def test_load_cluster_inspection_selection_supports_all_and_explicit_cluster_ids
         "tables_dir": tmp_path / "tables",
     }
     export_layout["tables_dir"].mkdir(parents=True)
-    outputs = shap_cluster_exports.write_cluster_exports(
+    outputs = feature_effect_cluster_exports.write_cluster_exports(
         clustered_df,
         cluster_scores_df,
         export_layout=export_layout,
         performance_metric_col="ml_ade",
         performance_group_col="performance_group",
-        shap_cols=["shap__speed", "shap__acceleration"],
+        effect_cols=["effect__speed", "effect__acceleration"],
     )
     cluster_assignments_path = export_layout["tables_dir"] / "cluster_assignments.csv"
     clustered_df.to_csv(cluster_assignments_path, index=False)
+    ranking_path = export_layout["tables_dir"] / "feature_effect_global_ranking.csv"
+    _sample_feature_effect_global_ranking_df(reverse_order=True).to_csv(ranking_path, index=False)
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(
         json.dumps(
             {
                 "schema_version": 1,
-                "run_context": {"run_name": "run_a"},
+                "run_context": {"run_name": "run_a", "model_id": "xgboost", "target_mode": "log"},
                 "data_context": {"target_col": "ml_ade"},
                 "cluster_spec": {"hash": "abc123"},
                 "artifacts": [
@@ -1056,13 +1173,19 @@ def test_load_cluster_inspection_selection_supports_all_and_explicit_cluster_ids
                         "relative_path": str(cluster_assignments_path.relative_to(tmp_path)),
                         "absolute_path": str(cluster_assignments_path.resolve()),
                     },
+                    {
+                        "artifact_kind": "table",
+                        "artifact_type": "feature_effect_global_ranking",
+                        "relative_path": str(ranking_path.relative_to(tmp_path)),
+                        "absolute_path": str(ranking_path.resolve()),
+                    },
                     *outputs["artifact_records"],
                 ],
             }
         )
     )
 
-    resolved_config = shap_cluster_inspection.resolve_cluster_inspection_config(
+    resolved_config = feature_effect_pr_cluster_inspection.resolve_cluster_inspection_config(
         {
             "cluster_spec_manifest_path": manifest_path,
             "performance_group": "easy",
@@ -1075,12 +1198,14 @@ def test_load_cluster_inspection_selection_supports_all_and_explicit_cluster_ids
             "sort_cluster_profiles_by": "cluster_size",
         }
     )
-    bundle = shap_cluster_inspection.load_cluster_inspection_selection(resolved_config)
+    bundle = feature_effect_pr_cluster_inspection.load_cluster_inspection_selection(resolved_config)
     assert bundle.ordered_cluster_ids == [0, 1, -1]
-    assert bundle.trajectory_feature_cols == ["target_orig", "speed", "acceleration"]
+    assert bundle.trajectory_feature_cols == ["target_orig", "acceleration", "speed"]
     assert bundle.scene_metric_cols == ["scene_density", "scene_weather"]
+    assert bundle.effect_title_label == "SHAP"
+    assert bundle.effect_value_axis_label == "Mean SHAP value"
 
-    explicit_config = shap_cluster_inspection.resolve_cluster_inspection_config(
+    explicit_config = feature_effect_pr_cluster_inspection.resolve_cluster_inspection_config(
         {
             "cluster_spec_manifest_path": manifest_path,
             "performance_group": "easy",
@@ -1093,9 +1218,22 @@ def test_load_cluster_inspection_selection_supports_all_and_explicit_cluster_ids
             "sort_cluster_profiles_by": "cluster_size",
         }
     )
-    explicit_bundle = shap_cluster_inspection.load_cluster_inspection_selection(explicit_config)
+    explicit_bundle = feature_effect_pr_cluster_inspection.load_cluster_inspection_selection(explicit_config)
     assert explicit_bundle.ordered_cluster_ids == [1, -1]
     assert explicit_bundle.selected_catalog_df["cluster_id"].astype(int).tolist() == [1, -1]
+
+
+def test_resolve_effect_display_context_switches_between_shap_and_additive_log_scale_labels():
+    xgboost_context = feature_effect_pr_cluster_inspection.resolve_effect_display_context("xgboost", "log")
+    assert xgboost_context["effect_title_label"] == "SHAP"
+    assert xgboost_context["effect_value_axis_label"] == "Mean SHAP value"
+    assert "SHAP contributions" in xgboost_context["effect_note"]
+
+    gam_context = feature_effect_pr_cluster_inspection.resolve_effect_display_context("gam", "log")
+    assert gam_context["effect_title_label"] == "Additive effect (log scale)"
+    assert gam_context["effect_value_axis_label"] == "Mean additive effect (log scale)"
+    assert "link/log scale" in gam_context["effect_note"]
+    assert "multiplicative changes" in gam_context["effect_note"]
 
 
 def test_resolve_metric_plot_type_distinguishes_continuous_and_discrete_series():
@@ -1103,52 +1241,54 @@ def test_resolve_metric_plot_type_distinguishes_continuous_and_discrete_series()
     discrete_numeric_series = pd.Series([0, 1, 0, 1, 1, 0], dtype=int)
     categorical_series = pd.Series(["sunny", "rain", "rain"], dtype="string")
 
-    assert shap_cluster_inspection.resolve_metric_plot_type(continuous_series) == "continuous"
-    assert shap_cluster_inspection.resolve_metric_plot_type(discrete_numeric_series) == "categorical"
-    assert shap_cluster_inspection.resolve_metric_plot_type(categorical_series) == "categorical"
+    assert feature_effect_pr_cluster_inspection.resolve_metric_plot_type(continuous_series) == "continuous"
+    assert feature_effect_pr_cluster_inspection.resolve_metric_plot_type(discrete_numeric_series) == "categorical"
+    assert feature_effect_pr_cluster_inspection.resolve_metric_plot_type(categorical_series) == "categorical"
 
 
 def test_chunk_metric_columns_splits_overview_pages_deterministically():
-    assert shap_cluster_inspection.chunk_metric_columns(
+    assert feature_effect_pr_cluster_inspection.chunk_metric_columns(
         ["f1", "f2", "f3", "f4", "f5"],
         max_columns=2,
     ) == [["f1", "f2"], ["f3", "f4"], ["f5"]]
 
 
 def test_build_subset_style_map_assigns_noise_and_baseline_colors():
-    style_map = shap_cluster_inspection.build_subset_style_map(
-        ["Cluster 2", "Cluster 0", "Noise", shap_cluster_inspection.WHOLE_GROUP_LABEL]
+    style_map = feature_effect_pr_cluster_inspection.build_subset_style_map(
+        ["Cluster 2", "Cluster 0", "Noise", feature_effect_pr_cluster_inspection.WHOLE_GROUP_LABEL]
     )
 
-    assert set(style_map) == {"Cluster 2", "Cluster 0", "Noise", shap_cluster_inspection.WHOLE_GROUP_LABEL}
-    assert style_map["Noise"]["color"] == shap_cluster_inspection.DEFAULT_NOISE_COLOR
-    assert style_map[shap_cluster_inspection.WHOLE_GROUP_LABEL]["color"] == shap_cluster_inspection.DEFAULT_BASELINE_COLOR
+    assert set(style_map) == {"Cluster 2", "Cluster 0", "Noise", feature_effect_pr_cluster_inspection.WHOLE_GROUP_LABEL}
+    assert style_map["Noise"]["color"] == feature_effect_pr_cluster_inspection.DEFAULT_NOISE_COLOR
+    assert style_map[feature_effect_pr_cluster_inspection.WHOLE_GROUP_LABEL]["color"] == feature_effect_pr_cluster_inspection.DEFAULT_BASELINE_COLOR
     assert style_map["Cluster 2"]["color"] != style_map["Cluster 0"]["color"]
 
 
-def test_load_cluster_inspection_selection_orders_trajectory_features_by_group_shap_importance(tmp_path):
+def test_load_cluster_inspection_selection_orders_trajectory_features_by_global_feature_effect_ranking(tmp_path):
     clustered_df, cluster_scores_df = _sample_cluster_export_inputs()
     export_layout = {
         "cluster_spec_root": tmp_path,
         "tables_dir": tmp_path / "tables",
     }
     export_layout["tables_dir"].mkdir(parents=True)
-    outputs = shap_cluster_exports.write_cluster_exports(
+    outputs = feature_effect_cluster_exports.write_cluster_exports(
         clustered_df,
         cluster_scores_df,
         export_layout=export_layout,
         performance_metric_col="ml_ade",
         performance_group_col="performance_group",
-        shap_cols=["shap__speed", "shap__acceleration"],
+        effect_cols=["effect__speed", "effect__acceleration"],
     )
     cluster_assignments_path = export_layout["tables_dir"] / "cluster_assignments.csv"
     clustered_df.to_csv(cluster_assignments_path, index=False)
+    ranking_path = export_layout["tables_dir"] / "feature_effect_global_ranking.csv"
+    _sample_feature_effect_global_ranking_df(reverse_order=True).to_csv(ranking_path, index=False)
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(
         json.dumps(
             {
                 "schema_version": 1,
-                "run_context": {"run_name": "run_a"},
+                "run_context": {"run_name": "run_a", "model_id": "xgboost", "target_mode": "log"},
                 "data_context": {"target_col": "ml_ade"},
                 "cluster_spec": {"hash": "abc123"},
                 "artifacts": [
@@ -1158,13 +1298,19 @@ def test_load_cluster_inspection_selection_orders_trajectory_features_by_group_s
                         "relative_path": str(cluster_assignments_path.relative_to(tmp_path)),
                         "absolute_path": str(cluster_assignments_path.resolve()),
                     },
+                    {
+                        "artifact_kind": "table",
+                        "artifact_type": "feature_effect_global_ranking",
+                        "relative_path": str(ranking_path.relative_to(tmp_path)),
+                        "absolute_path": str(ranking_path.resolve()),
+                    },
                     *outputs["artifact_records"],
                 ],
             }
         )
     )
 
-    bundle = shap_cluster_inspection.load_cluster_inspection_selection(
+    bundle = feature_effect_pr_cluster_inspection.load_cluster_inspection_selection(
         {
             "cluster_spec_manifest_path": manifest_path,
             "performance_group": "easy",
@@ -1178,7 +1324,7 @@ def test_load_cluster_inspection_selection_orders_trajectory_features_by_group_s
         }
     )
 
-    assert bundle.trajectory_feature_cols == ["target_orig", "speed", "acceleration"]
+    assert bundle.trajectory_feature_cols == ["target_orig", "acceleration", "speed"]
 
 
 def test_scene_metric_order_prefers_semantic_priority_then_alphabetical():
@@ -1194,7 +1340,7 @@ def test_scene_metric_order_prefers_semantic_priority_then_alphabetical():
         }
     )
 
-    ordered_cols = shap_cluster_inspection._resolve_scene_metric_cols(df)
+    ordered_cols = feature_effect_pr_cluster_inspection._resolve_scene_metric_cols(df)
 
     assert ordered_cols == [
         "scene_num_agents",
