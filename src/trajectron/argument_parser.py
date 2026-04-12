@@ -259,6 +259,12 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--restrict_to_predchal",
+    help="restrict nuScenes trainval runs to the prediction-challenge subset",
+    action="store_true",
+)
+
+parser.add_argument(
     "--data_loc_dict",
     help="JSON dict of dataset locations (will be set from --user if not specified)",
     type=str,

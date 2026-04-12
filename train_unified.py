@@ -73,10 +73,26 @@ def restrict_to_predchal(
     ) as f:
         within_challenge_split = pickle.load(f)
 
-    within_challenge_split = [
-        (dataset.cache_path / scene_info_path, num_elems, elems)
-        for scene_info_path, num_elems, elems in within_challenge_split
-    ]
+    active_env_name = pathlib.Path(dataset._scene_index[0]).relative_to(
+        dataset.cache_path
+    ).parts[0]
+
+    remapped_split = []
+    for scene_info_path, num_elems, elems in within_challenge_split:
+        scene_rel_path = pathlib.Path(scene_info_path)
+        if scene_rel_path.parts and scene_rel_path.parts[0] != active_env_name:
+            scene_rel_path = pathlib.Path(active_env_name, *scene_rel_path.parts[1:])
+
+        remapped_scene_path = dataset.cache_path / scene_rel_path
+        if not remapped_scene_path.exists():
+            raise FileNotFoundError(
+                "Prediction challenge split references missing scene cache: "
+                f"{remapped_scene_path}"
+            )
+
+        remapped_split.append((remapped_scene_path, num_elems, elems))
+
+    within_challenge_split = remapped_split
 
     dataset._scene_index = [orig_path for orig_path, _, _ in within_challenge_split]
 
@@ -236,7 +252,10 @@ def train(rank, args):
         verbose=True,
     )
 
-    if hyperparams["train_data"] == "nusc_trainval-train":
+    if (
+        hyperparams["train_data"] == "nusc_trainval-train"
+        and hyperparams.get("restrict_to_predchal", False)
+    ):
         restrict_to_predchal(train_dataset, "train")
 
     train_sampler = data.distributed.DistributedSampler(
@@ -269,7 +288,10 @@ def train(rank, args):
         verbose=True,
     )
 
-    if hyperparams["eval_data"] == "nusc_trainval-train_val":
+    if (
+        hyperparams["eval_data"] == "nusc_trainval-train_val"
+        and hyperparams.get("restrict_to_predchal", False)
+    ):
         restrict_to_predchal(eval_dataset, "train_val")
 
     eval_sampler = data.distributed.DistributedSampler(

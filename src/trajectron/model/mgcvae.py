@@ -90,7 +90,8 @@ class MultimodalGenerativeCVAE(nn.Module):
         dynamic_class = getattr(
             dynamic_module, hyperparams["dynamic"][self.node_type]["name"]
         )
-        dyn_limits = hyperparams["dynamic"][self.node_type]["limits"]
+        # Some config backends omit empty nested dicts, e.g. PEDESTRIAN limits: {}.
+        dyn_limits = hyperparams["dynamic"][self.node_type].get("limits", {})
         self.dynamic = dynamic_class(
             dyn_limits,
             device,
