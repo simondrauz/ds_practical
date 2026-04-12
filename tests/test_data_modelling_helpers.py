@@ -1077,7 +1077,7 @@ def test_load_cluster_inspection_selection_supports_all_and_explicit_cluster_ids
     )
     bundle = shap_cluster_inspection.load_cluster_inspection_selection(resolved_config)
     assert bundle.ordered_cluster_ids == [0, 1, -1]
-    assert bundle.trajectory_feature_cols == ["speed", "acceleration"]
+    assert bundle.trajectory_feature_cols == ["target_orig", "speed", "acceleration"]
     assert bundle.scene_metric_cols == ["scene_density", "scene_weather"]
 
     explicit_config = shap_cluster_inspection.resolve_cluster_inspection_config(
@@ -1178,7 +1178,7 @@ def test_load_cluster_inspection_selection_orders_trajectory_features_by_group_s
         }
     )
 
-    assert bundle.trajectory_feature_cols == ["speed", "acceleration"]
+    assert bundle.trajectory_feature_cols == ["target_orig", "speed", "acceleration"]
 
 
 def test_scene_metric_order_prefers_semantic_priority_then_alphabetical():

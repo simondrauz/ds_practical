@@ -27,6 +27,7 @@ WHOLE_GROUP_LABEL = "Whole performance group"
 NOISE_LABEL = "Noise"
 DEFAULT_NOISE_COLOR = "#9AA0A6"
 DEFAULT_BASELINE_COLOR = "#264653"
+TARGET_ORIGINAL_UNITS_COL = "target_orig"
 SCENE_METRIC_PRIORITY = [
     "scene_num_agents",
     "scene_num_PEDESTRIAN",
@@ -134,6 +135,7 @@ def _blend_with_white(color: str | tuple[float, float, float], amount: float = 0
 
 def _format_metric_label(metric_col: str) -> str:
     overrides = {
+        TARGET_ORIGINAL_UNITS_COL: "Target (original units)",
         "max_speed": "Max speed",
         "std_speed": "Speed variability",
         "mean_acceleration": "Mean acceleration",
@@ -165,6 +167,12 @@ def _format_metric_label(metric_col: str) -> str:
         else:
             words.append(word.capitalize())
     return " ".join(words)
+
+
+def format_metric_label(metric_col: str) -> str:
+    """Return a display-ready label for one plotted trajectory or scene metric."""
+
+    return _format_metric_label(metric_col)
 
 
 def _numeric_subset_values(subset_df: pd.DataFrame, metric_col: str) -> pd.Series:
@@ -428,13 +436,18 @@ def _resolve_trajectory_feature_cols(group_assignments_df: pd.DataFrame) -> list
         if feature_col.startswith("scene_") or feature_col not in group_assignments_df.columns:
             continue
         feature_rows.append((feature_col, float(group_assignments_df[shap_col].abs().mean())))
-    return [
+    ordered_feature_cols = [
         feature_col
         for feature_col, _ in sorted(
             feature_rows,
             key=lambda item: (-item[1], item[0]),
         )
     ]
+    # Keep the original-unit target as the leading trajectory metric so the
+    # cluster-wise loss distribution stays visible alongside feature plots.
+    if TARGET_ORIGINAL_UNITS_COL in group_assignments_df.columns:
+        return [TARGET_ORIGINAL_UNITS_COL, *ordered_feature_cols]
+    return ordered_feature_cols
 
 
 def _resolve_scene_metric_cols(group_assignments_df: pd.DataFrame) -> list[str]:

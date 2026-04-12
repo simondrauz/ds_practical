@@ -85,3 +85,4 @@ def test_shap_cluster_inspection_notebook_references_exported_cluster_artifacts(
     assert "plot_cluster_profile_heatmap" in source
     assert "plot_metric_distribution_panels" in source
     assert "plot_metric_overview_matrix_pages" in source
+    assert "target_orig" in source
