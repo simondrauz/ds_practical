@@ -1,0 +1,23 @@
+# Hyperparameter sweep configuration for Trajectron++.
+#
+# `base_args` are passed to every train_unified.py invocation unchanged.
+# `grid` defines the axes to sweep; all combinations are run (Cartesian product).
+#
+# `attention_radius_scale` is a multiplier applied to every radius value in
+# shared_config.yaml. Use 1.0 to keep the defaults, 0.5 to halve them, etc.
+
+base_args:
+  conf: config/nuScenes.json
+  log_tag: sweep_tpp
+  train_epochs: 5
+  eval_every: 5
+  save_every: 5
+  train_data: nusc_mini-mini_train
+  eval_data: nusc_mini-mini_val
+  trajdata_cache_dir: /Users/zoe/.unified_data_cache
+  data_loc_dict: '{"nusc_mini": "/Users/zoe/Desktop/ds_practical/data/raw"}'
+
+grid:
+  history_sec: [2.0, 4.0]
+  prediction_sec: [2.0, 4.0, 6.0]
+  attention_radius_scale: [0.5, 1.0, 2.0]
