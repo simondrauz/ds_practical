@@ -77,13 +77,27 @@ def restrict_to_predchal(dataset: UnifiedDataset, split: str, city: str = "") ->
     with open(predchal_path, "rb") as f:
         within_challenge_split = pickle.load(f)
 
-    within_challenge_split = [
-        (dataset.cache_path / scene_info_path, num_elems, elems)
-        for scene_info_path, num_elems, elems in within_challenge_split
+    active_env_name = Path(dataset._scene_index[0]).relative_to(dataset.cache_path).parts[
+        0
     ]
 
-    dataset._scene_index = [orig_path for orig_path, _, _ in within_challenge_split]
-    dataset._data_index = AgentDataIndex(within_challenge_split, dataset.verbose)
+    remapped_split = []
+    for scene_info_path, num_elems, elems in within_challenge_split:
+        scene_rel_path = Path(scene_info_path)
+        if scene_rel_path.parts and scene_rel_path.parts[0] != active_env_name:
+            scene_rel_path = Path(active_env_name, *scene_rel_path.parts[1:])
+
+        remapped_scene_path = dataset.cache_path / scene_rel_path
+        if not remapped_scene_path.exists():
+            raise FileNotFoundError(
+                "Prediction challenge split references missing scene cache: "
+                f"{remapped_scene_path}"
+            )
+
+        remapped_split.append((remapped_scene_path, num_elems, elems))
+
+    dataset._scene_index = [orig_path for orig_path, _, _ in remapped_split]
+    dataset._data_index = AgentDataIndex(remapped_split, dataset.verbose)
     dataset._data_len = len(dataset._data_index)
 
 
@@ -169,7 +183,10 @@ def build_agent_eval_dataset(
         verbose=True,
     )
 
-    if hyperparams["eval_data"] == "nusc_trainval-train_val":
+    if (
+        hyperparams["eval_data"] == "nusc_trainval-train_val"
+        and hyperparams.get("restrict_to_predchal", False)
+    ):
         # Mirror train_unified.py's prediction-challenge filtering.
         restrict_to_predchal(dataset, "train_val")
 
