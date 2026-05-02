@@ -15,7 +15,7 @@ USER_PATHS: Final[Dict[str, Dict[str, str]]] = {
     },
     "zoe": {
         "trajdata_cache": "/Users/zoe/.unified_data_cache",
-        "nusc_raw": "/Users/zoe/Desktop/ds_practical/adaptive-prediction/v1.0-mini",
+        "nusc_raw": "/Users/zoe/Desktop/ds_practical/data/raw",
     },
 }
 

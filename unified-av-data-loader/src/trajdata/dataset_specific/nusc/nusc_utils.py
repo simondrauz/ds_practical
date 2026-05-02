@@ -98,7 +98,8 @@ def agg_agent_data(
                     fp=np.unwrap([yaw_list[-1], heading]),
                 )
             )
-            translation_list.append(np.stack([xs, ys], axis=1))
+            # nuScenes translations are 3D; keep interpolated gaps in the same shape.
+            translation_list.append(np.stack([xs, ys, zs], axis=1))
             yaw_list.extend(headings.tolist())
 
         translation_list.append(translation[np.newaxis])
