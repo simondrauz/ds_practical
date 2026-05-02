@@ -166,14 +166,16 @@ def prepare_dual_target_model_data(
     excluded_cols = {c for c in [raw_target_source_col, log_target_source_col] if c is not None}
     feature_cols = _filter_numeric_feature_cols(df, [c for c in df.columns if c not in excluded_cols])
 
-    required_cols = feature_cols.copy()
-    if raw_target_source_col is not None:
-        required_cols.append(raw_target_source_col)
-    if log_target_source_col is not None and log_target_source_col not in required_cols:
-        required_cols.append(log_target_source_col)
+    # Verify model settings are present and preserved
+    MODEL_SETTING_COLS = ['attention_radius_m', 'history_sec', 'prediction_sec']
+    missing_settings = [c for c in MODEL_SETTING_COLS if c not in feature_cols]
+    if missing_settings:
+        print(f"WARNING: Expected model settings not found in features: {missing_settings}")
+    else:
+        print(f"✓ Model settings preserved: {[c for c in MODEL_SETTING_COLS if c in feature_cols]}")
 
     # Step 3: drop incomplete rows only after the full feature/target contract is known.
-    model_df = df[required_cols].dropna().copy()
+    model_df = df[feature_cols].dropna().copy()
 
     if raw_target_source_col is None and log_target_source_col is not None:
         raw_target_col = base_target_name
