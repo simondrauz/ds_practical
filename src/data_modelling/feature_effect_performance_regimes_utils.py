@@ -10,6 +10,8 @@ from typing import Any, Iterable, Mapping
 import numpy as np
 import pandas as pd
 
+from .prepared_data import IDENTITY_COLS
+
 EFFECT_PREFIX = "effect__"
 VALID_PERFORMANCE_GROUPS = ("easy", "medium", "hard")
 VALID_CLUSTER_ALGORITHMS = ("hdbscan", "optics")
@@ -101,6 +103,49 @@ def assert_unique_key(df: pd.DataFrame, key_cols: list[str], *, df_name: str) ->
         raise ValueError(
             f"{df_name} is not unique on key {key_cols}. Duplicate rows found: {duplicate_count}"
         )
+
+
+def _available_identity_cols(df: pd.DataFrame) -> list[str]:
+    return [col for col in IDENTITY_COLS if col in df.columns]
+
+
+def _unique_preserve_order(cols: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered_cols: list[str] = []
+    for col in cols:
+        if col in seen:
+            continue
+        seen.add(col)
+        ordered_cols.append(col)
+    return ordered_cols
+
+
+def _resolve_trajectory_key_cols(
+    *,
+    prepared_model_df: pd.DataFrame,
+    joined_metrics_df: pd.DataFrame,
+    feature_effects_df: pd.DataFrame,
+) -> list[str]:
+    """Resolve the stable row key shared by prepared, metrics, and effect exports."""
+    if "data_idx" not in prepared_model_df.columns:
+        raise ValueError(
+            "Prepared modelling data is missing 'data_idx'. Regenerate prepared data from "
+            "joined metrics so trajectory rows are aligned by eval identity, not row position."
+        )
+    if "data_idx" not in feature_effects_df.columns:
+        raise ValueError(
+            "Feature-effect export is missing 'data_idx'. Regenerate model OOF and "
+            "feature-effect exports with the stable trajectory identity columns preserved."
+        )
+
+    optional_context_cols = [
+        col
+        for col in ["run_name", "eval_csv_name"]
+        if col in prepared_model_df.columns
+        and col in joined_metrics_df.columns
+        and col in feature_effects_df.columns
+    ]
+    return optional_context_cols + ["data_idx"]
 
 
 def _ensure_prepared_row_id(prepared_model_df: pd.DataFrame) -> pd.DataFrame:
@@ -724,7 +769,10 @@ def prepare_feature_effect_export(
     base_values: np.ndarray | float | None = None,
 ) -> pd.DataFrame:
     """Build a run-scoped per-row feature-effect export with a stable column contract."""
-    required_cols = feature_cols + ["row_id", "outer_fold", "oof_pred_orig", "target_orig"]
+    identity_cols = _available_identity_cols(model_df_oof)
+    required_cols = _unique_preserve_order(
+        feature_cols + identity_cols + ["row_id", "outer_fold", "oof_pred_orig", "target_orig"]
+    )
     assert_columns_present(model_df_oof, required_cols, df_name="model_data_with_oof")
 
     effect_array = np.asarray(effect_values)
@@ -742,7 +790,10 @@ def prepare_feature_effect_export(
         )
 
     effect_col_names = [f"{EFFECT_PREFIX}{feature}" for feature in feature_cols]
-    effect_export_df = model_df_oof[feature_cols + ["row_id", "outer_fold", "oof_pred_orig", "target_orig"]].copy()
+    export_cols = _unique_preserve_order(
+        identity_cols + feature_cols + ["row_id", "outer_fold", "oof_pred_orig", "target_orig"]
+    )
+    effect_export_df = model_df_oof[export_cols].copy()
     effect_export_df = pd.concat(
         [
             effect_export_df.reset_index(drop=True),
@@ -966,19 +1017,29 @@ def assemble_step1_analysis_table(
         df_name="joined metrics",
     )
 
-    effect_required_cols = key_cols + ["row_id", "outer_fold", "oof_pred_orig", "target_orig"]
+    trajectory_key_cols = _resolve_trajectory_key_cols(
+        prepared_model_df=prepared_model_df,
+        joined_metrics_df=joined_metrics_df,
+        feature_effects_df=feature_effects_df,
+    )
+
+    effect_required_cols = _unique_preserve_order(
+        key_cols + trajectory_key_cols + ["row_id", "outer_fold", "oof_pred_orig", "target_orig"]
+    )
     assert_columns_present(feature_effects_df, effect_required_cols, df_name="feature-effect export")
     expected_effect_cols = [f"{EFFECT_PREFIX}{feature}" for feature in feature_cols]
     assert_columns_present(feature_effects_df, expected_effect_cols, df_name="feature-effect export")
 
-    assert_unique_key(joined_metrics_df, ["data_idx"], df_name="joined metrics")
-    assert_unique_key(feature_effects_df, ["row_id"], df_name="feature-effect export")
+    assert_unique_key(prepared_model_df, trajectory_key_cols, df_name="prepared data")
+    assert_unique_key(joined_metrics_df, trajectory_key_cols, df_name="joined metrics")
+    assert_unique_key(feature_effects_df, trajectory_key_cols, df_name="feature-effect export")
 
-    joined_metric_cols = [col for col in joined_metrics_df.columns if col not in (key_cols + ["data_idx"])]
+    joined_metric_cols = [
+        col for col in joined_metrics_df.columns if col not in (key_cols + trajectory_key_cols)
+    ]
     analysis_df = prepared_model_df.merge(
-        joined_metrics_df[["data_idx"] + joined_metric_cols],
-        left_on="row_id",
-        right_on="data_idx",
+        joined_metrics_df[trajectory_key_cols + joined_metric_cols],
+        on=trajectory_key_cols,
         how="left",
         validate="one_to_one",
         indicator="_metrics_merge",
@@ -990,9 +1051,13 @@ def assemble_step1_analysis_table(
             "Prepared rows could not be fully aligned back to the joined metrics export. "
             f"Unmatched rows: {merge_mismatch_count}"
         )
-    analysis_df = analysis_df.drop(columns=["_metrics_merge", "data_idx"])
+    analysis_df = analysis_df.drop(columns=["_metrics_merge"])
 
-    effect_merge_cols = [col for col in feature_effects_df.columns if col not in (key_cols + ["row_id"])]
+    effect_merge_cols = [
+        col
+        for col in feature_effects_df.columns
+        if col not in (key_cols + trajectory_key_cols + ["row_id"])
+    ]
     overlapping_cols = sorted(set(effect_merge_cols) & set(analysis_df.columns))
     if overlapping_cols:
         raise ValueError(
@@ -1001,8 +1066,8 @@ def assemble_step1_analysis_table(
         )
 
     analysis_df = analysis_df.merge(
-        feature_effects_df[["row_id"] + effect_merge_cols],
-        on="row_id",
+        feature_effects_df[trajectory_key_cols + effect_merge_cols],
+        on=trajectory_key_cols,
         how="left",
         validate="one_to_one",
         indicator="_feature_effect_merge",

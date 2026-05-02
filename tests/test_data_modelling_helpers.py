@@ -389,7 +389,7 @@ def test_summarize_nested_cv_requires_shared_metric_columns():
 
 
 def test_build_oof_frame_adds_shared_output_columns():
-    model_df = pd.DataFrame({"feature_a": [10, 20], "target": [0.1, 0.2]})
+    model_df = pd.DataFrame({"data_idx": [42, 17], "feature_a": [10, 20], "target": [0.1, 0.2]})
     frame = build_oof_frame(
         model_df,
         row_ids=np.array([5, 6]),
@@ -399,6 +399,7 @@ def test_build_oof_frame_adds_shared_output_columns():
         pred_scale_kwargs={"target_mode": "log"},
     )
 
+    assert frame["data_idx"].tolist() == [42, 17]
     assert frame["row_id"].tolist() == [5, 6]
     assert frame["outer_fold"].tolist() == [1, 2]
     np.testing.assert_allclose(frame["oof_pred_orig"], [0.5, 0.7])
@@ -493,6 +494,7 @@ def test_prepare_single_target_model_data_falls_back_to_last_column():
 def test_prepare_single_target_model_data_filters_non_numeric_and_resolves_target():
     df = pd.DataFrame(
         {
+            "data_idx": [42, 17],
             "feature_a": [1.0, 2.0],
             "feature_b": ["x", "y"],
             "ml_ade_log": [0.1, 0.2],
@@ -503,12 +505,15 @@ def test_prepare_single_target_model_data_filters_non_numeric_and_resolves_targe
 
     assert prepared["target_col"] == "ml_ade_log"
     assert prepared["feature_cols"] == ["feature_a"]
-    assert prepared["model_df"].columns.tolist() == ["feature_a", "ml_ade_log"]
+    assert prepared["identity_cols"] == ["data_idx"]
+    assert prepared["model_df"].columns.tolist() == ["data_idx", "feature_a", "ml_ade_log"]
 
 
 def test_prepare_dual_target_model_data_derives_missing_raw_target():
     df = pd.DataFrame(
         {
+            "run_name": ["run_a", "run_a"],
+            "data_idx": [42, 17],
             "feature_a": [1.0, 2.0],
             "ml_ade_log": np.log1p([1.0, 3.0]),
         }
@@ -517,6 +522,12 @@ def test_prepare_dual_target_model_data_derives_missing_raw_target():
     prepared = prepare_dual_target_model_data(df)
 
     assert prepared["raw_target_col"] == "ml_ade"
+    assert prepared["identity_cols"] == ["run_name", "data_idx"]
+    assert prepared["feature_cols"] == ["feature_a"]
+    assert prepared["model_df"][["run_name", "data_idx"]].to_dict("list") == {
+        "run_name": ["run_a", "run_a"],
+        "data_idx": [42, 17],
+    }
     np.testing.assert_allclose(prepared["y_raw"], [1.0, 3.0])
 
 
@@ -567,6 +578,8 @@ def test_load_run_context_requires_manifest_fields(tmp_path, monkeypatch):
 def test_prepare_feature_effect_export_names_effect_columns_and_base_value():
     model_df_oof = pd.DataFrame(
         {
+            "run_name": ["run_a", "run_a"],
+            "data_idx": [42, 17],
             "speed": [1.0, 2.0],
             "acceleration": [0.2, 0.4],
             "row_id": [0, 1],
@@ -584,6 +597,8 @@ def test_prepare_feature_effect_export_names_effect_columns_and_base_value():
     )
 
     assert export_df.columns.tolist() == [
+        "run_name",
+        "data_idx",
         "speed",
         "acceleration",
         "row_id",
@@ -594,6 +609,136 @@ def test_prepare_feature_effect_export_names_effect_columns_and_base_value():
         "effect__acceleration",
         "effect_base_value",
     ]
+    assert export_df[["run_name", "data_idx"]].to_dict("list") == {
+        "run_name": ["run_a", "run_a"],
+        "data_idx": [42, 17],
+    }
+
+
+def test_assemble_step1_analysis_table_aligns_metrics_by_data_idx_not_row_position():
+    prepared_model_df = pd.DataFrame(
+        {
+            "data_idx": [20, 10],
+            "speed": [2.0, 1.0],
+            "ml_ade_log": np.log1p([20.0, 10.0]),
+        }
+    )
+    joined_metrics_df = pd.DataFrame(
+        {
+            "data_idx": [10, 20],
+            "speed": [1.0, 2.0],
+            "ml_ade": [10.0, 20.0],
+            "scene_id": ["scene_10", "scene_20"],
+        }
+    )
+    feature_effects_df = pd.DataFrame(
+        {
+            "data_idx": [20, 10],
+            "speed": [2.0, 1.0],
+            "row_id": [0, 1],
+            "outer_fold": [1, 1],
+            "oof_pred_orig": [19.5, 9.5],
+            "target_orig": [20.0, 10.0],
+            "effect__speed": [0.2, 0.1],
+        }
+    )
+
+    analysis_df, group_summary_df = feature_effect_performance_regimes_utils.assemble_step1_analysis_table(
+        prepared_model_df=prepared_model_df,
+        joined_metrics_df=joined_metrics_df,
+        feature_effects_df=feature_effects_df,
+        feature_cols=["speed"],
+        target_col="ml_ade_log",
+        performance_metric_col="ml_ade",
+    )
+
+    assert analysis_df["data_idx"].tolist() == [20, 10]
+    assert analysis_df["ml_ade"].tolist() == [20.0, 10.0]
+    assert analysis_df["scene_id"].tolist() == ["scene_20", "scene_10"]
+    assert analysis_df["effect__speed"].tolist() == [0.2, 0.1]
+    assert set(analysis_df["performance_group"]).issubset({"easy", "medium", "hard"})
+    assert group_summary_df.loc[0, "n_total"] == 2
+
+
+def test_assemble_step1_analysis_table_uses_run_name_with_duplicate_data_idx():
+    prepared_model_df = pd.DataFrame(
+        {
+            "run_name": ["run_b", "run_a"],
+            "data_idx": [0, 0],
+            "speed": [2.0, 1.0],
+            "ml_ade_log": np.log1p([20.0, 10.0]),
+        }
+    )
+    joined_metrics_df = pd.DataFrame(
+        {
+            "run_name": ["run_a", "run_b"],
+            "data_idx": [0, 0],
+            "speed": [1.0, 2.0],
+            "ml_ade": [10.0, 20.0],
+        }
+    )
+    feature_effects_df = pd.DataFrame(
+        {
+            "run_name": ["run_b", "run_a"],
+            "data_idx": [0, 0],
+            "speed": [2.0, 1.0],
+            "row_id": [0, 1],
+            "outer_fold": [1, 1],
+            "oof_pred_orig": [19.5, 9.5],
+            "target_orig": [20.0, 10.0],
+            "effect__speed": [0.2, 0.1],
+        }
+    )
+
+    analysis_df, _ = feature_effect_performance_regimes_utils.assemble_step1_analysis_table(
+        prepared_model_df=prepared_model_df,
+        joined_metrics_df=joined_metrics_df,
+        feature_effects_df=feature_effects_df,
+        feature_cols=["speed"],
+        target_col="ml_ade_log",
+        performance_metric_col="ml_ade",
+    )
+
+    assert analysis_df[["run_name", "data_idx", "ml_ade"]].to_dict("records") == [
+        {"run_name": "run_b", "data_idx": 0, "ml_ade": 20.0},
+        {"run_name": "run_a", "data_idx": 0, "ml_ade": 10.0},
+    ]
+
+
+def test_assemble_step1_analysis_table_rejects_legacy_prepared_data_without_data_idx():
+    prepared_model_df = pd.DataFrame(
+        {
+            "speed": [2.0, 1.0],
+            "ml_ade_log": np.log1p([20.0, 10.0]),
+        }
+    )
+    joined_metrics_df = pd.DataFrame(
+        {
+            "data_idx": [10, 20],
+            "speed": [1.0, 2.0],
+            "ml_ade": [10.0, 20.0],
+        }
+    )
+    feature_effects_df = pd.DataFrame(
+        {
+            "speed": [2.0, 1.0],
+            "row_id": [0, 1],
+            "outer_fold": [1, 1],
+            "oof_pred_orig": [19.5, 9.5],
+            "target_orig": [20.0, 10.0],
+            "effect__speed": [0.2, 0.1],
+        }
+    )
+
+    with pytest.raises(ValueError, match="missing 'data_idx'"):
+        feature_effect_performance_regimes_utils.assemble_step1_analysis_table(
+            prepared_model_df=prepared_model_df,
+            joined_metrics_df=joined_metrics_df,
+            feature_effects_df=feature_effects_df,
+            feature_cols=["speed"],
+            target_col="ml_ade_log",
+            performance_metric_col="ml_ade",
+        )
 
 
 def test_build_feature_effect_importance_table_orders_xgboost_and_gam():
