@@ -431,7 +431,10 @@ def main() -> None:
         min_bbox_area_m2=args.scene_min_bbox_area_m2
     )
 
-    eval_files = list(iter_eval_files(args.metrics_root, args.run_dir))
+    run_dir = args.run_dir
+    if run_dir is not None and not run_dir.is_absolute():
+        run_dir = args.metrics_root / run_dir
+    eval_files = list(iter_eval_files(args.metrics_root, run_dir))
     if len(eval_files) == 0:
         raise FileNotFoundError(f"No eval_epoch_*.csv files found under {args.metrics_root}")
 
@@ -449,6 +452,13 @@ def main() -> None:
     all_indices_sorted = sorted(all_indices)
     print(f"Computing agent metrics once for {len(all_indices_sorted)} unique data_idx values")
     agent_char_df = compute_metrics_for_indices(agent_dataset, all_indices_sorted, metric_cfg)
+
+    attention_radius = load_attention_radius()
+    agent_char_df["attention_radius_m"] = agent_char_df["agent_type"].apply(
+        lambda name: attention_radius[(AgentType[name.upper()], AgentType[name.upper()])]
+    )
+    agent_char_df["history_sec"] = float(hyperparams["history_sec"])
+    agent_char_df["prediction_sec"] = float(hyperparams["prediction_sec"])
 
     print("Mapping data_idx to scene keys and computing scene metrics once")
     scene_keys_df = scene_keys_for_indices(agent_dataset, all_indices_sorted)
