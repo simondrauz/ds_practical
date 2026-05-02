@@ -39,8 +39,9 @@ from data_preparation.functions_traj_metrics.scene_centric_characteristic_metric
     compute_scene_characteristic_metrics,
 )
 from shared_config.config_loader import (  # noqa: E402
+    attention_radius_from_config,
     load_agent_type_defaults,
-    load_attention_radius,
+    load_attention_radius_config,
     load_vector_map_settings,
     parse_agent_type_list,
 )
@@ -303,7 +304,14 @@ def load_hyperparams(conf_path: Path, overrides: argparse.Namespace) -> Dict:
     if overrides.incl_robot_node is not None:
         hyperparams["incl_robot_node"] = overrides.incl_robot_node
 
+    if "attention_radius" not in hyperparams:
+        hyperparams["attention_radius"] = load_attention_radius_config()
+
     return hyperparams
+
+
+def resolve_attention_radius(hyperparams: Dict) -> Dict[Tuple[AgentType, AgentType], float]:
+    return attention_radius_from_config(hyperparams["attention_radius"])
 
 
 def _parse_data_dirs(hyperparams: Dict) -> Dict[str, str]:
@@ -350,7 +358,7 @@ def build_agent_eval_dataset(
         centric="agent",
         history_sec=(hyperparams["history_sec"], hyperparams["history_sec"]),
         future_sec=(hyperparams["prediction_sec"], hyperparams["prediction_sec"]),
-        agent_interaction_distances=load_attention_radius(),
+        agent_interaction_distances=resolve_attention_radius(hyperparams),
         incl_robot_future=hyperparams.get("incl_robot_node", False),
         incl_raster_map=hyperparams.get("map_encoding", False),
         raster_map_params=raster_map_params,
@@ -393,7 +401,7 @@ def build_scene_eval_dataset(
         centric="scene",
         history_sec=(hyperparams["history_sec"], hyperparams["history_sec"]),
         future_sec=(hyperparams["prediction_sec"], hyperparams["prediction_sec"]),
-        agent_interaction_distances=load_attention_radius(),
+        agent_interaction_distances=resolve_attention_radius(hyperparams),
         incl_robot_future=hyperparams.get("incl_robot_node", False),
         incl_raster_map=False,
         incl_vector_map=incl_vector_map,
@@ -635,7 +643,7 @@ def main() -> None:
     print(f"Computing agent metrics once for {len(all_indices_sorted)} unique data_idx values")
     agent_char_df = compute_metrics_for_indices(agent_dataset, all_indices_sorted, metric_cfg)
 
-    attention_radius = load_attention_radius()
+    attention_radius = resolve_attention_radius(hyperparams)
     agent_char_df["attention_radius_m"] = agent_char_df["agent_type"].apply(
         lambda name: attention_radius[(AgentType[name.upper()], AgentType[name.upper()])]
     )

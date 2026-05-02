@@ -45,8 +45,9 @@ from trajectron.model.model_utils import UpdateMode
 from trajectron.model.trajectron import Trajectron
 from trajectron.utils.comm import all_gather
 from shared_config.config_loader import (
+    attention_radius_from_config,
     load_agent_type_defaults,
-    load_attention_radius,
+    load_attention_radius_config,
     load_vector_map_settings,
     parse_agent_type_list,
 )
@@ -166,6 +167,9 @@ def train(rank, args):
     elif "edge_encoding" not in hyperparams:
         hyperparams["edge_encoding"] = not args.no_edge_encoding
 
+    if "attention_radius" not in hyperparams:
+        hyperparams["attention_radius"] = load_attention_radius_config()
+
     # Distributed LR Scaling
     hyperparams["learning_rate"] *= dist.get_world_size()
 
@@ -253,7 +257,7 @@ def train(rank, args):
         print("model_dir:", model_dir_subfolder)
 
     # Load training and evaluation environments and scenes
-    attention_radius = load_attention_radius()
+    attention_radius = attention_radius_from_config(hyperparams["attention_radius"])
 
     data_dirs: Dict[str, str] = json.loads(hyperparams["data_loc_dict"])
 

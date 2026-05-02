@@ -11,6 +11,16 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SHARED_CONFIG_PATH = _REPO_ROOT / "config" / "shared_config.yaml"
 
 
+def _agent_type_from_name(name: str) -> AgentType:
+    enum_name = str(name).split(".")[-1].upper()
+    if enum_name not in AgentType.__members__:
+        valid_types = ", ".join(AgentType.__members__.keys())
+        raise ValueError(
+            f"Unknown agent type `{name}`. Expected one of: {valid_types}"
+        )
+    return AgentType[enum_name]
+
+
 def _load_shared_config(config_path: Path | str = DEFAULT_SHARED_CONFIG_PATH) -> Dict[str, Any]:
     resolved_path = Path(config_path).expanduser().resolve()
     if not resolved_path.exists():
@@ -61,8 +71,19 @@ def load_attention_radius(
 ) -> Dict[Tuple[AgentType, AgentType], float]:
     """Loads agent interaction attention radii from config/shared_config.yaml."""
     raw_cfg = _load_shared_config(config_path)
+    return attention_radius_from_config(raw_cfg.get("attention_radius", {}))
 
-    attention_cfg = raw_cfg.get("attention_radius", {})
+
+def load_attention_radius_config(
+    config_path: Path | str = DEFAULT_SHARED_CONFIG_PATH,
+) -> Dict[str, Any]:
+    """Loads and normalises serialisable attention-radius config."""
+    raw_cfg = _load_shared_config(config_path)
+    return normalise_attention_radius_config(raw_cfg.get("attention_radius", {}))
+
+
+def normalise_attention_radius_config(attention_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate and normalise serialisable attention-radius config."""
     if not isinstance(attention_cfg, dict):
         raise ValueError("Invalid shared config: `attention_radius` must be a mapping")
 
@@ -73,15 +94,38 @@ def load_attention_radius(
             "Invalid shared config: `attention_radius.pairs` must be a mapping"
         )
 
-    radius = defaultdict(lambda: default_radius)
+    normalised_pairs: Dict[str, Dict[str, float]] = {}
     for src_name, targets in pairs_cfg.items():
         if not isinstance(targets, dict):
             raise ValueError(
                 f"Invalid shared config: `attention_radius.pairs.{src_name}` must be a mapping"
             )
-        src_agent = AgentType[src_name.upper()]
+        src_agent = _agent_type_from_name(str(src_name))
+        normalised_pairs[src_agent.name] = {}
         for dst_name, value in targets.items():
-            dst_agent = AgentType[dst_name.upper()]
+            dst_agent = _agent_type_from_name(str(dst_name))
+            normalised_pairs[src_agent.name][dst_agent.name] = float(value)
+
+    return {
+        "default": default_radius,
+        "pairs": normalised_pairs,
+    }
+
+
+def attention_radius_from_config(
+    attention_cfg: Dict[str, Any],
+) -> Dict[Tuple[AgentType, AgentType], float]:
+    """Build trajdata attention-radius mapping from serialisable config."""
+    attention_cfg = normalise_attention_radius_config(attention_cfg)
+
+    default_radius = float(attention_cfg["default"])
+    pairs_cfg = attention_cfg["pairs"]
+
+    radius = defaultdict(lambda: default_radius)
+    for src_name, targets in pairs_cfg.items():
+        src_agent = _agent_type_from_name(src_name)
+        for dst_name, value in targets.items():
+            dst_agent = _agent_type_from_name(dst_name)
             radius[(src_agent, dst_agent)] = float(value)
 
     return radius
@@ -89,16 +133,7 @@ def load_attention_radius(
 
 def _parse_agent_type_names(names: List[str]) -> List[AgentType]:
     """Convert a list of agent type name strings to AgentType enums."""
-    parsed = []
-    for name in names:
-        enum_name = name.split(".")[-1].upper()
-        if enum_name not in AgentType.__members__:
-            valid_types = ", ".join(AgentType.__members__.keys())
-            raise ValueError(
-                f"Unknown agent type `{name}`. Expected one of: {valid_types}"
-            )
-        parsed.append(AgentType[enum_name])
-    return parsed
+    return [_agent_type_from_name(name) for name in names]
 
 
 def load_agent_type_defaults(
@@ -165,4 +200,3 @@ def parse_agent_type_list(
         parsed.append(AgentType[enum_name])
 
     return parsed
-
