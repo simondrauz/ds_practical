@@ -175,7 +175,10 @@ def prepare_dual_target_model_data(
         print(f"✓ Model settings preserved: {[c for c in MODEL_SETTING_COLS if c in feature_cols]}")
 
     # Step 3: drop incomplete rows only after the full feature/target contract is known.
-    model_df = df[feature_cols].dropna().copy()
+    target_source_cols = [
+        c for c in [raw_target_source_col, log_target_source_col] if c is not None
+    ]
+    model_df = df[feature_cols + target_source_cols].dropna().copy()
 
     if raw_target_source_col is None and log_target_source_col is not None:
         raw_target_col = base_target_name
