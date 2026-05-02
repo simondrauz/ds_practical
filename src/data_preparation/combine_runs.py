@@ -1,8 +1,8 @@
 """Combine joined trajectory-metric CSVs from multiple Trajectron++ runs.
 
-Reads all eval CSV files produced by ``join_characteristic_metrics.py`` from
-``results/trajectory_prediction/trajectory_metrics_joined/`` and concatenates
-them into a single file.
+Reads selected eval CSV files produced by ``join_characteristic_metrics.py``
+from ``results/trajectory_prediction/trajectory_metrics_joined/`` and
+concatenates them into a single file.
 
 When runs differ in ``history_sec``, ``prediction_sec``, or ``attention_radius_m``,
 features that accumulate over the trajectory window are not directly comparable.
@@ -172,8 +172,16 @@ def parse_args() -> argparse.Namespace:
         default=None,
         metavar="RUN_DIR",
         help=(
-            "Optional: specific run directory names to include. "
-            "Defaults to all subdirectories of --joined_root."
+            "Specific run directory names to include. Required unless "
+            "--all_runs is passed."
+        ),
+    )
+    parser.add_argument(
+        "--all_runs",
+        action="store_true",
+        help=(
+            "Explicitly include every run directory under --joined_root. Use only "
+            "when intentionally recombining the full joined-output directory."
         ),
     )
     parser.add_argument(
@@ -191,7 +199,15 @@ def parse_args() -> argparse.Namespace:
         default="csv",
         help="Output file format (default: csv).",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.run_dirs and args.all_runs:
+        parser.error("--run_dirs and --all_runs are mutually exclusive")
+    if not args.run_dirs and not args.all_runs:
+        parser.error(
+            "refusing to combine every joined run implicitly; pass --run_dirs "
+            "for the current sweep, or --all_runs to opt in"
+        )
+    return args
 
 
 def main() -> None:
