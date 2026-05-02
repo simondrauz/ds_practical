@@ -37,6 +37,9 @@ results/evaluation/plots/characterization/*.png
 results/**/plots/
 results/**/*.csv
 results/interpretable_model/
+docs/current_pipeline_overview*.svg
+docs/current_pipeline_overview*.png
+docs/current_pipeline_overview*.pdf
 .mplconfig/
 *.egg-info/
 *.pt
