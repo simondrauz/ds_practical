@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 
-NOTEBOOK_DIR = Path(__file__).resolve().parents[1] / "src" / "data_modelling"
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from data_modelling.run_interpretable_notebook_workflow import _build_workflow, _patch_notebook
+
+
+NOTEBOOK_DIR = ROOT / "src" / "data_modelling"
 NOTEBOOK_NAMES = [
     "gam.ipynb",
     "feature_effect_performance_regimes.ipynb",
@@ -95,3 +102,23 @@ def test_feature_effect_pr_cluster_inspection_notebook_references_exported_clust
     assert "plot_metric_distribution_panels" in source
     assert "plot_metric_overview_matrix_pages" in source
     assert "target_orig" in source
+
+
+def test_notebook_workflow_patches_preparation_to_joined_eval_epoch():
+    workflow = _build_workflow(
+        run_name="workflow_run",
+        eval_csv_name="eval_epoch_7.csv",
+        prepared_target_col="ml_ade",
+        target_col=None,
+        include_gam=True,
+        include_xgboost=False,
+    )
+
+    notebook = _patch_notebook(workflow[0].notebook_path, workflow[0].patchers)
+    source = "\n".join(cell.get("source", "") for cell in notebook.cells)
+
+    assert "RUN_NAME = 'workflow_run'" in source
+    assert "EVAL_CSV_NAME = 'eval_epoch_7.csv'" in source
+    assert "trajectory_metrics_joined" in source
+    assert 'df.insert(0, "run_name", RUN_NAME)' in source
+    assert 'df.insert(insert_at, "eval_csv_name", EVAL_CSV_NAME)' in source

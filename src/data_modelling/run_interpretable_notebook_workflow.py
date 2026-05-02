@@ -99,7 +99,7 @@ def _build_workflow(
             notebook_path=NOTEBOOK_DIR / "interpretable_model_data_preparation.ipynb",
             patchers=[
                 lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(run_name)),
-                lambda source: _replace_first_literal(source, "eval_epoch_5.csv", eval_csv_name),
+                lambda source: _replace_assignment(source, "EVAL_CSV_NAME", _python_literal(eval_csv_name)),
                 lambda source: _replace_assignment(source, "target_col", _python_literal(prepared_target_col)),
             ],
             output_name="01_interpretable_model_data_preparation.ipynb",

@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,6 +12,28 @@ sys.path.insert(0, str(ROOT / "src"))
 
 import run_sweep
 from data_preparation import combine_runs
+
+
+def test_combine_runs_preserves_eval_csv_name_in_row_identity(tmp_path):
+    joined_root = tmp_path / "joined"
+    run_dir = joined_root / "run_a"
+    run_dir.mkdir(parents=True)
+    pd.DataFrame({"data_idx": [0], "ml_ade": [1.0]}).to_csv(
+        run_dir / "eval_epoch_1.csv",
+        index=False,
+    )
+    pd.DataFrame({"data_idx": [0], "ml_ade": [2.0]}).to_csv(
+        run_dir / "eval_epoch_2.csv",
+        index=False,
+    )
+
+    combined = combine_runs.combine(joined_root, ["run_a"])
+
+    assert combined[["run_name", "eval_csv_name", "data_idx", "ml_ade"]].to_dict("records") == [
+        {"run_name": "run_a", "eval_csv_name": "eval_epoch_1.csv", "data_idx": 0, "ml_ade": 1.0},
+        {"run_name": "run_a", "eval_csv_name": "eval_epoch_2.csv", "data_idx": 0, "ml_ade": 2.0},
+    ]
+    assert not combined.duplicated(["run_name", "eval_csv_name", "data_idx"]).any()
 
 
 def test_sweep_combine_command_is_scoped_to_current_run_dirs():
