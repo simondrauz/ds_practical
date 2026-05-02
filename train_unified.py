@@ -58,6 +58,34 @@ from shared_config.config_loader import (
 # cache = EnvCache("/Users/zoe/.unified_data_cache")
 
 DEFAULT_ONLY_PREDICT, DEFAULT_NO_TYPES = load_agent_type_defaults()
+EVAL_IDENTITY_COLS = ["data_idx", "scene_path", "agent_id", "scene_ts", "agent_type"]
+EVAL_CONTEXT_COLS = ["eval_data", "history_sec", "prediction_sec", "restrict_to_predchal"]
+
+
+def _agent_type_name(agent_type) -> str:
+    return agent_type.name if isinstance(agent_type, AgentType) else str(agent_type)
+
+
+def eval_identity_for_data_idx(eval_dataset: UnifiedDataset, data_idx: int, agent_type) -> Dict:
+    """Return stable eval-row identity metadata for one trajdata dataset index."""
+    scene_path, agent_id, scene_ts = eval_dataset._data_index[int(data_idx)]
+    return {
+        "data_idx": int(data_idx),
+        "scene_path": str(scene_path),
+        "agent_id": str(agent_id),
+        "scene_ts": int(scene_ts),
+        "agent_type": _agent_type_name(agent_type),
+    }
+
+
+def eval_context_from_hyperparams(hyperparams) -> Dict:
+    """Return scalar eval dataset settings that joined metrics must reproduce."""
+    return {
+        "eval_data": str(hyperparams["eval_data"]),
+        "history_sec": float(hyperparams["history_sec"]),
+        "prediction_sec": float(hyperparams["prediction_sec"]),
+        "restrict_to_predchal": bool(hyperparams.get("restrict_to_predchal", False)),
+    }
 
 
 def restrict_to_predchal(
@@ -462,6 +490,7 @@ def train(rank, args):
                     "nll_mean",
                     "nll_final",
                 ]
+                eval_context = eval_context_from_hyperparams(hyperparams)
 
                 batch: AgentBatch
                 for batch in tqdm(
@@ -493,7 +522,12 @@ def train(rank, args):
                             if metric in metric_dict
                         }
                         for row_idx, idx_val in enumerate(data_idx.tolist()):
-                            row = {"data_idx": int(idx_val)}
+                            row = eval_identity_for_data_idx(
+                                eval_dataset,
+                                int(idx_val),
+                                agent_type,
+                            )
+                            row.update(eval_context)
                             for metric in metrics_to_write:
                                 if metric in metric_arrays:
                                     row[metric] = float(metric_arrays[metric][row_idx])
@@ -539,7 +573,7 @@ def train(rank, args):
                     with open(
                         metrics_path, "w", newline="", encoding="utf-8"
                     ) as csvfile:
-                        fieldnames = ["data_idx"] + metrics_to_write
+                        fieldnames = EVAL_IDENTITY_COLS + EVAL_CONTEXT_COLS + metrics_to_write
                         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                         writer.writeheader()
                         writer.writerows(per_traj_rows)

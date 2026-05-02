@@ -46,6 +46,186 @@ from shared_config.config_loader import (  # noqa: E402
 )
 
 DEFAULT_ONLY_PREDICT, DEFAULT_NO_TYPES = load_agent_type_defaults()
+TRAJECTORY_IDENTITY_COLS = ["data_idx", "scene_path", "agent_id", "scene_ts", "agent_type"]
+TRAJECTORY_IDENTITY_CHECK_COLS = ["scene_path", "agent_id", "scene_ts", "agent_type"]
+EVAL_CONTEXT_COLS = ["eval_data", "history_sec", "prediction_sec", "restrict_to_predchal"]
+
+
+def _agent_type_name(agent_type) -> str:
+    return agent_type.name if isinstance(agent_type, AgentType) else str(agent_type)
+
+
+def trajectory_identity_for_index(
+    agent_dataset: UnifiedDataset,
+    data_idx: int,
+    elem=None,
+) -> Dict:
+    """Return the trajdata identity represented by one agent-centric data_idx."""
+    scene_path, agent_id, scene_ts = agent_dataset._data_index[int(data_idx)]
+    identity = {
+        "data_idx": int(data_idx),
+        "scene_path": str(scene_path),
+        "agent_id": str(agent_id),
+        "scene_ts": int(scene_ts),
+    }
+    if elem is not None:
+        identity["agent_type"] = _agent_type_name(elem.agent_type)
+    return identity
+
+
+def _normalise_identity_series(series: pd.Series, col: str) -> pd.Series:
+    if col == "scene_ts":
+        return pd.to_numeric(series, errors="coerce").astype("Int64")
+    return series.map(lambda value: "" if pd.isna(value) else str(value))
+
+
+def _bool_value(value) -> bool:
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    if isinstance(value, (int, np.integer)):
+        return bool(value)
+    if isinstance(value, str):
+        return _str2bool(value)
+    raise ValueError(f"Cannot interpret boolean value from: {value!r}")
+
+
+def eval_context_from_hyperparams(hyperparams: Dict) -> Dict:
+    """Return eval dataset settings that joined metrics must reproduce."""
+    return {
+        "eval_data": str(hyperparams["eval_data"]),
+        "history_sec": float(hyperparams["history_sec"]),
+        "prediction_sec": float(hyperparams["prediction_sec"]),
+        "restrict_to_predchal": bool(hyperparams.get("restrict_to_predchal", False)),
+    }
+
+
+def validate_eval_context(
+    eval_df: pd.DataFrame,
+    hyperparams: Dict,
+    *,
+    eval_file: Path,
+) -> None:
+    """Assert eval CSV context columns match the config used for reconstruction."""
+    present_cols = [col for col in EVAL_CONTEXT_COLS if col in eval_df.columns]
+    if not present_cols:
+        return
+
+    missing_cols = [col for col in EVAL_CONTEXT_COLS if col not in eval_df.columns]
+    if missing_cols:
+        raise ValueError(
+            f"{eval_file} has partial eval context columns. Missing: {missing_cols}. "
+            "Regenerate eval metrics so all context columns are written together."
+        )
+
+    expected_context = eval_context_from_hyperparams(hyperparams)
+    mismatches = []
+    for col in EVAL_CONTEXT_COLS:
+        values = eval_df[col].drop_duplicates().tolist()
+        if len(values) != 1:
+            raise ValueError(
+                f"{eval_file} has multiple values for eval context column {col!r}: {values[:5]}"
+            )
+        actual = values[0]
+        expected = expected_context[col]
+        if col in {"history_sec", "prediction_sec"}:
+            matches = abs(float(actual) - float(expected)) <= 1e-9
+        elif col == "restrict_to_predchal":
+            matches = _bool_value(actual) == bool(expected)
+        else:
+            matches = str(actual) == str(expected)
+        if not matches:
+            mismatches.append({"column": col, "eval_csv": actual, "reconstructed": expected})
+
+    if mismatches:
+        raise ValueError(
+            "Eval context does not match the config used to reconstruct trajdata for "
+            f"{eval_file}. Mismatches: {mismatches}"
+        )
+
+
+def validate_eval_identity(
+    eval_df: pd.DataFrame,
+    expected_identity_df: pd.DataFrame,
+    *,
+    eval_file: Path,
+) -> None:
+    """Assert eval CSV identity columns match the reconstructed trajdata dataset."""
+    present_cols = [col for col in TRAJECTORY_IDENTITY_CHECK_COLS if col in eval_df.columns]
+    if not present_cols:
+        return
+
+    missing_cols = [col for col in TRAJECTORY_IDENTITY_CHECK_COLS if col not in eval_df.columns]
+    if missing_cols:
+        raise ValueError(
+            f"{eval_file} has partial trajectory identity columns. Missing: {missing_cols}. "
+            "Regenerate eval metrics so all identity columns are written together."
+        )
+
+    required_cols = TRAJECTORY_IDENTITY_COLS
+    missing_expected_cols = [
+        col for col in required_cols if col not in expected_identity_df.columns
+    ]
+    if missing_expected_cols:
+        raise KeyError(
+            "Reconstructed characteristic metrics are missing identity columns: "
+            f"{missing_expected_cols}"
+        )
+
+    if expected_identity_df["data_idx"].duplicated().any():
+        duplicate_count = int(expected_identity_df["data_idx"].duplicated().sum())
+        raise ValueError(
+            "Reconstructed trajectory identity is not unique on data_idx. "
+            f"Duplicate rows: {duplicate_count}"
+        )
+
+    merged = eval_df[required_cols].merge(
+        expected_identity_df[required_cols],
+        on="data_idx",
+        how="left",
+        suffixes=("_eval", "_dataset"),
+        validate="many_to_one",
+        indicator="_identity_merge",
+    )
+    missing_dataset_rows = int((merged["_identity_merge"] != "both").sum())
+    if missing_dataset_rows:
+        raise ValueError(
+            "Eval rows could not be found in the reconstructed trajdata dataset for "
+            f"{eval_file}. Missing rows: {missing_dataset_rows}"
+        )
+
+    mismatch_mask = pd.Series(False, index=merged.index)
+    for col in TRAJECTORY_IDENTITY_CHECK_COLS:
+        eval_values = _normalise_identity_series(merged[f"{col}_eval"], col)
+        dataset_values = _normalise_identity_series(merged[f"{col}_dataset"], col)
+        mismatch_mask |= eval_values != dataset_values
+
+    mismatch_count = int(mismatch_mask.sum())
+    if mismatch_count:
+        sample_cols = ["data_idx"]
+        for col in TRAJECTORY_IDENTITY_CHECK_COLS:
+            sample_cols.extend([f"{col}_eval", f"{col}_dataset"])
+        sample = merged.loc[mismatch_mask, sample_cols].head(5).to_dict(orient="records")
+        raise ValueError(
+            "Eval trajectory identity does not match the reconstructed trajdata dataset for "
+            f"{eval_file}. Mismatched rows: {mismatch_count}. Sample: {sample}"
+        )
+
+
+def drop_overlapping_columns_for_join(
+    right_df: pd.DataFrame,
+    existing_cols: Iterable[str],
+    *,
+    join_cols: Iterable[str],
+) -> pd.DataFrame:
+    """Drop non-key columns that would otherwise create pandas merge suffixes."""
+    existing = set(existing_cols)
+    join_col_set = set(join_cols)
+    drop_cols = [
+        col for col in right_df.columns if col in existing and col not in join_col_set
+    ]
+    if not drop_cols:
+        return right_df
+    return right_df.drop(columns=drop_cols)
 
 
 def _str2bool(val: str) -> bool:
@@ -258,13 +438,9 @@ def compute_metrics_for_indices(
             )
         elem = dataset[idx]
         metrics = compute_agent_characteristic_metrics(elem, metric_cfg)
+        metrics.update(trajectory_identity_for_index(dataset, idx, elem))
         # Preserve the trajectory's agent category for downstream grouped analysis.
-        metrics["agent_type"] = (
-            elem.agent_type.name
-            if isinstance(elem.agent_type, AgentType)
-            else str(elem.agent_type)
-        )
-        metrics["data_idx"] = int(idx)
+        metrics["agent_type"] = _agent_type_name(elem.agent_type)
         rows.append(metrics)
     return pd.DataFrame(rows)
 
@@ -275,9 +451,13 @@ def scene_keys_for_indices(
     """Maps agent-centric data_idx values to (scene_path, scene_ts)."""
     rows = []
     for idx in data_indices:
-        scene_path, _agent_id, scene_ts = agent_dataset._data_index[int(idx)]
+        identity = trajectory_identity_for_index(agent_dataset, int(idx))
         rows.append(
-            {"data_idx": int(idx), "scene_path": scene_path, "scene_ts": int(scene_ts)}
+            {
+                "data_idx": identity["data_idx"],
+                "scene_path": identity["scene_path"],
+                "scene_ts": identity["scene_ts"],
+            }
         )
     return pd.DataFrame(rows)
 
@@ -292,6 +472,7 @@ def compute_scene_metrics_for_keys(
     remaining = set(needed_keys)
     for idx in tqdm(range(len(scene_dataset)), desc="Scene characteristic metrics"):
         scene_path, scene_ts = scene_dataset._data_index[idx]
+        scene_path = str(scene_path)
         key = (scene_path, int(scene_ts))
         if key not in remaining:
             continue
@@ -444,6 +625,7 @@ def main() -> None:
     all_indices: Set[int] = set()
     for eval_file in eval_files:
         eval_df = pd.read_csv(eval_file)
+        validate_eval_context(eval_df, hyperparams, eval_file=eval_file)
         eval_dfs[eval_file] = eval_df
         unique_indices = np.unique(eval_df["data_idx"].astype(int)).tolist()
         per_file_indices[eval_file] = unique_indices
@@ -480,11 +662,20 @@ def main() -> None:
         unique_indices = per_file_indices[eval_file]
         agent_subset = agent_char_by_idx.loc[unique_indices].reset_index()
         scene_subset = scene_char_by_idx.loc[unique_indices].reset_index()
+        validate_eval_identity(eval_df, agent_subset, eval_file=eval_file)
 
-        joined = (
-            eval_df.merge(agent_subset, on="data_idx", how="left")
-            .merge(scene_subset, on="data_idx", how="left")
+        agent_subset = drop_overlapping_columns_for_join(
+            agent_subset,
+            eval_df.columns,
+            join_cols=["data_idx"],
         )
+        joined = eval_df.merge(agent_subset, on="data_idx", how="left")
+        scene_subset = drop_overlapping_columns_for_join(
+            scene_subset,
+            joined.columns,
+            join_cols=["data_idx"],
+        )
+        joined = joined.merge(scene_subset, on="data_idx", how="left")
 
         run_name = eval_file.parent.name
         out_path = args.output_root / run_name / eval_file.stem
