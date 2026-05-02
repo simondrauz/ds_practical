@@ -99,8 +99,20 @@ def assert_unique_key(df: pd.DataFrame, key_cols: list[str], *, df_name: str) ->
     duplicate_count = int(df.duplicated(subset=key_cols).sum())
     if duplicate_count:
         raise ValueError(
-            f"{df_name} is not unique on the feature key. Duplicate rows found: {duplicate_count}"
+            f"{df_name} is not unique on key {key_cols}. Duplicate rows found: {duplicate_count}"
         )
+
+
+def _ensure_prepared_row_id(prepared_model_df: pd.DataFrame) -> pd.DataFrame:
+    """Expose a stable row-level key for prepared modelling tables."""
+    if "row_id" in prepared_model_df.columns:
+        prepared_with_row_id = prepared_model_df.copy()
+    else:
+        prepared_with_row_id = prepared_model_df.copy()
+        prepared_with_row_id.insert(0, "row_id", prepared_with_row_id.index.to_numpy())
+
+    assert_unique_key(prepared_with_row_id, ["row_id"], df_name="prepared data")
+    return prepared_with_row_id
 
 
 def _empty_trustworthiness_df() -> pd.DataFrame:
@@ -946,22 +958,27 @@ def assemble_step1_analysis_table(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Join prepared rows, run metrics, and feature-effect exports into one analysis table."""
     key_cols = list(feature_cols)
+    prepared_model_df = _ensure_prepared_row_id(prepared_model_df)
     assert_columns_present(prepared_model_df, key_cols + [target_col], df_name="prepared data")
-    assert_columns_present(joined_metrics_df, key_cols + [performance_metric_col], df_name="joined metrics")
+    assert_columns_present(
+        joined_metrics_df,
+        ["data_idx"] + key_cols + [performance_metric_col],
+        df_name="joined metrics",
+    )
 
     effect_required_cols = key_cols + ["row_id", "outer_fold", "oof_pred_orig", "target_orig"]
     assert_columns_present(feature_effects_df, effect_required_cols, df_name="feature-effect export")
     expected_effect_cols = [f"{EFFECT_PREFIX}{feature}" for feature in feature_cols]
     assert_columns_present(feature_effects_df, expected_effect_cols, df_name="feature-effect export")
 
-    assert_unique_key(prepared_model_df, key_cols, df_name="prepared data")
-    assert_unique_key(joined_metrics_df, key_cols, df_name="joined metrics")
-    assert_unique_key(feature_effects_df, key_cols, df_name="feature-effect export")
+    assert_unique_key(joined_metrics_df, ["data_idx"], df_name="joined metrics")
+    assert_unique_key(feature_effects_df, ["row_id"], df_name="feature-effect export")
 
-    joined_metric_cols = [col for col in joined_metrics_df.columns if col not in key_cols]
+    joined_metric_cols = [col for col in joined_metrics_df.columns if col not in (key_cols + ["data_idx"])]
     analysis_df = prepared_model_df.merge(
-        joined_metrics_df[key_cols + joined_metric_cols],
-        on=key_cols,
+        joined_metrics_df[["data_idx"] + joined_metric_cols],
+        left_on="row_id",
+        right_on="data_idx",
         how="left",
         validate="one_to_one",
         indicator="_metrics_merge",
@@ -973,9 +990,9 @@ def assemble_step1_analysis_table(
             "Prepared rows could not be fully aligned back to the joined metrics export. "
             f"Unmatched rows: {merge_mismatch_count}"
         )
-    analysis_df = analysis_df.drop(columns=["_metrics_merge"])
+    analysis_df = analysis_df.drop(columns=["_metrics_merge", "data_idx"])
 
-    effect_merge_cols = [col for col in feature_effects_df.columns if col not in key_cols]
+    effect_merge_cols = [col for col in feature_effects_df.columns if col not in (key_cols + ["row_id"])]
     overlapping_cols = sorted(set(effect_merge_cols) & set(analysis_df.columns))
     if overlapping_cols:
         raise ValueError(
@@ -984,8 +1001,8 @@ def assemble_step1_analysis_table(
         )
 
     analysis_df = analysis_df.merge(
-        feature_effects_df[key_cols + effect_merge_cols],
-        on=key_cols,
+        feature_effects_df[["row_id"] + effect_merge_cols],
+        on="row_id",
         how="left",
         validate="one_to_one",
         indicator="_feature_effect_merge",
