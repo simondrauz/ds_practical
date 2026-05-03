@@ -28,6 +28,7 @@ Thumbs.db
 trajdata_cache/
 *.log
 wandb/
+results/trajectory_prediction/logs/
 results/trajectory_prediction/trajectory_metrics/
 results/trajectory_prediction/trajectory_metrics_joined/
 results/trajectory_prediction/nuScenes/models/
