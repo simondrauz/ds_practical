@@ -76,6 +76,18 @@ If the mini data is not under the repo-local default paths, add
 `trajdata_cache_dir` and `data_loc_dict` overrides under `base_args` in the
 local sweep config.
 
+`--user simon` or `--user zoe` does not replace path values that are already
+present in `config/nuScenes_mini.json`. Use explicit `base_args` path overrides
+for machine-specific mini layouts:
+
+```yaml
+base_args:
+  conf: config/nuScenes_mini.json
+  log_tag: sweep_tpp
+  trajdata_cache_dir: /path/to/mini_trajdata_cache
+  data_loc_dict: '{"nusc_mini": "/path/to/mini_raw"}'
+```
+
 Confirm the runner parses the local config and prints the scoped commands before
 doing an expensive run:
 

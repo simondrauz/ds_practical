@@ -36,8 +36,8 @@ There are two supported analysis paths:
 - `config/nuScenes_full_trainval.json`: full nuScenes trainval run overlay.
 - `config/nuScenes_mini.json`: nuScenes mini run overlay.
 - `config/sweep_config.yaml`: example model-settings sweep configuration. It
-  contains local path examples and should be copied or overridden for your
-  machine.
+  inherits the mini run overlay and should be copied only when your machine
+  needs local path overrides.
 - `results/trajectory_prediction/trajectory_metrics/`: per-epoch evaluation CSVs
   from Trajectron++.
 - `results/trajectory_prediction/trajectory_metrics_joined/`: joined
@@ -97,9 +97,23 @@ LaCie drive:
 if your local layout differs:
 
 ```bash
---trajdata_cache_dir "/Volumes/LaCie 1TB/nuScenes/trajdata_cache" \
---data_loc_dict '{"nusc_trainval": "/Volumes/LaCie 1TB/nuScenes/v1.0-trainval_raw"}'
+--trajdata_cache_dir "/path/to/trajdata_cache" \
+--data_loc_dict '{"nusc_trainval": "/path/to/v1.0-trainval_raw"}'
 ```
+
+Path precedence is:
+
+1. Explicit CLI flags such as `--trajdata_cache_dir` and `--data_loc_dict`.
+2. Values in the resolved JSON config passed to `--conf`.
+3. `--user` profile paths from `config/experimental_setup/nuScenes/user_config.py`,
+   but only when the selected config does not already define the path key.
+4. Repo-relative fallback paths.
+
+The dedicated mini and full config overlays already define `trajdata_cache_dir`
+and `data_loc_dict`, so `--user simon` or `--user zoe` does not replace those
+paths. For shared work across machines, either keep the same repo-local mini
+layout, pass path overrides on the CLI, or use a local uncommitted config/sweep
+overlay with only path overrides.
 
 The prediction-challenge split index files under
 `config/experimental_setup/nuScenes/` are required for trainval split handling
@@ -157,10 +171,15 @@ conda run -n adaptive-py310 python -m data_preparation.join_characteristic_metri
   --output_root results/trajectory_prediction/trajectory_metrics_joined \
   --format csv \
   --incl_vector_map \
-  --trajdata_cache_dir "/Volumes/LaCie 1TB/nuScenes/trajdata_cache" \
-  --data_loc_dict '{"nusc_trainval": "/Volumes/LaCie 1TB/nuScenes/v1.0-trainval_raw"}' \
+  --trajdata_cache_dir "/path/to/trajdata_cache" \
+  --data_loc_dict '{"nusc_trainval": "/path/to/v1.0-trainval_raw"}' \
   --preprocess_workers 16
 ```
+
+The join path flags can be omitted when the saved run `config.json` already
+contains valid paths for the machine running the join. Include them when moving
+outputs across machines or when the saved config points at a different local
+layout.
 
 Output:
 
@@ -240,6 +259,16 @@ therefore choose between epochs 25, 30, 35, and 40.
 If your mini data is not under `data/raw` and `data/processed/trajdata_cache`,
 add `trajdata_cache_dir` and `data_loc_dict` overrides under `base_args` in your
 local sweep config.
+
+Example local-path override:
+
+```yaml
+base_args:
+  conf: config/nuScenes_mini.json
+  log_tag: sweep_tpp
+  trajdata_cache_dir: /path/to/mini_trajdata_cache
+  data_loc_dict: '{"nusc_mini": "/path/to/mini_raw"}'
+```
 
 ### 2. Run the Sweep
 
@@ -366,8 +395,9 @@ workflow is mostly the same, but the contracts are stricter now:
 - Regenerate old prepared data, OOF predictions, feature-effect exports, and
   regime outputs before interpretation. Older artifacts may lack stable identity
   columns or persisted attention-radius settings.
-- Update local path values before running if needed. Do not commit
-  machine-specific edits to `config/sweep_config.yaml`; prefer a local copy
+- Update local path values before running if needed. `--user` does not override
+  path keys that are already present in a selected run config. Do not commit
+  machine-specific edits to shared configs; prefer CLI overrides or a local copy
   under `results/` or another ignored location.
 
 ## Common Troubleshooting

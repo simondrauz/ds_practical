@@ -48,26 +48,58 @@ Use `--eval_only_predict PEDESTRIAN` when training should keep the configured
 target mix but evaluation/prediction output should be restricted to Pedestrian
 trajectories.
 
+### Local Path Handling
+
+The `extends` parent path is resolved relative to the child config file. Other
+paths such as `trajdata_cache_dir`, `data_loc_dict`, and `log_dir` are passed to
+the runtime as written. Relative values are therefore interpreted from the shell
+working directory; run commands from the repository root unless you pass
+absolute paths.
+
+`--user` selects fallback paths from
+`config/experimental_setup/nuScenes/user_config.py`, but only for path keys that
+are missing from the selected config. The dedicated mini and full overlays
+already define `trajdata_cache_dir` and `data_loc_dict`, so `--user simon` or
+`--user zoe` does not override those values.
+
+Use explicit CLI path overrides when your machine uses a different layout:
+
+```bash
+torchrun --nproc_per_node=1 train_unified.py \
+  --conf config/nuScenes_full_trainval.json \
+  --trajdata_cache_dir "/path/to/trajdata_cache" \
+  --data_loc_dict '{"nusc_trainval": "/path/to/v1.0-trainval_raw"}'
+```
+
+For repeated local use, create an uncommitted overlay that extends the shared
+run config and changes only local paths. For example, if the local overlay lives
+under `results/interpretable_model/local_configs/`:
+
+```json
+{
+  "extends": "../../../config/nuScenes_full_trainval.json",
+  "trajdata_cache_dir": "/path/to/trajdata_cache",
+  "data_loc_dict": "{\"nusc_trainval\":\"/path/to/v1.0-trainval_raw\"}"
+}
+```
+
 ### Example Commands
 
 Config-driven mini run:
 ```bash
 torchrun --nproc_per_node=1 train_unified.py \
-  --user simon \
   --conf config/nuScenes_mini.json
 ```
 
 Config-driven full trainval run:
 ```bash
 torchrun --nproc_per_node=1 train_unified.py \
-  --user simon \
   --conf config/nuScenes_full_trainval.json
 ```
 
 Override one config value explicitly:
 ```bash
 torchrun --nproc_per_node=1 train_unified.py \
-  --user simon \
   --conf config/nuScenes_mini.json \
   --batch_size 128
 ```

@@ -368,7 +368,9 @@ the audit include mini/debug run names, trainval/debug run names, absolute
 `/Users/...` result paths, and old exported plot/table paths in notebook output
 cells. `config/sweep_config.yaml` now uses repo-local example paths instead of
 one machine's absolute cache/data paths. The README still tells users to copy
-the sweep config to an ignored local path when their data layout differs.
+the sweep config to an ignored local path when their data layout differs, and
+now states that `--user` fallback paths do not override path keys already
+defined by a selected run config.
 
 Why this threatens validity and reproducibility:
 
@@ -384,8 +386,9 @@ What should be changed or explicitly verified:
 - Parameterize run names, data roots, cache roots, and result roots rather than
   embedding user-specific absolute paths.
 - Keep the README as the source of current path-level usage guidance; it now
-  distinguishes full trainval from mini sweep and states that the sweep stops at
-  model inference.
+  distinguishes full trainval from mini sweep, documents path precedence across
+  CLI/config/`--user` fallback values, and states that the sweep stops at model
+  inference.
 - Treat existing rendered notebook outputs as stale until the notebooks are
   rerun from fixed inputs.
 - Add a lightweight check that fails on newly committed notebook outputs or
