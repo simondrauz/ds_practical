@@ -22,18 +22,31 @@ This directory contains configuration files for reproducible experiments, includ
 Training/eval hyperparameters for `train_unified.py` are read from a JSON file passed via `--conf`.
 
 Common files in this folder:
-- `runtime_config.json`: recommended local run config (used by short `torchrun` command examples).
-- `nuScenes.json`: baseline Trajectron++ config.
+- `nuScenes.json`: baseline Trajectron++ config, kept aligned with the upstream
+  NVlabs nuScenes model hyperparameters and free of project runtime keys.
+- `nuScenes_full_trainval.json`: full nuScenes trainval run config. It extends
+  `nuScenes.json` and adds the trainval split/path/runtime overrides.
+- `nuScenes_mini.json`: nuScenes mini run config. It extends `nuScenes.json`
+  and adds the mini split/path/runtime overrides.
+- `runtime_config.json`: backwards-compatible alias for `nuScenes_mini.json`.
+
+Run config JSON files can use an `extends` key. Relative parent paths are
+resolved from the child config file, nested mappings are merged recursively, and
+child values override parent values.
 
 ### Resolution Order
 
 At runtime, values are resolved in this order:
 1. Explicit CLI flags (highest priority).
-2. Values from the JSON config file passed to `--conf`.
+2. Values from the resolved JSON config file passed to `--conf`.
 3. Argparse defaults (only for keys missing from config).
 
 "Explicit CLI flag" means it is present in the command (`--key value` or `--key=value`).
-If `--conf` is omitted, parser default is `config/runtime_config.json`.
+If `--conf` is omitted, parser default is `config/nuScenes_mini.json`.
+
+Use `--eval_only_predict PEDESTRIAN` when training should keep the configured
+target mix but evaluation/prediction output should be restricted to Pedestrian
+trajectories.
 
 ### Example Commands
 
@@ -41,14 +54,21 @@ Config-driven mini run:
 ```bash
 torchrun --nproc_per_node=1 train_unified.py \
   --user simon \
-  --conf config/runtime_config.json
+  --conf config/nuScenes_mini.json
+```
+
+Config-driven full trainval run:
+```bash
+torchrun --nproc_per_node=1 train_unified.py \
+  --user simon \
+  --conf config/nuScenes_full_trainval.json
 ```
 
 Override one config value explicitly:
 ```bash
 torchrun --nproc_per_node=1 train_unified.py \
   --user simon \
-  --conf config/runtime_config.json \
+  --conf config/nuScenes_mini.json \
   --batch_size 128
 ```
 

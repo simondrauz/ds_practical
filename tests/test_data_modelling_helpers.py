@@ -509,6 +509,26 @@ def test_prepare_single_target_model_data_filters_non_numeric_and_resolves_targe
     assert prepared["model_df"].columns.tolist() == ["data_idx", "feature_a", "ml_ade_log"]
 
 
+def test_prepare_single_target_model_data_derives_requested_log_target():
+    df = pd.DataFrame(
+        {
+            "data_idx": [42, 17],
+            "feature_a": [1.0, 2.0],
+            "ml_ade": [1.0, 3.0],
+        }
+    )
+
+    prepared = prepare_single_target_model_data(df, target_col="ml_ade_log")
+
+    assert prepared["target_col"] == "ml_ade_log"
+    assert prepared["feature_cols"] == ["feature_a"]
+    np.testing.assert_allclose(
+        prepared["model_df"]["ml_ade_log"].to_numpy(),
+        np.log1p([1.0, 3.0]),
+    )
+    assert "ml_ade_log" not in df.columns
+
+
 def test_prepare_dual_target_model_data_derives_missing_raw_target():
     df = pd.DataFrame(
         {

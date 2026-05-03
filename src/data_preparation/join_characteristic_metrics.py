@@ -42,6 +42,7 @@ from shared_config.config_loader import (  # noqa: E402
     attention_radius_from_config,
     load_agent_type_defaults,
     load_attention_radius_config,
+    load_json_config,
     load_vector_map_settings,
     parse_agent_type_list,
 )
@@ -284,8 +285,7 @@ def restrict_to_predchal(dataset: UnifiedDataset, split: str, city: str = "") ->
 
 def load_hyperparams(conf_path: Path, overrides: argparse.Namespace) -> Dict:
     """Loads hyperparameters from config JSON and applies CLI overrides."""
-    with open(conf_path, "r", encoding="utf-8") as f:
-        hyperparams = json.load(f)
+    hyperparams = load_json_config(conf_path)
 
     if overrides.eval_data is not None:
         hyperparams["eval_data"] = overrides.eval_data
@@ -303,6 +303,8 @@ def load_hyperparams(conf_path: Path, overrides: argparse.Namespace) -> Dict:
         hyperparams["map_encoding"] = overrides.map_encoding
     if overrides.incl_robot_node is not None:
         hyperparams["incl_robot_node"] = overrides.incl_robot_node
+    if getattr(overrides, "eval_only_predict", None) is not None:
+        hyperparams["eval_only_predict"] = overrides.eval_only_predict
 
     if "attention_radius" not in hyperparams:
         hyperparams["attention_radius"] = load_attention_radius_config()
@@ -312,6 +314,15 @@ def load_hyperparams(conf_path: Path, overrides: argparse.Namespace) -> Dict:
 
 def resolve_attention_radius(hyperparams: Dict) -> Dict[Tuple[AgentType, AgentType], float]:
     return attention_radius_from_config(hyperparams["attention_radius"])
+
+
+def resolve_eval_only_predict(hyperparams: Dict) -> List[AgentType]:
+    only_predict = parse_agent_type_list(
+        hyperparams.get("only_predict"), DEFAULT_ONLY_PREDICT, "only_predict"
+    )
+    return parse_agent_type_list(
+        hyperparams.get("eval_only_predict"), only_predict, "eval_only_predict"
+    )
 
 
 def _parse_data_dirs(hyperparams: Dict) -> Dict[str, str]:
@@ -346,9 +357,7 @@ def build_agent_eval_dataset(
     The parameters here intentionally match the eval dataset construction in
     `train_unified.py` (including filters and map parameters).
     """
-    only_predict = parse_agent_type_list(
-        hyperparams.get("only_predict"), DEFAULT_ONLY_PREDICT, "only_predict"
-    )
+    only_predict = resolve_eval_only_predict(hyperparams)
     no_types = parse_agent_type_list(
         hyperparams.get("no_types"), DEFAULT_NO_TYPES, "no_types"
     )
@@ -389,9 +398,7 @@ def build_scene_eval_dataset(
     This uses the same temporal windows and interaction radii as the eval loop
     so that the scene context is comparable to the agent-centric samples.
     """
-    only_predict = parse_agent_type_list(
-        hyperparams.get("only_predict"), DEFAULT_ONLY_PREDICT, "only_predict"
-    )
+    only_predict = resolve_eval_only_predict(hyperparams)
     no_types = parse_agent_type_list(
         hyperparams.get("no_types"), DEFAULT_NO_TYPES, "no_types"
     )
@@ -582,6 +589,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--preprocess_workers", type=int, default=None)
     parser.add_argument("--map_encoding", type=_str2bool, default=None)
     parser.add_argument("--incl_robot_node", type=_str2bool, default=None)
+    parser.add_argument("--eval_only_predict", nargs="+", type=str, default=None)
 
     # Metric configuration.
     parser.add_argument("--collision_threshold_m", type=float, default=0.75)

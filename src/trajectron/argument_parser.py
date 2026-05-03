@@ -48,7 +48,7 @@ parser.add_argument(
     "--conf",
     help="path to json config file for hyperparameters",
     type=str,
-    default="config/runtime_config.json",
+    default="config/nuScenes_mini.json",
 )
 
 parser.add_argument(
@@ -256,6 +256,17 @@ parser.add_argument(
     help="name of data to use for evaluation",
     type=str,
     default="nusc_mini-mini_val",
+)
+
+parser.add_argument(
+    "--eval_only_predict",
+    nargs="+",
+    help=(
+        "agent types to evaluate/predict. Defaults to the training only_predict "
+        "filter when omitted."
+    ),
+    type=str,
+    default=None,
 )
 
 parser.add_argument(

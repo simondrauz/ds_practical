@@ -276,7 +276,7 @@ Fix:
   GAM, XGBoost, model inference, clustering, and cluster inspection for both
   models.
 - For the mini sweep path, it writes a temporary local sweep config instead of
-  relying on user-specific paths in `config/sweep_config.yaml`, runs eight
+  relying on the committed example paths in `config/sweep_config.yaml`, runs eight
   capped mini combinations, scopes combine to the fresh joined dirs, bridges the
   combined dataframe into the existing preparation notebook contract, and stops
   after model inference.
@@ -366,10 +366,9 @@ Several modelling notebooks contain rendered outputs with absolute local paths,
 specific old run names, and stale result summaries. Examples observed during
 the audit include mini/debug run names, trainval/debug run names, absolute
 `/Users/...` result paths, and old exported plot/table paths in notebook output
-cells. `config/sweep_config.yaml` also contains user-specific cache/data paths
-for one local machine. The README no longer depends on those machine-specific
-values as authoritative instructions; it now tells users to copy the sweep
-config to an ignored local path and edit paths there.
+cells. `config/sweep_config.yaml` now uses repo-local example paths instead of
+one machine's absolute cache/data paths. The README still tells users to copy
+the sweep config to an ignored local path when their data layout differs.
 
 Why this threatens validity and reproducibility:
 

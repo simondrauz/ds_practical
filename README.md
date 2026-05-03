@@ -32,6 +32,9 @@ There are two supported analysis paths:
 - `src/data_modelling/`: interpretable modelling helpers and notebooks.
 - `config/shared_config.yaml`: shared agent filtering, attention radius, and map
   settings.
+- `config/nuScenes.json`: upstream-aligned Trajectron++ nuScenes base config.
+- `config/nuScenes_full_trainval.json`: full nuScenes trainval run overlay.
+- `config/nuScenes_mini.json`: nuScenes mini run overlay.
 - `config/sweep_config.yaml`: example model-settings sweep configuration. It
   contains local path examples and should be copied or overridden for your
   machine.
@@ -90,8 +93,8 @@ LaCie drive:
 /Volumes/LaCie 1TB/nuScenes/trajdata_cache
 ```
 
-Pass paths directly rather than relying on user-specific config whenever
-possible:
+`config/nuScenes_full_trainval.json` uses these paths. Override them on the CLI
+if your local layout differs:
 
 ```bash
 --trajdata_cache_dir "/Volumes/LaCie 1TB/nuScenes/trajdata_cache" \
@@ -119,22 +122,13 @@ Example full trainval command:
 PYTHONPATH=src:unified-av-data-loader/src WANDB_MODE=disabled \
 conda run -n adaptive-py310 python -m torch.distributed.run --nproc_per_node=1 \
   train_unified.py \
-  --conf config/nuScenes.json \
-  --log_tag nusc_trainval_tpp \
-  --log_dir results/trajectory_prediction/nuScenes/models \
-  --train_data nusc_trainval-train \
-  --eval_data nusc_trainval-train_val \
-  --trajdata_cache_dir "/Volumes/LaCie 1TB/nuScenes/trajdata_cache" \
-  --data_loc_dict '{"nusc_trainval": "/Volumes/LaCie 1TB/nuScenes/v1.0-trainval_raw"}' \
-  --history_sec 2.0 \
-  --prediction_sec 6.0 \
-  --batch_size 256 \
-  --eval_batch_size 256 \
-  --preprocess_workers 16 \
-  --train_epochs 20 \
-  --eval_every 1 \
-  --save_every 1
+  --conf config/nuScenes_full_trainval.json
 ```
+
+`config/nuScenes_full_trainval.json` extends `config/nuScenes.json` and contains
+the full trainval split names, LaCie dataset/cache paths, 12 epochs, learning
+rate 0.003, and Pedestrian-only evaluation. Override paths on the CLI if your
+machine uses a different trainval layout.
 
 Training writes evaluation CSVs to:
 
@@ -218,9 +212,9 @@ XGBoost feature.
 
 ### 1. Create a Local Sweep Config
 
-`config/sweep_config.yaml` is an example and currently contains user-specific
-path values. Copy it to an ignored or temporary location and edit the paths for
-your machine:
+`config/sweep_config.yaml` is an example with repo-local paths. Copy it to an
+ignored or temporary location and edit the paths if your machine uses a
+different data layout:
 
 ```bash
 mkdir -p results/interpretable_model/local_configs
@@ -231,21 +225,21 @@ For local mini data in this repo, use:
 
 ```yaml
 base_args:
-  conf: config/nuScenes.json
+  conf: config/nuScenes_mini.json
   log_tag: sweep_tpp
-  train_epochs: 5
-  eval_every: 5
-  save_every: 5
-  train_data: nusc_mini-mini_train
-  eval_data: nusc_mini-mini_val
-  trajdata_cache_dir: data/processed/trajdata_cache
-  data_loc_dict: '{"nusc_mini": "data/raw"}'
 
 grid:
   history_sec: [2.0, 4.0]
   prediction_sec: [2.0, 4.0, 6.0]
   attention_radius_scale: [0.5, 1.0, 2.0]
 ```
+
+`config/nuScenes_mini.json` supplies the mini split/path settings, 40 epochs,
+learning rate 0.003, and five-epoch eval/save cadence. Downstream analysis can
+therefore choose between epochs 25, 30, 35, and 40.
+If your mini data is not under `data/raw` and `data/processed/trajdata_cache`,
+add `trajdata_cache_dir` and `data_loc_dict` overrides under `base_args` in your
+local sweep config.
 
 ### 2. Run the Sweep
 
@@ -372,9 +366,9 @@ workflow is mostly the same, but the contracts are stricter now:
 - Regenerate old prepared data, OOF predictions, feature-effect exports, and
   regime outputs before interpretation. Older artifacts may lack stable identity
   columns or persisted attention-radius settings.
-- Update local path values before running. Do not commit machine-specific edits
-  to `config/sweep_config.yaml`; prefer a local copy under `results/` or another
-  ignored location.
+- Update local path values before running if needed. Do not commit
+  machine-specific edits to `config/sweep_config.yaml`; prefer a local copy
+  under `results/` or another ignored location.
 
 ## Common Troubleshooting
 

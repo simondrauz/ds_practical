@@ -134,14 +134,33 @@ def prepare_single_target_model_data(
     target_col: str | None = None,
     default_target: str = "ml_ade",
 ) -> SingleTargetModelData:
+    if (
+        target_col is not None
+        and target_col not in df.columns
+        and target_col.endswith("_log")
+    ):
+        raw_target_col = target_col[:-4]
+        if raw_target_col in df.columns:
+            if (df[raw_target_col] < -1).any():
+                raise AssertionError(
+                    f"Cannot derive {target_col} because {raw_target_col} contains values < -1."
+                )
+            df = df.copy()
+            df[target_col] = np.log1p(df[raw_target_col].to_numpy())
+
     # Step 1: resolve the target column that defines the modelling/evaluation scale.
     resolved_target_col = _resolve_single_target_col(df, target_col, default_target)
+    target_variant_cols = {resolved_target_col}
+    if resolved_target_col.endswith("_log"):
+        target_variant_cols.add(resolved_target_col[:-4])
+    else:
+        target_variant_cols.add(f"{resolved_target_col}_log")
 
     # Step 2: retain only numeric predictors and keep row identity out of the feature matrix.
     identity_cols = _available_identity_cols(df)
     feature_cols = _filter_numeric_feature_cols(
         df,
-        [c for c in df.columns if c != resolved_target_col and c not in identity_cols],
+        [c for c in df.columns if c not in target_variant_cols and c not in identity_cols],
     )
 
     # Step 3: freeze the modelling frame and row ids after dropping incomplete rows.

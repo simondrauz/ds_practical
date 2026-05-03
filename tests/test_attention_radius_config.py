@@ -16,6 +16,7 @@ from shared_config.config_loader import (
     attention_radius_from_config,
     load_attention_radius,
     load_attention_radius_config,
+    load_json_config,
     normalise_attention_radius_config,
 )
 
@@ -30,6 +31,7 @@ def _empty_overrides() -> argparse.Namespace:
         preprocess_workers=None,
         map_encoding=None,
         incl_robot_node=None,
+        eval_only_predict=None,
     )
 
 
@@ -97,6 +99,42 @@ attention_radius:
     assert radius[(AgentType.PEDESTRIAN, AgentType.PEDESTRIAN)] == pytest.approx(30.0)
 
 
+def test_load_json_config_resolves_relative_extends_and_deep_merges(tmp_path):
+    base_path = tmp_path / "base.json"
+    child_path = tmp_path / "runs" / "child.json"
+    child_path.parent.mkdir()
+    base_path.write_text(
+        json.dumps(
+            {
+                "learning_rate": 0.0003,
+                "map_encoder": {"PEDESTRIAN": {"dropout": 0.5, "output_size": 32}},
+                "pred_state": {"VEHICLE": {"position": ["x", "y"]}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    child_path.write_text(
+        json.dumps(
+            {
+                "extends": "../base.json",
+                "learning_rate": 0.003,
+                "map_encoder": {"PEDESTRIAN": {"dropout": 0.25}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_json_config(child_path)
+
+    assert config["learning_rate"] == pytest.approx(0.003)
+    assert config["map_encoder"]["PEDESTRIAN"] == {
+        "dropout": 0.25,
+        "output_size": 32,
+    }
+    assert config["pred_state"] == {"VEHICLE": {"position": ["x", "y"]}}
+    assert "extends" not in config
+
+
 def test_join_load_hyperparams_keeps_persisted_attention_radius(tmp_path, monkeypatch):
     conf_path = tmp_path / "config.json"
     persisted_attention_radius = {
@@ -155,3 +193,51 @@ def test_join_load_hyperparams_backfills_legacy_config_from_shared_config(tmp_pa
     assert hyperparams["attention_radius"] == fallback_attention_radius
     assert radius[(AgentType.PEDESTRIAN, AgentType.PEDESTRIAN)] == pytest.approx(3.0)
     assert radius[(AgentType.VEHICLE, AgentType.VEHICLE)] == pytest.approx(12.0)
+
+
+def test_join_resolve_eval_only_predict_overrides_training_filter():
+    hyperparams = {
+        "only_predict": ["VEHICLE", "PEDESTRIAN"],
+        "eval_only_predict": ["PEDESTRIAN"],
+    }
+
+    assert join_characteristic_metrics.resolve_eval_only_predict(hyperparams) == [
+        AgentType.PEDESTRIAN
+    ]
+
+
+def test_join_resolve_eval_only_predict_falls_back_to_only_predict():
+    hyperparams = {"only_predict": ["PEDESTRIAN"]}
+
+    assert join_characteristic_metrics.resolve_eval_only_predict(hyperparams) == [
+        AgentType.PEDESTRIAN
+    ]
+
+
+def test_join_build_agent_eval_dataset_uses_eval_only_predict(monkeypatch):
+    captured_kwargs = {}
+
+    class FakeUnifiedDataset:
+        def __init__(self, **kwargs):
+            captured_kwargs.update(kwargs)
+
+    monkeypatch.setattr(join_characteristic_metrics, "UnifiedDataset", FakeUnifiedDataset)
+    monkeypatch.setattr(join_characteristic_metrics, "resolve_attention_radius", lambda _: {})
+
+    hyperparams = {
+        "eval_data": "nusc_mini-mini_val",
+        "history_sec": 2.0,
+        "prediction_sec": 6.0,
+        "trajdata_cache_dir": "data/processed/trajdata_cache",
+        "only_predict": ["VEHICLE", "PEDESTRIAN"],
+        "eval_only_predict": ["PEDESTRIAN"],
+    }
+
+    join_characteristic_metrics.build_agent_eval_dataset(
+        hyperparams,
+        data_dirs={"nusc_mini": "data/raw"},
+        incl_vector_map=False,
+        raster_map_params={"px_per_m": 2, "map_size_px": 100},
+    )
+
+    assert captured_kwargs["only_predict"] == [AgentType.PEDESTRIAN]
