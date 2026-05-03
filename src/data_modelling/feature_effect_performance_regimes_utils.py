@@ -1053,10 +1053,17 @@ def assemble_step1_analysis_table(
         )
     analysis_df = analysis_df.drop(columns=["_metrics_merge"])
 
+    non_key_identity_cols = set(IDENTITY_COLS) - set(trajectory_key_cols)
     effect_merge_cols = [
         col
         for col in feature_effects_df.columns
-        if col not in (key_cols + trajectory_key_cols + ["row_id"])
+        if col
+        not in (
+            set(key_cols)
+            | set(trajectory_key_cols)
+            | non_key_identity_cols
+            | {"row_id"}
+        )
     ]
     overlapping_cols = sorted(set(effect_merge_cols) & set(analysis_df.columns))
     if overlapping_cols:

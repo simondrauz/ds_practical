@@ -221,6 +221,10 @@ def train(rank, args):
     print("| Max Future: %ss" % hyperparams["prediction_sec"])
     print("| Batch Size: %d" % hyperparams["batch_size"])
     print("| Eval Batch Size: %d" % hyperparams["eval_batch_size"])
+    if hyperparams.get("max_train_batches") is not None:
+        print("| Max Train Batches: %s" % hyperparams["max_train_batches"])
+    if hyperparams.get("max_eval_batches") is not None:
+        print("| Max Eval Batches: %s" % hyperparams["max_eval_batches"])
     print("| Device: %s" % hyperparams["device"])
     print("| Learning Rate: %s" % hyperparams["learning_rate"])
     print("| Learning Rate Step Every: %s" % hyperparams["lr_step"])
@@ -419,6 +423,10 @@ def train(rank, args):
 
         batch: AgentBatch
         for batch_idx, batch in enumerate(pbar):
+            max_train_batches = hyperparams.get("max_train_batches")
+            if max_train_batches is not None and batch_idx >= int(max_train_batches):
+                break
+
             # if batch_idx >= (1 + 1 + 3) * 2:
             #     break
 
@@ -497,13 +505,22 @@ def train(rank, args):
                 eval_context = eval_context_from_hyperparams(hyperparams)
 
                 batch: AgentBatch
-                for batch in tqdm(
-                    eval_dataloader,
-                    ncols=80,
-                    unit_scale=dist.get_world_size(),
-                    disable=(rank > 0),
-                    desc=f"Epoch {epoch} Eval",
+                for batch_idx, batch in enumerate(
+                    tqdm(
+                        eval_dataloader,
+                        ncols=80,
+                        unit_scale=dist.get_world_size(),
+                        disable=(rank > 0),
+                        desc=f"Epoch {epoch} Eval",
+                    )
                 ):
+                    max_eval_batches = hyperparams.get("max_eval_batches")
+                    if (
+                        max_eval_batches is not None
+                        and batch_idx >= int(max_eval_batches)
+                    ):
+                        break
+
                     eval_results = (
                         trajectron_module.predict_and_evaluate_batch(
                             batch,

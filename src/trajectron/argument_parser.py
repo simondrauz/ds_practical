@@ -325,6 +325,26 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--max_train_batches",
+    help=(
+        "validation-only cap on training batches per epoch; processes all batches "
+        "when omitted"
+    ),
+    type=int,
+    default=None,
+)
+
+parser.add_argument(
+    "--max_eval_batches",
+    help=(
+        "validation-only cap on evaluation batches per evaluation pass; processes "
+        "all batches when omitted"
+    ),
+    type=int,
+    default=None,
+)
+
+parser.add_argument(
     "--K",
     help="how many CVAE discrete latent modes to have in the model",
     type=int,
