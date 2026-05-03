@@ -1,7 +1,7 @@
 # Model Settings Sweep Hand-Off
 
 This note is for Zoe when moving from `dev-model-settings-inclusion` to the
-current `dev`/`dev-fixes` workflow. It focuses on how to run and interpret the
+current `dev` workflow. It focuses on how to run and interpret the
 model-settings sweep, not on the implementation changes behind it.
 
 ## Usage Changes That Matter
@@ -32,7 +32,7 @@ Run these from the repository root.
 
 ```bash
 git status --short --branch
-ps -axo pid,command | rg "run_sweep.py|train_unified.py"
+ps -axo pid,command | rg "[r]un_sweep.py|[t]rain_unified.py"
 git diff -- config/shared_config.yaml
 ```
 
