@@ -22,33 +22,85 @@ This directory contains configuration files for reproducible experiments, includ
 Training/eval hyperparameters for `train_unified.py` are read from a JSON file passed via `--conf`.
 
 Common files in this folder:
-- `runtime_config.json`: recommended local run config (used by short `torchrun` command examples).
-- `nuScenes.json`: baseline Trajectron++ config.
+- `nuScenes.json`: baseline Trajectron++ config, kept aligned with the upstream
+  NVlabs nuScenes model hyperparameters and free of project runtime keys.
+- `nuScenes_full_trainval.json`: full nuScenes trainval run config. It extends
+  `nuScenes.json` and adds the trainval split/path/runtime overrides.
+- `nuScenes_mini.json`: nuScenes mini run config. It extends `nuScenes.json`
+  and adds the mini split/path/runtime overrides.
+- `runtime_config.json`: backwards-compatible alias for `nuScenes_mini.json`.
+
+Run config JSON files can use an `extends` key. Relative parent paths are
+resolved from the child config file, nested mappings are merged recursively, and
+child values override parent values.
 
 ### Resolution Order
 
 At runtime, values are resolved in this order:
 1. Explicit CLI flags (highest priority).
-2. Values from the JSON config file passed to `--conf`.
+2. Values from the resolved JSON config file passed to `--conf`.
 3. Argparse defaults (only for keys missing from config).
 
 "Explicit CLI flag" means it is present in the command (`--key value` or `--key=value`).
-If `--conf` is omitted, parser default is `config/runtime_config.json`.
+If `--conf` is omitted, parser default is `config/nuScenes_mini.json`.
+
+Use `--eval_only_predict PEDESTRIAN` when training should keep the configured
+target mix but evaluation/prediction output should be restricted to Pedestrian
+trajectories.
+
+### Local Path Handling
+
+The `extends` parent path is resolved relative to the child config file. Other
+paths such as `trajdata_cache_dir`, `data_loc_dict`, and `log_dir` are passed to
+the runtime as written. Relative values are therefore interpreted from the shell
+working directory; run commands from the repository root unless you pass
+absolute paths.
+
+`--user` selects fallback paths from
+`config/experimental_setup/nuScenes/user_config.py`, but only for path keys that
+are missing from the selected config. The dedicated mini and full overlays
+already define `trajdata_cache_dir` and `data_loc_dict`, so `--user simon` or
+`--user zoe` does not override those values.
+
+Use explicit CLI path overrides when your machine uses a different layout:
+
+```bash
+torchrun --nproc_per_node=1 train_unified.py \
+  --conf config/nuScenes_full_trainval.json \
+  --trajdata_cache_dir "/path/to/trajdata_cache" \
+  --data_loc_dict '{"nusc_trainval": "/path/to/v1.0-trainval_raw"}'
+```
+
+For repeated local use, create an uncommitted overlay that extends the shared
+run config and changes only local paths. For example, if the local overlay lives
+under `results/interpretable_model/local_configs/`:
+
+```json
+{
+  "extends": "../../../config/nuScenes_full_trainval.json",
+  "trajdata_cache_dir": "/path/to/trajdata_cache",
+  "data_loc_dict": "{\"nusc_trainval\":\"/path/to/v1.0-trainval_raw\"}"
+}
+```
 
 ### Example Commands
 
 Config-driven mini run:
 ```bash
 torchrun --nproc_per_node=1 train_unified.py \
-  --user simon \
-  --conf config/runtime_config.json
+  --conf config/nuScenes_mini.json
+```
+
+Config-driven full trainval run:
+```bash
+torchrun --nproc_per_node=1 train_unified.py \
+  --conf config/nuScenes_full_trainval.json
 ```
 
 Override one config value explicitly:
 ```bash
 torchrun --nproc_per_node=1 train_unified.py \
-  --user simon \
-  --conf config/runtime_config.json \
+  --conf config/nuScenes_mini.json \
   --batch_size 128
 ```
 

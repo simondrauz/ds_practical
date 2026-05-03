@@ -1,7 +1,7 @@
 # Model Settings Sweep Hand-Off
 
 This note is for Zoe when moving from `dev-model-settings-inclusion` to the
-current `dev`/`dev-fixes` workflow. It focuses on how to run and interpret the
+current `dev` workflow. It focuses on how to run and interpret the
 model-settings sweep, not on the implementation changes behind it.
 
 ## Usage Changes That Matter
@@ -32,7 +32,7 @@ Run these from the repository root.
 
 ```bash
 git status --short --branch
-ps -axo pid,command | rg "run_sweep.py|train_unified.py"
+ps -axo pid,command | rg "[r]un_sweep.py|[t]rain_unified.py"
 git diff -- config/shared_config.yaml
 ```
 
@@ -60,20 +60,32 @@ For a repo-local mini setup, the local config should look like this:
 
 ```yaml
 base_args:
-  conf: config/nuScenes.json
+  conf: config/nuScenes_mini.json
   log_tag: sweep_tpp
-  train_epochs: 5
-  eval_every: 5
-  save_every: 5
-  train_data: nusc_mini-mini_train
-  eval_data: nusc_mini-mini_val
-  trajdata_cache_dir: data/processed/trajdata_cache
-  data_loc_dict: '{"nusc_mini": "data/raw"}'
 
 grid:
   history_sec: [2.0, 4.0]
   prediction_sec: [2.0, 4.0, 6.0]
   attention_radius_scale: [0.5, 1.0, 2.0]
+```
+
+`config/nuScenes_mini.json` supplies the mini split/path settings, 40 epochs,
+learning rate 0.003, and five-epoch eval/save cadence, so the analysis can
+later use epoch 25, 30, 35, or 40.
+If the mini data is not under the repo-local default paths, add
+`trajdata_cache_dir` and `data_loc_dict` overrides under `base_args` in the
+local sweep config.
+
+`--user simon` or `--user zoe` does not replace path values that are already
+present in `config/nuScenes_mini.json`. Use explicit `base_args` path overrides
+for machine-specific mini layouts:
+
+```yaml
+base_args:
+  conf: config/nuScenes_mini.json
+  log_tag: sweep_tpp
+  trajdata_cache_dir: /path/to/mini_trajdata_cache
+  data_loc_dict: '{"nusc_mini": "/path/to/mini_raw"}'
 ```
 
 Confirm the runner parses the local config and prints the scoped commands before

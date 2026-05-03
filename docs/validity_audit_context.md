@@ -276,7 +276,7 @@ Fix:
   GAM, XGBoost, model inference, clustering, and cluster inspection for both
   models.
 - For the mini sweep path, it writes a temporary local sweep config instead of
-  relying on user-specific paths in `config/sweep_config.yaml`, runs eight
+  relying on the committed example paths in `config/sweep_config.yaml`, runs eight
   capped mini combinations, scopes combine to the fresh joined dirs, bridges the
   combined dataframe into the existing preparation notebook contract, and stops
   after model inference.
@@ -366,10 +366,11 @@ Several modelling notebooks contain rendered outputs with absolute local paths,
 specific old run names, and stale result summaries. Examples observed during
 the audit include mini/debug run names, trainval/debug run names, absolute
 `/Users/...` result paths, and old exported plot/table paths in notebook output
-cells. `config/sweep_config.yaml` also contains user-specific cache/data paths
-for one local machine. The README no longer depends on those machine-specific
-values as authoritative instructions; it now tells users to copy the sweep
-config to an ignored local path and edit paths there.
+cells. `config/sweep_config.yaml` now uses repo-local example paths instead of
+one machine's absolute cache/data paths. The README still tells users to copy
+the sweep config to an ignored local path when their data layout differs, and
+now states that `--user` fallback paths do not override path keys already
+defined by a selected run config.
 
 Why this threatens validity and reproducibility:
 
@@ -385,8 +386,9 @@ What should be changed or explicitly verified:
 - Parameterize run names, data roots, cache roots, and result roots rather than
   embedding user-specific absolute paths.
 - Keep the README as the source of current path-level usage guidance; it now
-  distinguishes full trainval from mini sweep and states that the sweep stops at
-  model inference.
+  distinguishes full trainval from mini sweep, documents path precedence across
+  CLI/config/`--user` fallback values, and states that the sweep stops at model
+  inference.
 - Treat existing rendered notebook outputs as stale until the notebooks are
   rerun from fixed inputs.
 - Add a lightweight check that fails on newly committed notebook outputs or

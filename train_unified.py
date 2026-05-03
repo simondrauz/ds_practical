@@ -48,6 +48,7 @@ from shared_config.config_loader import (
     attention_radius_from_config,
     load_agent_type_defaults,
     load_attention_radius_config,
+    load_json_config,
     load_vector_map_settings,
     parse_agent_type_list,
 )
@@ -151,8 +152,7 @@ def train(rank, args):
     print(f"Loading hyperparameters from {str(args.conf)}...")
     if not os.path.exists(args.conf):
         raise ValueError(f"Config json at {args.conf} not found!")
-    with open(args.conf, "r", encoding="utf-8") as conf_json:
-        hyperparams = json.load(conf_json)
+    hyperparams = load_json_config(args.conf)
 
     # CLI args override config only when passed explicitly.
     # Argparse defaults fill missing config keys as a fallback.
@@ -213,6 +213,11 @@ def train(rank, args):
         DEFAULT_NO_TYPES,
         key_name="no_types",
     )
+    eval_only_predict = parse_agent_type_list(
+        hyperparams.get("eval_only_predict"),
+        only_predict,
+        key_name="eval_only_predict",
+    )
 
     print("-----------------------")
     print("| TRAINING PARAMETERS |")
@@ -232,6 +237,10 @@ def train(rank, args):
     print("| Robot Future: %s" % hyperparams["incl_robot_node"])
     print("| Map Encoding: %s" % hyperparams["map_encoding"])
     print("| Only Predict: %s" % [agent_type.name for agent_type in only_predict])
+    print(
+        "| Eval Only Predict: %s"
+        % [agent_type.name for agent_type in eval_only_predict]
+    )
     print("| Excluded Types: %s" % [agent_type.name for agent_type in no_types])
     print("| Added Input Noise: %.2f" % hyperparams["augment_input_noise"])
     print("| Overall GMM Components: %d" % hyperparams["K"])
@@ -316,7 +325,7 @@ def train(rank, args):
         incl_robot_future=hyperparams["incl_robot_node"],
         incl_raster_map=hyperparams["map_encoding"],
         raster_map_params=map_params,
-        only_predict=only_predict,
+        only_predict=eval_only_predict,
         no_types=no_types,
         num_workers=hyperparams["preprocess_workers"],
         cache_location=hyperparams["trajdata_cache_dir"],

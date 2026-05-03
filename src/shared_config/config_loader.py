@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import copy
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -28,6 +30,59 @@ def _load_shared_config(config_path: Path | str = DEFAULT_SHARED_CONFIG_PATH) ->
 
     with open(resolved_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
+
+
+def _deep_merge(base: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
+    merged = copy.deepcopy(base)
+    for key, value in overrides.items():
+        if (
+            key in merged
+            and isinstance(merged[key], dict)
+            and isinstance(value, dict)
+        ):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
+def load_json_config(config_path: Path | str) -> Dict[str, Any]:
+    """Load a JSON config, resolving an optional ``extends`` parent first.
+
+    ``extends`` is resolved relative to the child config file. Values in the
+    child config override the parent; nested mappings are merged recursively.
+    The returned config is fully resolved and does not include ``extends``.
+    """
+    return _load_json_config(Path(config_path).expanduser(), seen=set())
+
+
+def _load_json_config(config_path: Path, seen: set[Path]) -> Dict[str, Any]:
+    resolved_path = config_path.resolve()
+    if resolved_path in seen:
+        chain = " -> ".join(str(path) for path in [*seen, resolved_path])
+        raise ValueError(f"Config inheritance cycle detected: {chain}")
+    if not resolved_path.exists():
+        raise FileNotFoundError(f"Config json at {resolved_path} not found!")
+
+    with open(resolved_path, "r", encoding="utf-8") as f:
+        config = json.load(f)
+    if not isinstance(config, dict):
+        raise ValueError(f"Config json at {resolved_path} must contain an object")
+
+    parent = config.pop("extends", None)
+    if parent is None:
+        return config
+    if not isinstance(parent, str) or not parent.strip():
+        raise ValueError(f"`extends` in {resolved_path} must be a non-empty string")
+
+    parent_path = Path(parent).expanduser()
+    if not parent_path.is_absolute():
+        parent_path = resolved_path.parent / parent_path
+
+    return _deep_merge(
+        _load_json_config(parent_path, seen | {resolved_path}),
+        config,
+    )
 
 
 def load_vector_map_settings(
