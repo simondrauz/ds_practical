@@ -18,10 +18,13 @@ import pandas as pd
 
 DisplayFn = Callable[[Any], None]
 
+IDENTITY_COLS = ["run_name", "eval_csv_name", "data_idx"]
+
 
 class SingleTargetModelData(TypedDict):
     target_col: str
     feature_cols: list[str]
+    identity_cols: list[str]
     model_df: pd.DataFrame
     X: pd.DataFrame
     y: pd.Series
@@ -34,6 +37,7 @@ class DualTargetModelData(TypedDict):
     log_target_col: str
     target_col: str
     feature_cols: list[str]
+    identity_cols: list[str]
     model_df: pd.DataFrame
     X: np.ndarray
     y_raw: np.ndarray
@@ -120,28 +124,53 @@ def _filter_numeric_feature_cols(df: pd.DataFrame, candidate_cols: list[str]) ->
     return [c for c in candidate_cols if c not in non_numeric_features]
 
 
+def _available_identity_cols(df: pd.DataFrame) -> list[str]:
+    return [col for col in IDENTITY_COLS if col in df.columns]
+
+
 def prepare_single_target_model_data(
     df: pd.DataFrame,
     *,
     target_col: str | None = None,
     default_target: str = "ml_ade",
 ) -> SingleTargetModelData:
+    if (
+        target_col is not None
+        and target_col not in df.columns
+        and target_col.endswith("_log")
+    ):
+        raw_target_col = target_col[:-4]
+        if raw_target_col in df.columns:
+            if (df[raw_target_col] < -1).any():
+                raise AssertionError(
+                    f"Cannot derive {target_col} because {raw_target_col} contains values < -1."
+                )
+            df = df.copy()
+            df[target_col] = np.log1p(df[raw_target_col].to_numpy())
+
     # Step 1: resolve the target column that defines the modelling/evaluation scale.
     resolved_target_col = _resolve_single_target_col(df, target_col, default_target)
+    target_variant_cols = {resolved_target_col}
+    if resolved_target_col.endswith("_log"):
+        target_variant_cols.add(resolved_target_col[:-4])
+    else:
+        target_variant_cols.add(f"{resolved_target_col}_log")
 
-    # Step 2: retain only numeric predictors and keep the target out of the feature matrix.
+    # Step 2: retain only numeric predictors and keep row identity out of the feature matrix.
+    identity_cols = _available_identity_cols(df)
     feature_cols = _filter_numeric_feature_cols(
         df,
-        [c for c in df.columns if c != resolved_target_col],
+        [c for c in df.columns if c not in target_variant_cols and c not in identity_cols],
     )
 
     # Step 3: freeze the modelling frame and row ids after dropping incomplete rows.
     # Downstream notebooks rely on `row_ids` to map OOF predictions back to original rows.
-    model_df = df[feature_cols + [resolved_target_col]].dropna().copy()
+    model_df = df[identity_cols + feature_cols + [resolved_target_col]].dropna().copy()
 
     return {
         "target_col": resolved_target_col,
         "feature_cols": feature_cols,
+        "identity_cols": identity_cols,
         "model_df": model_df,
         "X": model_df[feature_cols],
         "y": model_df[resolved_target_col],
@@ -163,8 +192,12 @@ def prepare_dual_target_model_data(
     )
 
     # Step 2: build a purely numeric feature set so GAM variants can share one matrix.
+    identity_cols = _available_identity_cols(df)
     excluded_cols = {c for c in [raw_target_source_col, log_target_source_col] if c is not None}
-    feature_cols = _filter_numeric_feature_cols(df, [c for c in df.columns if c not in excluded_cols])
+    feature_cols = _filter_numeric_feature_cols(
+        df,
+        [c for c in df.columns if c not in excluded_cols and c not in identity_cols],
+    )
 
     # Verify model settings are present and preserved
     MODEL_SETTING_COLS = ['attention_radius_m', 'history_sec', 'prediction_sec']
@@ -175,7 +208,10 @@ def prepare_dual_target_model_data(
         print(f"✓ Model settings preserved: {[c for c in MODEL_SETTING_COLS if c in feature_cols]}")
 
     # Step 3: drop incomplete rows only after the full feature/target contract is known.
-    model_df = df[feature_cols].dropna().copy()
+    target_source_cols = [
+        c for c in [raw_target_source_col, log_target_source_col] if c is not None
+    ]
+    model_df = df[identity_cols + feature_cols + target_source_cols].dropna().copy()
 
     if raw_target_source_col is None and log_target_source_col is not None:
         raw_target_col = base_target_name
@@ -211,6 +247,7 @@ def prepare_dual_target_model_data(
         "log_target_col": log_target_col,
         "target_col": target_col_out,
         "feature_cols": feature_cols,
+        "identity_cols": identity_cols,
         "model_df": model_df,
         "X": X,
         "y_raw": y_raw,

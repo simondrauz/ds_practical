@@ -48,7 +48,7 @@ parser.add_argument(
     "--conf",
     help="path to json config file for hyperparameters",
     type=str,
-    default="config/runtime_config.json",
+    default="config/nuScenes_mini.json",
 )
 
 parser.add_argument(
@@ -259,6 +259,23 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--eval_only_predict",
+    nargs="+",
+    help=(
+        "agent types to evaluate/predict. Defaults to the training only_predict "
+        "filter when omitted."
+    ),
+    type=str,
+    default=None,
+)
+
+parser.add_argument(
+    "--restrict_to_predchal",
+    help="restrict nuScenes trainval runs to the prediction-challenge subset",
+    action="store_true",
+)
+
+parser.add_argument(
     "--data_loc_dict",
     help="JSON dict of dataset locations (will be set from --user if not specified)",
     type=str,
@@ -316,6 +333,26 @@ parser.add_argument("--batch_size", help="training batch size", type=int, defaul
 
 parser.add_argument(
     "--eval_batch_size", help="evaluation batch size", type=int, default=256
+)
+
+parser.add_argument(
+    "--max_train_batches",
+    help=(
+        "validation-only cap on training batches per epoch; processes all batches "
+        "when omitted"
+    ),
+    type=int,
+    default=None,
+)
+
+parser.add_argument(
+    "--max_eval_batches",
+    help=(
+        "validation-only cap on evaluation batches per evaluation pass; processes "
+        "all batches when omitted"
+    ),
+    type=int,
+    default=None,
 )
 
 parser.add_argument(

@@ -1,8 +1,8 @@
 """Combine joined trajectory-metric CSVs from multiple Trajectron++ runs.
 
-Reads all eval CSV files produced by ``join_characteristic_metrics.py`` from
-``results/trajectory_prediction/trajectory_metrics_joined/`` and concatenates
-them into a single file.
+Reads selected eval CSV files produced by ``join_characteristic_metrics.py``
+from ``results/trajectory_prediction/trajectory_metrics_joined/`` and
+concatenates them into a single file.
 
 When runs differ in ``history_sec``, ``prediction_sec``, or ``attention_radius_m``,
 features that accumulate over the trajectory window are not directly comparable.
@@ -76,6 +76,27 @@ def _add_normalised_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _ensure_constant_identity_column(
+    df: pd.DataFrame,
+    *,
+    column: str,
+    value: str,
+    insert_at: int,
+) -> None:
+    """Insert a source-identity column, or validate/fill it when already present."""
+    if column not in df.columns:
+        df.insert(insert_at, column, value)
+        return
+
+    present_values = df[column].dropna().astype(str).unique().tolist()
+    if present_values and present_values != [value]:
+        raise ValueError(
+            f"Existing column {column!r} does not match source identity {value!r}. "
+            f"Found: {present_values[:5]}"
+        )
+    df[column] = value
+
+
 def collect_run_csvs(
     joined_root: Path, run_dirs: Optional[List[str]]
 ) -> List[Path]:
@@ -107,9 +128,8 @@ def combine(
 ) -> pd.DataFrame:
     """Loads, annotates, normalises, and concatenates all run CSVs.
 
-    Each row gains a ``run_name`` column (the subdirectory name) inserted as
-    the first column so that results from different runs remain identifiable
-    after concatenation.
+    Each row gains ``run_name`` and ``eval_csv_name`` columns so repeated
+    ``data_idx`` values remain identifiable across runs and eval epochs.
     """
     csv_paths = collect_run_csvs(joined_root, run_dirs)
     if not csv_paths:
@@ -120,7 +140,18 @@ def combine(
     frames: List[pd.DataFrame] = []
     for path in csv_paths:
         df = pd.read_csv(path)
-        df.insert(0, "run_name", path.parent.name)
+        _ensure_constant_identity_column(
+            df,
+            column="run_name",
+            value=path.parent.name,
+            insert_at=0,
+        )
+        _ensure_constant_identity_column(
+            df,
+            column="eval_csv_name",
+            value=path.name,
+            insert_at=df.columns.get_loc("run_name") + 1,
+        )
         df = _add_normalised_features(df)
         frames.append(df)
         print(f"  Loaded {len(df):>6} rows  {path.relative_to(joined_root)}")
@@ -172,8 +203,16 @@ def parse_args() -> argparse.Namespace:
         default=None,
         metavar="RUN_DIR",
         help=(
-            "Optional: specific run directory names to include. "
-            "Defaults to all subdirectories of --joined_root."
+            "Specific run directory names to include. Required unless "
+            "--all_runs is passed."
+        ),
+    )
+    parser.add_argument(
+        "--all_runs",
+        action="store_true",
+        help=(
+            "Explicitly include every run directory under --joined_root. Use only "
+            "when intentionally recombining the full joined-output directory."
         ),
     )
     parser.add_argument(
@@ -191,7 +230,15 @@ def parse_args() -> argparse.Namespace:
         default="csv",
         help="Output file format (default: csv).",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.run_dirs and args.all_runs:
+        parser.error("--run_dirs and --all_runs are mutually exclusive")
+    if not args.run_dirs and not args.all_runs:
+        parser.error(
+            "refusing to combine every joined run implicitly; pass --run_dirs "
+            "for the current sweep, or --all_runs to opt in"
+        )
+    return args
 
 
 def main() -> None:

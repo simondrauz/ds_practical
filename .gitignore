@@ -28,6 +28,7 @@ Thumbs.db
 trajdata_cache/
 *.log
 wandb/
+results/trajectory_prediction/logs/
 results/trajectory_prediction/trajectory_metrics/
 results/trajectory_prediction/trajectory_metrics_joined/
 results/trajectory_prediction/nuScenes/models/
@@ -37,6 +38,9 @@ results/evaluation/plots/characterization/*.png
 results/**/plots/
 results/**/*.csv
 results/interpretable_model/
+docs/current_pipeline_overview*.svg
+docs/current_pipeline_overview*.png
+docs/current_pipeline_overview*.pdf
 .mplconfig/
 *.egg-info/
 *.pt

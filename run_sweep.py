@@ -1,7 +1,8 @@
 """Hyperparameter sweep runner for Trajectron++.
 
 Runs training + metric-joining for every combination defined in
-``config/sweep_config.yaml``, then combines all results into one file.
+``config/sweep_config.yaml``, then combines the joined outputs created by
+that sweep into one file.
 
 Attention radius is varied by writing a scaled copy of ``shared_config.yaml``
 before each training run and restoring the original afterwards (runs are
@@ -105,9 +106,8 @@ def run_combination(
     joined_root: Path,
     output_format: str,
     dry_run: bool,
-) -> bool:
-    """Runs training + join for one hyperparameter combination. Returns True on success."""
-    scale = combo.get("attention_radius_scale", 1.0)
+) -> Optional[str]:
+    """Runs training + join for one combination and returns its joined run name."""
     history_sec = combo["history_sec"]
     prediction_sec = combo["prediction_sec"]
 
@@ -132,16 +132,16 @@ def run_combination(
         # Detect the model directory created by this run
         model_dir = _wait_for_new_subdir(log_dir, before_log, label="model")
         if model_dir is None:
-            return False
+            return None
         conf_path = model_dir / "config.json"
         if not conf_path.exists():
             print(f"  Warning: config.json not found at {conf_path}; skipping join step")
-            return False
+            return None
 
         # Detect the metrics directory created by this run's eval
         metrics_run_dir = _wait_for_new_subdir(metrics_root, before_metrics, label="metrics")
         if metrics_run_dir is None:
-            return False
+            return None
         run_name = metrics_run_dir.name
     else:
         conf_path = Path("<model_dir>/config.json")
@@ -160,8 +160,29 @@ def run_combination(
 
     if not dry_run:
         subprocess.run(join_cmd, check=True, env=_subprocess_env(), cwd=str(ROOT))
+        return run_name
 
-    return True
+    return None
+
+
+def build_combine_command(
+    joined_root: Path,
+    output_format: str,
+    run_names: List[str],
+) -> List[str]:
+    """Builds a combine command scoped to the joined runs from this sweep."""
+    if not run_names:
+        raise ValueError(
+            "No joined run directories were produced by this sweep; refusing to "
+            "combine all existing joined outputs."
+        )
+
+    return [
+        sys.executable, "-m", "data_preparation.combine_runs",
+        "--joined_root", str(joined_root),
+        "--format", output_format,
+        "--run_dirs", *run_names,
+    ]
 
 
 def run_sweep(args: argparse.Namespace) -> None:
@@ -175,6 +196,7 @@ def run_sweep(args: argparse.Namespace) -> None:
     log_dir = Path(base_args.pop("log_dir", DEFAULT_LOG_DIR))
     metrics_root = Path(args.metrics_root)
     joined_root = Path(args.joined_root)
+    completed_run_names: List[str] = []
 
     print(f"Sweep: {len(combos)} combination(s)")
     for i, combo in enumerate(combos):
@@ -190,7 +212,7 @@ def run_sweep(args: argparse.Namespace) -> None:
             _write_yaml(scaled_cfg, SHARED_CONFIG_PATH)
 
         try:
-            ok = run_combination(
+            run_name = run_combination(
                 combo=combo,
                 base_args=dict(base_args),
                 log_dir=log_dir,
@@ -199,18 +221,33 @@ def run_sweep(args: argparse.Namespace) -> None:
                 output_format=args.format,
                 dry_run=args.dry_run,
             )
-            if not ok:
-                print(f"  Skipped combination {i + 1} due to missing outputs.")
+            if run_name is None:
+                if not args.dry_run:
+                    print(f"  Skipped combination {i + 1} due to missing outputs.")
+            else:
+                completed_run_names.append(run_name)
         finally:
             if not args.dry_run:
                 _write_yaml(original_shared, SHARED_CONFIG_PATH)
 
-    # ── Combine all runs ──────────────────────────────────────────────────────
-    combine_cmd = [
-        sys.executable, "-m", "data_preparation.combine_runs",
-        "--joined_root", str(joined_root),
-        "--format", args.format,
-    ]
+    # ── Combine joined runs from this sweep only ──────────────────────────────
+    if args.dry_run:
+        run_names_for_combine = [
+            f"<current_sweep_run_{i + 1}>" for i in range(len(combos))
+        ]
+    else:
+        run_names_for_combine = completed_run_names
+
+    try:
+        combine_cmd = build_combine_command(
+            joined_root=joined_root,
+            output_format=args.format,
+            run_names=run_names_for_combine,
+        )
+    except ValueError as exc:
+        print(f"\nSkipping combine step: {exc}")
+        return
+
     print(f"\n{'─' * 60}")
     print(f"Combining: {' '.join(combine_cmd)}")
 

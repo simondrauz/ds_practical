@@ -45,8 +45,10 @@ from trajectron.model.model_utils import UpdateMode
 from trajectron.model.trajectron import Trajectron
 from trajectron.utils.comm import all_gather
 from shared_config.config_loader import (
+    attention_radius_from_config,
     load_agent_type_defaults,
-    load_attention_radius,
+    load_attention_radius_config,
+    load_json_config,
     load_vector_map_settings,
     parse_agent_type_list,
 )
@@ -58,6 +60,34 @@ from shared_config.config_loader import (
 # cache = EnvCache("/Users/zoe/.unified_data_cache")
 
 DEFAULT_ONLY_PREDICT, DEFAULT_NO_TYPES = load_agent_type_defaults()
+EVAL_IDENTITY_COLS = ["data_idx", "scene_path", "agent_id", "scene_ts", "agent_type"]
+EVAL_CONTEXT_COLS = ["eval_data", "history_sec", "prediction_sec", "restrict_to_predchal"]
+
+
+def _agent_type_name(agent_type) -> str:
+    return agent_type.name if isinstance(agent_type, AgentType) else str(agent_type)
+
+
+def eval_identity_for_data_idx(eval_dataset: UnifiedDataset, data_idx: int, agent_type) -> Dict:
+    """Return stable eval-row identity metadata for one trajdata dataset index."""
+    scene_path, agent_id, scene_ts = eval_dataset._data_index[int(data_idx)]
+    return {
+        "data_idx": int(data_idx),
+        "scene_path": str(scene_path),
+        "agent_id": str(agent_id),
+        "scene_ts": int(scene_ts),
+        "agent_type": _agent_type_name(agent_type),
+    }
+
+
+def eval_context_from_hyperparams(hyperparams) -> Dict:
+    """Return scalar eval dataset settings that joined metrics must reproduce."""
+    return {
+        "eval_data": str(hyperparams["eval_data"]),
+        "history_sec": float(hyperparams["history_sec"]),
+        "prediction_sec": float(hyperparams["prediction_sec"]),
+        "restrict_to_predchal": bool(hyperparams.get("restrict_to_predchal", False)),
+    }
 
 
 def restrict_to_predchal(
@@ -73,10 +103,26 @@ def restrict_to_predchal(
     ) as f:
         within_challenge_split = pickle.load(f)
 
-    within_challenge_split = [
-        (dataset.cache_path / scene_info_path, num_elems, elems)
-        for scene_info_path, num_elems, elems in within_challenge_split
-    ]
+    active_env_name = pathlib.Path(dataset._scene_index[0]).relative_to(
+        dataset.cache_path
+    ).parts[0]
+
+    remapped_split = []
+    for scene_info_path, num_elems, elems in within_challenge_split:
+        scene_rel_path = pathlib.Path(scene_info_path)
+        if scene_rel_path.parts and scene_rel_path.parts[0] != active_env_name:
+            scene_rel_path = pathlib.Path(active_env_name, *scene_rel_path.parts[1:])
+
+        remapped_scene_path = dataset.cache_path / scene_rel_path
+        if not remapped_scene_path.exists():
+            raise FileNotFoundError(
+                "Prediction challenge split references missing scene cache: "
+                f"{remapped_scene_path}"
+            )
+
+        remapped_split.append((remapped_scene_path, num_elems, elems))
+
+    within_challenge_split = remapped_split
 
     dataset._scene_index = [orig_path for orig_path, _, _ in within_challenge_split]
 
@@ -106,8 +152,7 @@ def train(rank, args):
     print(f"Loading hyperparameters from {str(args.conf)}...")
     if not os.path.exists(args.conf):
         raise ValueError(f"Config json at {args.conf} not found!")
-    with open(args.conf, "r", encoding="utf-8") as conf_json:
-        hyperparams = json.load(conf_json)
+    hyperparams = load_json_config(args.conf)
 
     # CLI args override config only when passed explicitly.
     # Argparse defaults fill missing config keys as a fallback.
@@ -121,6 +166,9 @@ def train(rank, args):
         hyperparams["edge_encoding"] = not args.no_edge_encoding
     elif "edge_encoding" not in hyperparams:
         hyperparams["edge_encoding"] = not args.no_edge_encoding
+
+    if "attention_radius" not in hyperparams:
+        hyperparams["attention_radius"] = load_attention_radius_config()
 
     # Distributed LR Scaling
     hyperparams["learning_rate"] *= dist.get_world_size()
@@ -165,6 +213,11 @@ def train(rank, args):
         DEFAULT_NO_TYPES,
         key_name="no_types",
     )
+    eval_only_predict = parse_agent_type_list(
+        hyperparams.get("eval_only_predict"),
+        only_predict,
+        key_name="eval_only_predict",
+    )
 
     print("-----------------------")
     print("| TRAINING PARAMETERS |")
@@ -173,6 +226,10 @@ def train(rank, args):
     print("| Max Future: %ss" % hyperparams["prediction_sec"])
     print("| Batch Size: %d" % hyperparams["batch_size"])
     print("| Eval Batch Size: %d" % hyperparams["eval_batch_size"])
+    if hyperparams.get("max_train_batches") is not None:
+        print("| Max Train Batches: %s" % hyperparams["max_train_batches"])
+    if hyperparams.get("max_eval_batches") is not None:
+        print("| Max Eval Batches: %s" % hyperparams["max_eval_batches"])
     print("| Device: %s" % hyperparams["device"])
     print("| Learning Rate: %s" % hyperparams["learning_rate"])
     print("| Learning Rate Step Every: %s" % hyperparams["lr_step"])
@@ -180,6 +237,10 @@ def train(rank, args):
     print("| Robot Future: %s" % hyperparams["incl_robot_node"])
     print("| Map Encoding: %s" % hyperparams["map_encoding"])
     print("| Only Predict: %s" % [agent_type.name for agent_type in only_predict])
+    print(
+        "| Eval Only Predict: %s"
+        % [agent_type.name for agent_type in eval_only_predict]
+    )
     print("| Excluded Types: %s" % [agent_type.name for agent_type in no_types])
     print("| Added Input Noise: %.2f" % hyperparams["augment_input_noise"])
     print("| Overall GMM Components: %d" % hyperparams["K"])
@@ -209,7 +270,7 @@ def train(rank, args):
         print("model_dir:", model_dir_subfolder)
 
     # Load training and evaluation environments and scenes
-    attention_radius = load_attention_radius()
+    attention_radius = attention_radius_from_config(hyperparams["attention_radius"])
 
     data_dirs: Dict[str, str] = json.loads(hyperparams["data_loc_dict"])
 
@@ -236,7 +297,10 @@ def train(rank, args):
         verbose=True,
     )
 
-    if hyperparams["train_data"] == "nusc_trainval-train":
+    if (
+        hyperparams["train_data"] == "nusc_trainval-train"
+        and hyperparams.get("restrict_to_predchal", False)
+    ):
         restrict_to_predchal(train_dataset, "train")
 
     train_sampler = data.distributed.DistributedSampler(
@@ -261,7 +325,7 @@ def train(rank, args):
         incl_robot_future=hyperparams["incl_robot_node"],
         incl_raster_map=hyperparams["map_encoding"],
         raster_map_params=map_params,
-        only_predict=only_predict,
+        only_predict=eval_only_predict,
         no_types=no_types,
         num_workers=hyperparams["preprocess_workers"],
         cache_location=hyperparams["trajdata_cache_dir"],
@@ -269,7 +333,10 @@ def train(rank, args):
         verbose=True,
     )
 
-    if hyperparams["eval_data"] == "nusc_trainval-train_val":
+    if (
+        hyperparams["eval_data"] == "nusc_trainval-train_val"
+        and hyperparams.get("restrict_to_predchal", False)
+    ):
         restrict_to_predchal(eval_dataset, "train_val")
 
     eval_sampler = data.distributed.DistributedSampler(
@@ -365,6 +432,10 @@ def train(rank, args):
 
         batch: AgentBatch
         for batch_idx, batch in enumerate(pbar):
+            max_train_batches = hyperparams.get("max_train_batches")
+            if max_train_batches is not None and batch_idx >= int(max_train_batches):
+                break
+
             # if batch_idx >= (1 + 1 + 3) * 2:
             #     break
 
@@ -440,15 +511,25 @@ def train(rank, args):
                     "nll_mean",
                     "nll_final",
                 ]
+                eval_context = eval_context_from_hyperparams(hyperparams)
 
                 batch: AgentBatch
-                for batch in tqdm(
-                    eval_dataloader,
-                    ncols=80,
-                    unit_scale=dist.get_world_size(),
-                    disable=(rank > 0),
-                    desc=f"Epoch {epoch} Eval",
+                for batch_idx, batch in enumerate(
+                    tqdm(
+                        eval_dataloader,
+                        ncols=80,
+                        unit_scale=dist.get_world_size(),
+                        disable=(rank > 0),
+                        desc=f"Epoch {epoch} Eval",
+                    )
                 ):
+                    max_eval_batches = hyperparams.get("max_eval_batches")
+                    if (
+                        max_eval_batches is not None
+                        and batch_idx >= int(max_eval_batches)
+                    ):
+                        break
+
                     eval_results = (
                         trajectron_module.predict_and_evaluate_batch(
                             batch,
@@ -471,7 +552,12 @@ def train(rank, args):
                             if metric in metric_dict
                         }
                         for row_idx, idx_val in enumerate(data_idx.tolist()):
-                            row = {"data_idx": int(idx_val)}
+                            row = eval_identity_for_data_idx(
+                                eval_dataset,
+                                int(idx_val),
+                                agent_type,
+                            )
+                            row.update(eval_context)
                             for metric in metrics_to_write:
                                 if metric in metric_arrays:
                                     row[metric] = float(metric_arrays[metric][row_idx])
@@ -517,7 +603,7 @@ def train(rank, args):
                     with open(
                         metrics_path, "w", newline="", encoding="utf-8"
                     ) as csvfile:
-                        fieldnames = ["data_idx"] + metrics_to_write
+                        fieldnames = EVAL_IDENTITY_COLS + EVAL_CONTEXT_COLS + metrics_to_write
                         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                         writer.writeheader()
                         writer.writerows(per_traj_rows)
