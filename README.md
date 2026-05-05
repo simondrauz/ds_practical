@@ -141,8 +141,20 @@ conda run -n adaptive-py310 python -m torch.distributed.run --nproc_per_node=1 \
 
 `config/nuScenes_full_trainval.json` extends `config/nuScenes.json` and contains
 the full trainval split names, LaCie dataset/cache paths, 12 epochs, learning
-rate 0.003, and Pedestrian-only evaluation. Override paths on the CLI if your
-machine uses a different trainval layout.
+rate 0.003, serial preprocessing, pedestrian-only training targets, and
+pedestrian-only evaluation. Override paths on the CLI if your machine uses a
+different trainval layout.
+
+The full trainval config uses `only_predict: ["PEDESTRIAN"]` and
+`eval_only_predict: ["PEDESTRIAN"]`. This trains/evaluates pedestrian target
+trajectories while preserving non-`UNKNOWN` surrounding agents as context through
+the configured attention radii. Keep `no_types` at the shared default
+`["UNKNOWN"]`; do not add `VEHICLE`, `BICYCLE`, or `MOTORCYCLE` there unless you
+intentionally want to remove those agents from context.
+
+Keep `--preprocess_workers` at `0` unless you have validated multiprocessing on
+your platform. On macOS, multiple workers can fail while pickling dataset
+objects during DataLoader startup.
 
 Training writes evaluation CSVs to:
 
@@ -173,7 +185,7 @@ conda run -n adaptive-py310 python -m data_preparation.join_characteristic_metri
   --incl_vector_map \
   --trajdata_cache_dir "/path/to/trajdata_cache" \
   --data_loc_dict '{"nusc_trainval": "/path/to/v1.0-trainval_raw"}' \
-  --preprocess_workers 16
+  --preprocess_workers 0
 ```
 
 The join path flags can be omitted when the saved run `config.json` already

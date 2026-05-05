@@ -13,8 +13,14 @@
   "log_dir": "results/trajectory_prediction/nuScenes/models",
   "log_tag": "nusc_trainval_tpp",
   "eval_batch_size": 256,
-  "preprocess_workers": 16,
+  "preprocess_workers": 0,
+  "only_predict": [
+    "PEDESTRIAN"
+  ],
   "eval_only_predict": [
     "PEDESTRIAN"
+  ],
+  "no_types": [
+    "UNKNOWN"
   ]
 }
