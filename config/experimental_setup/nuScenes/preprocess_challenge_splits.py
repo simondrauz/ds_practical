@@ -43,7 +43,7 @@ print(f"  NUSC_RAW_DATA_DIR: {NUSC_RAW_DATA_DIR}")
 #   python preprocess_challenge_splits.py --user zoe
 #
 # Example torchrun command (both scripts now support --user argument):
-#   torchrun --nproc_per_node=1 train_unified.py --user simon --eval_every=1 --vis_every=1 --batch_size=256 --eval_batch_size=256 --preprocess_workers=16 --log_dir=results/trajectory_prediction/nuScenes/models --log_tag=nusc_adaptive_tpp --train_epochs=20 --conf=results/trajectory_prediction/nuScenes/models/nusc_mm_sec4_tpp-13_Sep_2022_11_06_01/config.json --train_data=nusc_trainval-train --eval_data=nusc_trainval-train_val --history_sec=2.0 --prediction_sec=6.0
+#   torchrun --nproc_per_node=1 train_unified.py --user simon --eval_every=1 --vis_every=1 --batch_size=256 --eval_batch_size=256 --preprocess_workers=0 --log_dir=results/trajectory_prediction/nuScenes/models --log_tag=nusc_adaptive_tpp --train_epochs=20 --conf=results/trajectory_prediction/nuScenes/models/nusc_mm_sec4_tpp-13_Sep_2022_11_06_01/config.json --train_data=nusc_trainval-train --eval_data=nusc_trainval-train_val --history_sec=2.0 --prediction_sec=6.0
 
 # Load training and evaluation environments and scenes
 attention_radius = defaultdict(

@@ -12,7 +12,13 @@
   "save_every": 5,
   "log_dir": "results/trajectory_prediction/nuScenes/models",
   "log_tag": "nusc_mini_tpp",
+  "only_predict": [
+    "PEDESTRIAN"
+  ],
   "eval_only_predict": [
     "PEDESTRIAN"
+  ],
+  "no_types": [
+    "UNKNOWN"
   ]
 }
