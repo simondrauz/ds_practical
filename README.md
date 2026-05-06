@@ -243,21 +243,27 @@ XGBoost feature.
 
 ### 1. Create a Local Sweep Config
 
-`config/sweep_config.yaml` is an example with repo-local paths. Copy it to an
-ignored or temporary location and edit the paths if your machine uses a
-different data layout:
+`config/sweep_config.yaml` is the small 18-setting grid used for the three-seed
+curated sweep. `config/sweep_config_large.yaml` is the expanded 64-setting grid
+used for the one-seed curated sweep. Copy either config to an ignored or
+temporary location and edit the paths if your machine uses a different data
+layout:
 
 ```bash
 mkdir -p results/interpretable_model/local_configs
 cp config/sweep_config.yaml results/interpretable_model/local_configs/sweep_config.local.yaml
 ```
 
-For local mini data in this repo, use:
+For direct `run_sweep.py` usage on local mini data, use the small grid and make
+the epoch-30 protocol explicit in the copied local config:
 
 ```yaml
 base_args:
   conf: config/nuScenes_mini.json
   log_tag: sweep_tpp
+  train_epochs: 30
+  eval_every: 30
+  save_every: 30
 
 grid:
   history_sec: [2.0, 4.0]
@@ -265,12 +271,21 @@ grid:
   attention_radius_scale: [0.5, 1.0, 2.0]
 ```
 
-`config/nuScenes_mini.json` supplies the mini split/path settings, 40 epochs,
-learning rate 0.003, and five-epoch eval/save cadence. Downstream analysis can
-therefore choose between epochs 25, 30, 35, and 40.
+`config/nuScenes_mini.json` supplies the mini split/path settings and learning
+rate 0.003. The curated result-set launcher overrides sweep training to 30
+epochs with an epoch-30 eval/save cadence, so downstream interpretation should
+use `eval_epoch_30.csv`.
 If your mini data is not under `data/raw` and `data/processed/trajdata_cache`,
 add `trajdata_cache_dir` and `data_loc_dict` overrides under `base_args` in your
 local sweep config.
+
+For the curated four-result layout, prefer the single entrypoint:
+
+```bash
+conda run -n adaptive-py310 python scripts/run_prediction_result_set.py \
+  --experiment sweep_small_3seeds \
+  --phase all
+```
 
 Example local-path override:
 

@@ -48,20 +48,26 @@ git restore config/shared_config.yaml
 
 ## Create A Local Sweep Config
 
-Do not commit machine-specific path edits to `config/sweep_config.yaml`. Copy it
-to an ignored local location and edit the paths there.
+Do not commit machine-specific path edits to the sweep configs. Use
+`config/sweep_config.yaml` for the small 18-setting grid and
+`config/sweep_config_large.yaml` for the expanded 64-setting grid. Copy the
+config you need to an ignored local location and edit paths there.
 
 ```bash
 mkdir -p results/interpretable_model/local_configs
 cp config/sweep_config.yaml results/interpretable_model/local_configs/sweep_config.local.yaml
 ```
 
-For a repo-local mini setup, the local config should look like this:
+For direct `run_sweep.py` usage with the small grid, make the epoch-30 protocol
+explicit in the copied local config:
 
 ```yaml
 base_args:
   conf: config/nuScenes_mini.json
   log_tag: sweep_tpp
+  train_epochs: 30
+  eval_every: 30
+  save_every: 30
 
 grid:
   history_sec: [2.0, 4.0]
@@ -69,12 +75,22 @@ grid:
   attention_radius_scale: [0.5, 1.0, 2.0]
 ```
 
-`config/nuScenes_mini.json` supplies the mini split/path settings, 40 epochs,
-learning rate 0.003, and five-epoch eval/save cadence, so the analysis can
-later use epoch 25, 30, 35, or 40.
+`config/nuScenes_mini.json` supplies the mini split/path settings and learning
+rate 0.003. The curated result-set launcher overrides sweep training to 30
+epochs with an epoch-30 eval/save cadence, so downstream interpretation should
+use `eval_epoch_30.csv` rather than mixing checkpoints.
 If the mini data is not under the repo-local default paths, add
 `trajdata_cache_dir` and `data_loc_dict` overrides under `base_args` in the
 local sweep config.
+
+For the curated result sets, use the single launcher instead of calling
+`run_sweep.py` directly:
+
+```bash
+conda run -n adaptive-py310 python scripts/run_prediction_result_set.py \
+  --experiment sweep_small_3seeds \
+  --phase all
+```
 
 `--user simon` or `--user zoe` does not replace path values that are already
 present in `config/nuScenes_mini.json`. Use explicit `base_args` path overrides
