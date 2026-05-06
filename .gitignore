@@ -32,6 +32,10 @@ results/trajectory_prediction/logs/
 results/trajectory_prediction/trajectory_metrics/
 results/trajectory_prediction/trajectory_metrics_joined/
 results/trajectory_prediction/nuScenes/models/
+results/trajectory_prediction/experiment_sets/
+results/trajectory_prediction/seeded_experiments/
+results/trajectory_prediction/overnight_runs/
+results/_archive/
 results/evaluation/metrics/*.csv
 results/evaluation/plots/characterization/*.png
 # Results artifacts
