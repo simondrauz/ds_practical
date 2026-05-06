@@ -87,6 +87,7 @@ def _build_workflow(
     eval_csv_name: str,
     prepared_target_col: str,
     target_col: str | None,
+    include_model_settings_as_features: bool,
     include_gam: bool,
     include_xgboost: bool,
 ) -> list[NotebookExecution]:
@@ -100,6 +101,11 @@ def _build_workflow(
             patchers=[
                 lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(run_name)),
                 lambda source: _replace_assignment(source, "EVAL_CSV_NAME", _python_literal(eval_csv_name)),
+                lambda source: _replace_assignment(
+                    source,
+                    "INCLUDE_MODEL_SETTINGS_AS_FEATURES",
+                    repr(include_model_settings_as_features),
+                ),
                 lambda source: _replace_assignment(source, "target_col", _python_literal(prepared_target_col)),
             ],
             output_name="01_interpretable_model_data_preparation.ipynb",
@@ -208,6 +214,7 @@ def _write_summary(
     eval_csv_name: str,
     prepared_target_col: str,
     target_col: str | None,
+    include_model_settings_as_features: bool,
     include_gam: bool,
     include_xgboost: bool,
     executed_notebooks: list[dict[str, str]],
@@ -217,6 +224,7 @@ def _write_summary(
         "eval_csv_name": eval_csv_name,
         "prepared_target_col": prepared_target_col,
         "target_col_override": target_col,
+        "include_model_settings_as_features": include_model_settings_as_features,
         "executed_notebooks": executed_notebooks,
         "artifacts": {
             "prepared_data_path": str(
@@ -257,6 +265,19 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional target override for model/inference notebooks, e.g. ml_ade_log.",
     )
+    model_setting_group = parser.add_mutually_exclusive_group(required=True)
+    model_setting_group.add_argument(
+        "--include-model-settings-as-features",
+        dest="include_model_settings_as_features",
+        action="store_true",
+        help="Fit model-setting columns as predictors in GAM/XGBoost.",
+    )
+    model_setting_group.add_argument(
+        "--exclude-model-settings-as-features",
+        dest="include_model_settings_as_features",
+        action="store_false",
+        help="Keep model-setting columns as metadata only, excluding them from GAM/XGBoost features.",
+    )
     parser.add_argument(
         "--models",
         nargs="+",
@@ -292,6 +313,7 @@ def main() -> int:
         eval_csv_name=args.eval_csv_name,
         prepared_target_col=args.prepared_target_col,
         target_col=args.target_col,
+        include_model_settings_as_features=args.include_model_settings_as_features,
         include_gam=include_gam,
         include_xgboost=include_xgboost,
     )
@@ -323,6 +345,7 @@ def main() -> int:
         eval_csv_name=args.eval_csv_name,
         prepared_target_col=args.prepared_target_col,
         target_col=args.target_col,
+        include_model_settings_as_features=args.include_model_settings_as_features,
         include_gam=include_gam,
         include_xgboost=include_xgboost,
         executed_notebooks=executed_notebooks,

@@ -110,6 +110,7 @@ def test_notebook_workflow_patches_preparation_to_joined_eval_epoch():
         eval_csv_name="eval_epoch_7.csv",
         prepared_target_col="ml_ade",
         target_col=None,
+        include_model_settings_as_features=False,
         include_gam=True,
         include_xgboost=False,
     )
@@ -119,6 +120,7 @@ def test_notebook_workflow_patches_preparation_to_joined_eval_epoch():
 
     assert "RUN_NAME = 'workflow_run'" in source
     assert "EVAL_CSV_NAME = 'eval_epoch_7.csv'" in source
+    assert "INCLUDE_MODEL_SETTINGS_AS_FEATURES = False" in source
     assert "trajectory_metrics_joined" in source
     assert 'df.insert(0, "run_name", RUN_NAME)' in source
     assert 'df.insert(insert_at, "eval_csv_name", EVAL_CSV_NAME)' in source

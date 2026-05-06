@@ -9,6 +9,7 @@ Workflow overview:
 4. Drop incomplete rows once the feature/target contract is fixed.
 """
 
+import json
 from pathlib import Path
 from typing import Any, Callable, TypedDict
 
@@ -19,12 +20,15 @@ import pandas as pd
 DisplayFn = Callable[[Any], None]
 
 IDENTITY_COLS = ["run_name", "eval_csv_name", "data_idx"]
+MODEL_SETTING_COLS = ["attention_radius_m", "history_sec", "prediction_sec"]
+INCLUDE_MODEL_SETTINGS_AS_FEATURES_KEY = "include_model_settings_as_features"
 
 
 class SingleTargetModelData(TypedDict):
     target_col: str
     feature_cols: list[str]
     identity_cols: list[str]
+    model_setting_cols: list[str]
     model_df: pd.DataFrame
     X: pd.DataFrame
     y: pd.Series
@@ -38,6 +42,7 @@ class DualTargetModelData(TypedDict):
     target_col: str
     feature_cols: list[str]
     identity_cols: list[str]
+    model_setting_cols: list[str]
     model_df: pd.DataFrame
     X: np.ndarray
     y_raw: np.ndarray
@@ -95,6 +100,13 @@ def load_prepared_data(
 ) -> pd.DataFrame:
     # Step 1: load the exact prepared dataset that later modelling stages consume.
     df = pd.read_csv(data_path)
+    metadata_path = data_path.with_suffix(".metadata.json")
+    if metadata_path.exists():
+        metadata = json.loads(metadata_path.read_text())
+        if INCLUDE_MODEL_SETTINGS_AS_FEATURES_KEY in metadata:
+            df.attrs[INCLUDE_MODEL_SETTINGS_AS_FEATURES_KEY] = metadata[
+                INCLUDE_MODEL_SETTINGS_AS_FEATURES_KEY
+            ]
     print(f"Dataset shape: {df.shape}")
     print("Columns:")
     print(df.columns.tolist())
@@ -128,11 +140,55 @@ def _available_identity_cols(df: pd.DataFrame) -> list[str]:
     return [col for col in IDENTITY_COLS if col in df.columns]
 
 
+def _available_model_setting_cols(df: pd.DataFrame) -> list[str]:
+    return [col for col in MODEL_SETTING_COLS if col in df.columns]
+
+
+def _model_setting_feature_exclusions(
+    df: pd.DataFrame,
+    *,
+    include_model_settings_as_features: bool | None,
+) -> list[str]:
+    model_setting_cols = _available_model_setting_cols(df)
+    if not model_setting_cols:
+        return []
+
+    if include_model_settings_as_features is None:
+        include_model_settings_as_features = df.attrs.get(
+            INCLUDE_MODEL_SETTINGS_AS_FEATURES_KEY
+        )
+
+    if include_model_settings_as_features is None:
+        raise ValueError(
+            "Prepared data contains model-setting columns, but "
+            "include_model_settings_as_features was not set. Set "
+            "INCLUDE_MODEL_SETTINGS_AS_FEATURES to True or False in "
+            "interpretable_model_data_preparation.ipynb and rerun the prepared-data export."
+        )
+    if not isinstance(include_model_settings_as_features, bool):
+        raise TypeError(
+            "include_model_settings_as_features must be True or False when model-setting "
+            f"columns are present; got {include_model_settings_as_features!r}."
+        )
+
+    if include_model_settings_as_features:
+        excluded_cols: list[str] = []
+    else:
+        excluded_cols = model_setting_cols
+
+    if excluded_cols:
+        print(f"Model setting metadata excluded from features: {excluded_cols}")
+    elif model_setting_cols:
+        print(f"Model settings included as features: {model_setting_cols}")
+    return excluded_cols
+
+
 def prepare_single_target_model_data(
     df: pd.DataFrame,
     *,
     target_col: str | None = None,
     default_target: str = "ml_ade",
+    include_model_settings_as_features: bool | None = None,
 ) -> SingleTargetModelData:
     if (
         target_col is not None
@@ -158,19 +214,32 @@ def prepare_single_target_model_data(
 
     # Step 2: retain only numeric predictors and keep row identity out of the feature matrix.
     identity_cols = _available_identity_cols(df)
+    model_setting_cols = _available_model_setting_cols(df)
+    excluded_model_setting_cols = _model_setting_feature_exclusions(
+        df,
+        include_model_settings_as_features=include_model_settings_as_features,
+    )
     feature_cols = _filter_numeric_feature_cols(
         df,
-        [c for c in df.columns if c not in target_variant_cols and c not in identity_cols],
+        [
+            c
+            for c in df.columns
+            if c not in target_variant_cols
+            and c not in identity_cols
+            and c not in excluded_model_setting_cols
+        ],
     )
+    metadata_cols = [c for c in model_setting_cols if c not in feature_cols]
 
     # Step 3: freeze the modelling frame and row ids after dropping incomplete rows.
     # Downstream notebooks rely on `row_ids` to map OOF predictions back to original rows.
-    model_df = df[identity_cols + feature_cols + [resolved_target_col]].dropna().copy()
+    model_df = df[identity_cols + feature_cols + metadata_cols + [resolved_target_col]].dropna().copy()
 
     return {
         "target_col": resolved_target_col,
         "feature_cols": feature_cols,
         "identity_cols": identity_cols,
+        "model_setting_cols": model_setting_cols,
         "model_df": model_df,
         "X": model_df[feature_cols],
         "y": model_df[resolved_target_col],
@@ -183,6 +252,7 @@ def prepare_dual_target_model_data(
     *,
     target_col: str | None = None,
     default_target: str = "ml_ade",
+    include_model_settings_as_features: bool | None = None,
 ) -> DualTargetModelData:
     # Step 1: resolve the base target and discover whether raw/log variants already exist.
     base_target_name, raw_target_source_col, log_target_source_col = _resolve_dual_target_sources(
@@ -193,25 +263,29 @@ def prepare_dual_target_model_data(
 
     # Step 2: build a purely numeric feature set so GAM variants can share one matrix.
     identity_cols = _available_identity_cols(df)
+    model_setting_cols = _available_model_setting_cols(df)
     excluded_cols = {c for c in [raw_target_source_col, log_target_source_col] if c is not None}
+    excluded_model_setting_cols = _model_setting_feature_exclusions(
+        df,
+        include_model_settings_as_features=include_model_settings_as_features,
+    )
     feature_cols = _filter_numeric_feature_cols(
         df,
-        [c for c in df.columns if c not in excluded_cols and c not in identity_cols],
+        [
+            c
+            for c in df.columns
+            if c not in excluded_cols
+            and c not in identity_cols
+            and c not in excluded_model_setting_cols
+        ],
     )
-
-    # Verify model settings are present and preserved
-    MODEL_SETTING_COLS = ['attention_radius_m', 'history_sec', 'prediction_sec']
-    missing_settings = [c for c in MODEL_SETTING_COLS if c not in feature_cols]
-    if missing_settings:
-        print(f"WARNING: Expected model settings not found in features: {missing_settings}")
-    else:
-        print(f"✓ Model settings preserved: {[c for c in MODEL_SETTING_COLS if c in feature_cols]}")
+    metadata_cols = [c for c in model_setting_cols if c not in feature_cols]
 
     # Step 3: drop incomplete rows only after the full feature/target contract is known.
     target_source_cols = [
         c for c in [raw_target_source_col, log_target_source_col] if c is not None
     ]
-    model_df = df[identity_cols + feature_cols + target_source_cols].dropna().copy()
+    model_df = df[identity_cols + feature_cols + metadata_cols + target_source_cols].dropna().copy()
 
     if raw_target_source_col is None and log_target_source_col is not None:
         raw_target_col = base_target_name
@@ -248,6 +322,7 @@ def prepare_dual_target_model_data(
         "target_col": target_col_out,
         "feature_cols": feature_cols,
         "identity_cols": identity_cols,
+        "model_setting_cols": model_setting_cols,
         "model_df": model_df,
         "X": X,
         "y_raw": y_raw,

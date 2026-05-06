@@ -477,6 +477,23 @@ def test_load_prepared_data_includes_optional_summaries(tmp_path):
     assert len(displayed) == 3
 
 
+def test_load_prepared_data_attaches_model_setting_feature_policy(tmp_path):
+    data_path = tmp_path / "prepared.csv"
+    pd.DataFrame({"feature_a": [1.0], "attention_radius_m": [10.0], "ml_ade_log": [0.1]}).to_csv(
+        data_path,
+        index=False,
+    )
+    data_path.with_suffix(".metadata.json").write_text(
+        json.dumps({"include_model_settings_as_features": False})
+    )
+
+    df = load_prepared_data(data_path)
+
+    assert df.attrs["include_model_settings_as_features"] is False
+    prepared = prepare_single_target_model_data(df)
+    assert prepared["feature_cols"] == ["feature_a"]
+
+
 def test_prepare_single_target_model_data_falls_back_to_last_column():
     df = pd.DataFrame(
         {
@@ -501,12 +518,67 @@ def test_prepare_single_target_model_data_filters_non_numeric_and_resolves_targe
         }
     )
 
-    prepared = prepare_single_target_model_data(df)
+    prepared = prepare_single_target_model_data(df, include_model_settings_as_features=False)
 
     assert prepared["target_col"] == "ml_ade_log"
     assert prepared["feature_cols"] == ["feature_a"]
     assert prepared["identity_cols"] == ["data_idx"]
     assert prepared["model_df"].columns.tolist() == ["data_idx", "feature_a", "ml_ade_log"]
+
+
+def test_prepare_single_target_model_data_excludes_full_trainval_model_settings_from_features():
+    df = pd.DataFrame(
+        {
+            "run_name": ["full_trainval_12ep_1seed", "full_trainval_12ep_1seed"],
+            "eval_csv_name": ["eval_epoch_12.csv", "eval_epoch_12.csv"],
+            "data_idx": [42, 17],
+            "feature_a": [1.0, 2.0],
+            "attention_radius_m": [10.0, 10.0],
+            "history_sec": [2.0, 2.0],
+            "prediction_sec": [6.0, 6.0],
+            "ml_ade_log": [0.1, 0.2],
+        }
+    )
+
+    prepared = prepare_single_target_model_data(df, include_model_settings_as_features=False)
+
+    assert prepared["feature_cols"] == ["feature_a"]
+    assert prepared["model_setting_cols"] == ["attention_radius_m", "history_sec", "prediction_sec"]
+    assert prepared["X"].columns.tolist() == ["feature_a"]
+    assert prepared["model_df"].columns.tolist() == [
+        "run_name",
+        "eval_csv_name",
+        "data_idx",
+        "feature_a",
+        "attention_radius_m",
+        "history_sec",
+        "prediction_sec",
+        "ml_ade_log",
+    ]
+
+
+def test_prepare_single_target_model_data_keeps_sweep_model_settings_as_features():
+    df = pd.DataFrame(
+        {
+            "run_name": ["sweep_large_30ep_1seed", "sweep_large_30ep_1seed"],
+            "data_idx": [42, 17],
+            "feature_a": [1.0, 2.0],
+            "attention_radius_m": [10.0, 20.0],
+            "history_sec": [2.0, 4.0],
+            "prediction_sec": [4.0, 6.0],
+            "ml_ade_log": [0.1, 0.2],
+        }
+    )
+
+    prepared = prepare_single_target_model_data(df, include_model_settings_as_features=True)
+
+    assert prepared["feature_cols"] == [
+        "feature_a",
+        "attention_radius_m",
+        "history_sec",
+        "prediction_sec",
+    ]
+    assert prepared["X"].columns.tolist() == prepared["feature_cols"]
 
 
 def test_prepare_single_target_model_data_derives_requested_log_target():
@@ -539,7 +611,7 @@ def test_prepare_dual_target_model_data_derives_missing_raw_target():
         }
     )
 
-    prepared = prepare_dual_target_model_data(df)
+    prepared = prepare_dual_target_model_data(df, include_model_settings_as_features=False)
 
     assert prepared["raw_target_col"] == "ml_ade"
     assert prepared["identity_cols"] == ["run_name", "data_idx"]
@@ -560,13 +632,69 @@ def test_prepare_dual_target_model_data_derives_missing_log_target():
         }
     )
 
-    prepared = prepare_dual_target_model_data(df)
+    prepared = prepare_dual_target_model_data(df, include_model_settings_as_features=True)
 
     assert prepared["raw_target_col"] == "ml_ade"
     assert prepared["log_target_col"] == "ml_ade_log"
     assert prepared["target_col"] == "ml_ade_log"
     assert prepared["feature_cols"] == ["feature_a"]
     np.testing.assert_allclose(prepared["y_log"], np.log1p([1.0, 3.0]))
+
+
+def test_prepare_dual_target_model_data_excludes_full_trainval_model_settings_from_features():
+    df = pd.DataFrame(
+        {
+            "run_name": ["full_trainval_12ep_3seeds", "full_trainval_12ep_3seeds"],
+            "data_idx": [42, 17],
+            "feature_a": [1.0, 2.0],
+            "attention_radius_m": [10.0, 10.0],
+            "history_sec": [2.0, 2.0],
+            "prediction_sec": [6.0, 6.0],
+            "ml_ade_log": np.log1p([1.0, 3.0]),
+        }
+    )
+
+    prepared = prepare_dual_target_model_data(df, include_model_settings_as_features=False)
+
+    assert prepared["feature_cols"] == ["feature_a"]
+    assert prepared["n_features"] == 1
+    assert prepared["X"].shape == (2, 1)
+    assert prepared["model_setting_cols"] == ["attention_radius_m", "history_sec", "prediction_sec"]
+    assert prepared["model_df"].columns.tolist() == [
+        "run_name",
+        "data_idx",
+        "feature_a",
+        "attention_radius_m",
+        "history_sec",
+        "prediction_sec",
+        "ml_ade_log",
+        "ml_ade",
+    ]
+
+
+def test_prepare_dual_target_model_data_keeps_sweep_model_settings_as_features():
+    df = pd.DataFrame(
+        {
+            "run_name": ["sweep_small_30ep_3seeds", "sweep_small_30ep_3seeds"],
+            "data_idx": [42, 17],
+            "feature_a": [1.0, 2.0],
+            "attention_radius_m": [10.0, 20.0],
+            "history_sec": [2.0, 4.0],
+            "prediction_sec": [4.0, 6.0],
+            "ml_ade": [1.0, 3.0],
+        }
+    )
+
+    prepared = prepare_dual_target_model_data(df, include_model_settings_as_features=True)
+
+    assert prepared["feature_cols"] == [
+        "feature_a",
+        "attention_radius_m",
+        "history_sec",
+        "prediction_sec",
+    ]
+    assert prepared["n_features"] == 4
+    assert prepared["X"].shape == (2, 4)
 
 
 def test_load_run_context_requires_manifest_fields(tmp_path, monkeypatch):
