@@ -9,6 +9,7 @@ from typing import Any, Iterable, Mapping
 
 import numpy as np
 import pandas as pd
+from sklearn.cluster import KMeans
 
 from .prepared_data import IDENTITY_COLS
 
@@ -940,34 +941,76 @@ def assign_performance_groups(
     metric_values: pd.Series,
     *,
     lower_is_better: bool = True,
-) -> tuple[pd.Series, float, float]:
-    """Assign easy/medium/hard groups from quartile thresholds.
+    n_groups: int = 3,
+    use_log_space: bool = True,
+    random_state: int = 42,
+) -> tuple[pd.Series, dict[str, object]]:
+    """Assign easy/medium/hard groups via k-means clustering on the performance metric.
 
-    The notebook defines regimes relative to the empirical performance distribution
-    within the selected run: the best quartile is `easy`, the worst quartile is
-    `hard`, and the middle half is `medium`.
+    Clustering runs in log1p space by default because ADE/FDE distributions are
+    heavily right-skewed; this is consistent with how the rest of the pipeline
+    handles `ml_ade` (see `prepared_data.py` and the data-preparation notebook).
+    Centroids and boundaries are back-transformed to the raw metric scale in the
+    returned `group_info` dict.
     """
     if metric_values.isna().any():
         missing_count = int(metric_values.isna().sum())
         raise ValueError(f"Performance metric contains missing values: {missing_count}")
 
-    q25 = float(metric_values.quantile(0.25))
-    q75 = float(metric_values.quantile(0.75))
+    if use_log_space:
+        if (metric_values < -1).any():
+            raise ValueError(
+                "Cannot apply log1p transform: performance metric contains values < -1."
+            )
+        cluster_values = np.log1p(metric_values.to_numpy())
+    else:
+        cluster_values = metric_values.to_numpy()
+
+    kmeans = KMeans(n_clusters=n_groups, random_state=random_state)
+    cluster_ids = kmeans.fit_predict(cluster_values.reshape(-1, 1))
+
+    # Sort centroid indices so rank 0 = smallest centroid (best when lower_is_better).
+    sorted_centroid_indices = np.argsort(kmeans.cluster_centers_.ravel())
+    if lower_is_better:
+        rank_to_label = {0: "easy", 1: "medium", 2: "hard"}
+    else:
+        rank_to_label = {0: "hard", 1: "medium", 2: "easy"}
+
+    # Map each row's cluster id to its sorted rank, then to a label.
+    cluster_id_to_rank = {int(cid): rank for rank, cid in enumerate(sorted_centroid_indices)}
+    labels = np.array([rank_to_label[cluster_id_to_rank[cid]] for cid in cluster_ids])
+
+    sorted_centroids_log = kmeans.cluster_centers_.ravel()[sorted_centroid_indices]
+    if use_log_space:
+        sorted_centroids_raw = np.expm1(sorted_centroids_log)
+        # Boundaries are midpoints in log space, back-transformed.
+        boundary_low_raw = float(np.expm1((sorted_centroids_log[0] + sorted_centroids_log[1]) / 2))
+        boundary_high_raw = float(np.expm1((sorted_centroids_log[1] + sorted_centroids_log[2]) / 2))
+    else:
+        sorted_centroids_raw = sorted_centroids_log
+        boundary_low_raw = float((sorted_centroids_raw[0] + sorted_centroids_raw[1]) / 2)
+        boundary_high_raw = float((sorted_centroids_raw[1] + sorted_centroids_raw[2]) / 2)
 
     if lower_is_better:
-        labels = np.select(
-            [metric_values <= q25, metric_values >= q75],
-            ["easy", "hard"],
-            default="medium",
-        )
+        group_info: dict[str, object] = {
+            "centroid_easy": float(sorted_centroids_raw[0]),
+            "centroid_medium": float(sorted_centroids_raw[1]),
+            "centroid_hard": float(sorted_centroids_raw[2]),
+            "boundary_easy_medium": boundary_low_raw,
+            "boundary_medium_hard": boundary_high_raw,
+        }
     else:
-        labels = np.select(
-            [metric_values >= q75, metric_values <= q25],
-            ["easy", "hard"],
-            default="medium",
-        )
+        group_info = {
+            "centroid_easy": float(sorted_centroids_raw[2]),
+            "centroid_medium": float(sorted_centroids_raw[1]),
+            "centroid_hard": float(sorted_centroids_raw[0]),
+            "boundary_easy_medium": boundary_high_raw,
+            "boundary_medium_hard": boundary_low_raw,
+        }
+    group_info["use_log_space"] = use_log_space
+    group_info["n_groups"] = n_groups
 
-    return pd.Series(labels, index=metric_values.index, name="performance_group"), q25, q75
+    return pd.Series(labels, index=metric_values.index, name="performance_group"), group_info
 
 
 def build_group_summary_df(
@@ -975,22 +1018,23 @@ def build_group_summary_df(
     analysis_df: pd.DataFrame,
     performance_metric_col: str,
     performance_group_col: str,
-    q25: float,
-    q75: float,
+    group_info: dict[str, object],
 ) -> pd.DataFrame:
-    """Build a compact one-row summary of the quartile grouping result."""
+    """Build a compact one-row summary of the k-means grouping result."""
     return pd.DataFrame(
         [
             {
                 "metric_col": performance_metric_col,
-                "q25": q25,
-                "q75": q75,
+                "centroid_easy": group_info["centroid_easy"],
+                "centroid_medium": group_info["centroid_medium"],
+                "centroid_hard": group_info["centroid_hard"],
+                "boundary_easy_medium": group_info["boundary_easy_medium"],
+                "boundary_medium_hard": group_info["boundary_medium_hard"],
+                "use_log_space": group_info["use_log_space"],
                 "n_total": len(analysis_df),
                 "n_easy": int((analysis_df[performance_group_col] == "easy").sum()),
                 "n_medium": int((analysis_df[performance_group_col] == "medium").sum()),
                 "n_hard": int((analysis_df[performance_group_col] == "hard").sum()),
-                "n_equal_q25": int((analysis_df[performance_metric_col] == q25).sum()),
-                "n_equal_q75": int((analysis_df[performance_metric_col] == q75).sum()),
             }
         ]
     )
@@ -1006,6 +1050,7 @@ def assemble_step1_analysis_table(
     performance_metric_col: str,
     lower_is_better: bool = True,
     performance_group_col: str = "performance_group",
+    random_state: int = 42,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Join prepared rows, run metrics, and feature-effect exports into one analysis table."""
     key_cols = list(feature_cols)
@@ -1088,9 +1133,10 @@ def assemble_step1_analysis_table(
         )
     analysis_df = analysis_df.drop(columns=["_feature_effect_merge"])
 
-    performance_groups, q25, q75 = assign_performance_groups(
+    performance_groups, group_info = assign_performance_groups(
         analysis_df[performance_metric_col],
         lower_is_better=lower_is_better,
+        random_state=random_state,
     )
     analysis_df[performance_group_col] = performance_groups
 
@@ -1098,8 +1144,7 @@ def assemble_step1_analysis_table(
         analysis_df=analysis_df,
         performance_metric_col=performance_metric_col,
         performance_group_col=performance_group_col,
-        q25=q25,
-        q75=q75,
+        group_info=group_info,
     )
 
     return analysis_df, group_summary_df
