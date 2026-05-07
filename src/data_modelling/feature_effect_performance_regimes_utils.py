@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
 
-from .prepared_data import IDENTITY_COLS
+from .prepared_data import IDENTITY_COLS, MODEL_SETTING_COLS
 
 EFFECT_PREFIX = "effect__"
 VALID_PERFORMANCE_GROUPS = ("easy", "medium", "hard")
@@ -1058,7 +1058,7 @@ def assemble_step1_analysis_table(
     assert_columns_present(prepared_model_df, key_cols + [target_col], df_name="prepared data")
     assert_columns_present(
         joined_metrics_df,
-        ["data_idx"] + key_cols + [performance_metric_col],
+        ["data_idx", performance_metric_col],
         df_name="joined metrics",
     )
 
@@ -1080,7 +1080,10 @@ def assemble_step1_analysis_table(
     assert_unique_key(feature_effects_df, trajectory_key_cols, df_name="feature-effect export")
 
     joined_metric_cols = [
-        col for col in joined_metrics_df.columns if col not in (key_cols + trajectory_key_cols)
+        col
+        for col in joined_metrics_df.columns
+        if col not in (key_cols + trajectory_key_cols)
+        and col not in MODEL_SETTING_COLS
     ]
     analysis_df = prepared_model_df.merge(
         joined_metrics_df[trajectory_key_cols + joined_metric_cols],

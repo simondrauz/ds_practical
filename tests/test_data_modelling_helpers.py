@@ -550,9 +550,6 @@ def test_prepare_single_target_model_data_excludes_full_trainval_model_settings_
         "eval_csv_name",
         "data_idx",
         "feature_a",
-        "attention_radius_m",
-        "history_sec",
-        "prediction_sec",
         "ml_ade_log",
     ]
 
@@ -579,6 +576,35 @@ def test_prepare_single_target_model_data_keeps_sweep_model_settings_as_features
         "prediction_sec",
     ]
     assert prepared["X"].columns.tolist() == prepared["feature_cols"]
+
+
+def test_prepare_single_target_model_data_can_retain_model_settings_as_metadata():
+    df = pd.DataFrame(
+        {
+            "run_name": ["full_trainval_12ep_1seed"],
+            "feature_a": [1.0],
+            "attention_radius_m": [10.0],
+            "history_sec": [2.0],
+            "prediction_sec": [6.0],
+            "ml_ade_log": [0.1],
+        }
+    )
+
+    prepared = prepare_single_target_model_data(
+        df,
+        include_model_settings_as_features=False,
+        retain_model_settings_as_metadata=True,
+    )
+
+    assert prepared["feature_cols"] == ["feature_a"]
+    assert prepared["model_df"].columns.tolist() == [
+        "run_name",
+        "feature_a",
+        "attention_radius_m",
+        "history_sec",
+        "prediction_sec",
+        "ml_ade_log",
+    ]
 
 
 def test_prepare_single_target_model_data_derives_requested_log_target():
@@ -664,9 +690,6 @@ def test_prepare_dual_target_model_data_excludes_full_trainval_model_settings_fr
         "run_name",
         "data_idx",
         "feature_a",
-        "attention_radius_m",
-        "history_sec",
-        "prediction_sec",
         "ml_ade_log",
         "ml_ade",
     ]
@@ -766,28 +789,30 @@ def test_prepare_feature_effect_export_names_effect_columns_and_base_value():
 def test_assemble_step1_analysis_table_aligns_metrics_by_data_idx_not_row_position():
     prepared_model_df = pd.DataFrame(
         {
-            "data_idx": [20, 10],
-            "speed": [2.0, 1.0],
-            "ml_ade_log": np.log1p([20.0, 10.0]),
+            "data_idx": [20, 10, 30],
+            "speed": [2.0, 1.0, 3.0],
+            "ml_ade_log": np.log1p([20.0, 10.0, 30.0]),
         }
     )
     joined_metrics_df = pd.DataFrame(
         {
-            "data_idx": [10, 20],
-            "speed": [1.0, 2.0],
-            "ml_ade": [10.0, 20.0],
-            "scene_id": ["scene_10", "scene_20"],
+            "data_idx": [10, 20, 30],
+            "ml_ade": [10.0, 20.0, 30.0],
+            "attention_radius_m": [10.0, 10.0, 10.0],
+            "history_sec": [2.0, 2.0, 2.0],
+            "prediction_sec": [6.0, 6.0, 6.0],
+            "scene_id": ["scene_10", "scene_20", "scene_30"],
         }
     )
     feature_effects_df = pd.DataFrame(
         {
-            "data_idx": [20, 10],
-            "speed": [2.0, 1.0],
-            "row_id": [0, 1],
-            "outer_fold": [1, 1],
-            "oof_pred_orig": [19.5, 9.5],
-            "target_orig": [20.0, 10.0],
-            "effect__speed": [0.2, 0.1],
+            "data_idx": [20, 10, 30],
+            "speed": [2.0, 1.0, 3.0],
+            "row_id": [0, 1, 2],
+            "outer_fold": [1, 1, 2],
+            "oof_pred_orig": [19.5, 9.5, 29.5],
+            "target_orig": [20.0, 10.0, 30.0],
+            "effect__speed": [0.2, 0.1, 0.3],
         }
     )
 
@@ -800,41 +825,44 @@ def test_assemble_step1_analysis_table_aligns_metrics_by_data_idx_not_row_positi
         performance_metric_col="ml_ade",
     )
 
-    assert analysis_df["data_idx"].tolist() == [20, 10]
-    assert analysis_df["ml_ade"].tolist() == [20.0, 10.0]
-    assert analysis_df["scene_id"].tolist() == ["scene_20", "scene_10"]
-    assert analysis_df["effect__speed"].tolist() == [0.2, 0.1]
+    assert analysis_df["data_idx"].tolist() == [20, 10, 30]
+    assert analysis_df["ml_ade"].tolist() == [20.0, 10.0, 30.0]
+    assert analysis_df["scene_id"].tolist() == ["scene_20", "scene_10", "scene_30"]
+    assert analysis_df["effect__speed"].tolist() == [0.2, 0.1, 0.3]
+    assert "attention_radius_m" not in analysis_df.columns
+    assert "history_sec" not in analysis_df.columns
+    assert "prediction_sec" not in analysis_df.columns
     assert set(analysis_df["performance_group"]).issubset({"easy", "medium", "hard"})
-    assert group_summary_df.loc[0, "n_total"] == 2
+    assert group_summary_df.loc[0, "n_total"] == 3
 
 
 def test_assemble_step1_analysis_table_uses_run_name_with_duplicate_data_idx():
     prepared_model_df = pd.DataFrame(
         {
-            "run_name": ["run_b", "run_a"],
-            "data_idx": [0, 0],
-            "speed": [2.0, 1.0],
-            "ml_ade_log": np.log1p([20.0, 10.0]),
+            "run_name": ["run_b", "run_a", "run_c"],
+            "data_idx": [0, 0, 0],
+            "speed": [2.0, 1.0, 3.0],
+            "ml_ade_log": np.log1p([20.0, 10.0, 30.0]),
         }
     )
     joined_metrics_df = pd.DataFrame(
         {
-            "run_name": ["run_a", "run_b"],
-            "data_idx": [0, 0],
-            "speed": [1.0, 2.0],
-            "ml_ade": [10.0, 20.0],
+            "run_name": ["run_a", "run_c", "run_b"],
+            "data_idx": [0, 0, 0],
+            "speed": [1.0, 3.0, 2.0],
+            "ml_ade": [10.0, 30.0, 20.0],
         }
     )
     feature_effects_df = pd.DataFrame(
         {
-            "run_name": ["run_b", "run_a"],
-            "data_idx": [0, 0],
-            "speed": [2.0, 1.0],
-            "row_id": [0, 1],
-            "outer_fold": [1, 1],
-            "oof_pred_orig": [19.5, 9.5],
-            "target_orig": [20.0, 10.0],
-            "effect__speed": [0.2, 0.1],
+            "run_name": ["run_b", "run_a", "run_c"],
+            "data_idx": [0, 0, 0],
+            "speed": [2.0, 1.0, 3.0],
+            "row_id": [0, 1, 2],
+            "outer_fold": [1, 1, 2],
+            "oof_pred_orig": [19.5, 9.5, 29.5],
+            "target_orig": [20.0, 10.0, 30.0],
+            "effect__speed": [0.2, 0.1, 0.3],
         }
     )
 
@@ -850,37 +878,38 @@ def test_assemble_step1_analysis_table_uses_run_name_with_duplicate_data_idx():
     assert analysis_df[["run_name", "data_idx", "ml_ade"]].to_dict("records") == [
         {"run_name": "run_b", "data_idx": 0, "ml_ade": 20.0},
         {"run_name": "run_a", "data_idx": 0, "ml_ade": 10.0},
+        {"run_name": "run_c", "data_idx": 0, "ml_ade": 30.0},
     ]
 
 
 def test_assemble_step1_analysis_table_drops_non_key_identity_overlaps():
     prepared_model_df = pd.DataFrame(
         {
-            "run_name": ["run_a", "run_a"],
-            "eval_csv_name": ["eval_epoch_1.csv", "eval_epoch_1.csv"],
-            "data_idx": [0, 1],
-            "speed": [1.0, 2.0],
-            "ml_ade_log": np.log1p([10.0, 20.0]),
+            "run_name": ["run_a", "run_a", "run_a"],
+            "eval_csv_name": ["eval_epoch_1.csv", "eval_epoch_1.csv", "eval_epoch_1.csv"],
+            "data_idx": [0, 1, 2],
+            "speed": [1.0, 2.0, 3.0],
+            "ml_ade_log": np.log1p([10.0, 20.0, 30.0]),
         }
     )
     joined_metrics_df = pd.DataFrame(
         {
-            "data_idx": [0, 1],
-            "speed": [1.0, 2.0],
-            "ml_ade": [10.0, 20.0],
+            "data_idx": [0, 1, 2],
+            "speed": [1.0, 2.0, 3.0],
+            "ml_ade": [10.0, 20.0, 30.0],
         }
     )
     feature_effects_df = pd.DataFrame(
         {
-            "run_name": ["run_a", "run_a"],
-            "eval_csv_name": ["eval_epoch_1.csv", "eval_epoch_1.csv"],
-            "data_idx": [0, 1],
-            "speed": [1.0, 2.0],
-            "row_id": [0, 1],
-            "outer_fold": [1, 2],
-            "oof_pred_orig": [9.5, 19.5],
-            "target_orig": [10.0, 20.0],
-            "effect__speed": [0.1, 0.2],
+            "run_name": ["run_a", "run_a", "run_a"],
+            "eval_csv_name": ["eval_epoch_1.csv", "eval_epoch_1.csv", "eval_epoch_1.csv"],
+            "data_idx": [0, 1, 2],
+            "speed": [1.0, 2.0, 3.0],
+            "row_id": [0, 1, 2],
+            "outer_fold": [1, 2, 3],
+            "oof_pred_orig": [9.5, 19.5, 29.5],
+            "target_orig": [10.0, 20.0, 30.0],
+            "effect__speed": [0.1, 0.2, 0.3],
         }
     )
 
@@ -896,8 +925,9 @@ def test_assemble_step1_analysis_table_drops_non_key_identity_overlaps():
     assert analysis_df[["run_name", "eval_csv_name", "data_idx"]].to_dict("records") == [
         {"run_name": "run_a", "eval_csv_name": "eval_epoch_1.csv", "data_idx": 0},
         {"run_name": "run_a", "eval_csv_name": "eval_epoch_1.csv", "data_idx": 1},
+        {"run_name": "run_a", "eval_csv_name": "eval_epoch_1.csv", "data_idx": 2},
     ]
-    assert analysis_df["effect__speed"].tolist() == [0.1, 0.2]
+    assert analysis_df["effect__speed"].tolist() == [0.1, 0.2, 0.3]
 
 
 def test_assemble_step1_analysis_table_rejects_legacy_prepared_data_without_data_idx():

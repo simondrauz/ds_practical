@@ -177,7 +177,7 @@ def _model_setting_feature_exclusions(
         excluded_cols = model_setting_cols
 
     if excluded_cols:
-        print(f"Model setting metadata excluded from features: {excluded_cols}")
+        print(f"Model settings excluded from features: {excluded_cols}")
     elif model_setting_cols:
         print(f"Model settings included as features: {model_setting_cols}")
     return excluded_cols
@@ -189,6 +189,7 @@ def prepare_single_target_model_data(
     target_col: str | None = None,
     default_target: str = "ml_ade",
     include_model_settings_as_features: bool | None = None,
+    retain_model_settings_as_metadata: bool = False,
 ) -> SingleTargetModelData:
     if (
         target_col is not None
@@ -229,7 +230,11 @@ def prepare_single_target_model_data(
             and c not in excluded_model_setting_cols
         ],
     )
-    metadata_cols = [c for c in model_setting_cols if c not in feature_cols]
+    metadata_cols = (
+        [c for c in model_setting_cols if c not in feature_cols]
+        if retain_model_settings_as_metadata
+        else []
+    )
 
     # Step 3: freeze the modelling frame and row ids after dropping incomplete rows.
     # Downstream notebooks rely on `row_ids` to map OOF predictions back to original rows.
@@ -253,6 +258,7 @@ def prepare_dual_target_model_data(
     target_col: str | None = None,
     default_target: str = "ml_ade",
     include_model_settings_as_features: bool | None = None,
+    retain_model_settings_as_metadata: bool = False,
 ) -> DualTargetModelData:
     # Step 1: resolve the base target and discover whether raw/log variants already exist.
     base_target_name, raw_target_source_col, log_target_source_col = _resolve_dual_target_sources(
@@ -279,7 +285,11 @@ def prepare_dual_target_model_data(
             and c not in excluded_model_setting_cols
         ],
     )
-    metadata_cols = [c for c in model_setting_cols if c not in feature_cols]
+    metadata_cols = (
+        [c for c in model_setting_cols if c not in feature_cols]
+        if retain_model_settings_as_metadata
+        else []
+    )
 
     # Step 3: drop incomplete rows only after the full feature/target contract is known.
     target_source_cols = [

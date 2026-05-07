@@ -276,7 +276,7 @@ def parse_args() -> argparse.Namespace:
         "--exclude-model-settings-as-features",
         dest="include_model_settings_as_features",
         action="store_false",
-        help="Keep model-setting columns as metadata only, excluding them from GAM/XGBoost features.",
+        help="Exclude model-setting columns from the prepared GAM/XGBoost model frame.",
     )
     parser.add_argument(
         "--models",
