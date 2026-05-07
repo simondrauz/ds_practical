@@ -36,6 +36,25 @@ def test_combine_runs_preserves_eval_csv_name_in_row_identity(tmp_path):
     assert not combined.duplicated(["run_name", "eval_csv_name", "data_idx"]).any()
 
 
+def test_combine_runs_replaces_heading_change_with_per_second_variant(tmp_path):
+    joined_root = tmp_path / "joined"
+    run_dir = joined_root / "run_a"
+    run_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "data_idx": [0, 1],
+            "duration": [8.5, 4.0],
+            "heading_change": [17.0, 10.0],
+            "ml_ade": [1.0, 2.0],
+        }
+    ).to_csv(run_dir / "eval_epoch_1.csv", index=False)
+
+    combined = combine_runs.combine(joined_root, ["run_a"])
+
+    assert "heading_change" not in combined.columns
+    assert combined["heading_change_per_sec"].tolist() == [2.0, 2.5]
+
+
 def test_sweep_combine_command_is_scoped_to_current_run_dirs():
     cmd = run_sweep.build_combine_command(
         joined_root=Path("/tmp/joined"),

@@ -4,19 +4,18 @@ Reads selected eval CSV files produced by ``join_characteristic_metrics.py``
 from ``results/trajectory_prediction/trajectory_metrics_joined/`` and
 concatenates them into a single file.
 
-When runs differ in ``history_sec``, ``prediction_sec``, or ``attention_radius_m``,
-features that accumulate over the trajectory window are not directly comparable.
-This script adds normalised per-second variants of those features alongside the
-originals so that cross-run analysis is not confounded by window-length differences.
+When runs differ in ``history_sec`` or ``prediction_sec``, heading change is not
+directly comparable because it accumulates over the trajectory window. This
+script replaces it with a normalised per-second variant so that cross-run
+analysis is not confounded by window-length differences or by keeping direct
+scalar dependencies in the modelling feature set.
 
 Normalised features
 -------------------
-The following features are computed over the full trajectory window
-(history + future) and are divided by ``duration`` (seconds):
+The following feature is computed over the full trajectory window (history +
+future) and is divided by ``duration`` (seconds):
 
-* ``displacement``     → ``displacement_per_sec``
-* ``path_length``      → ``path_length_per_sec``
-* ``heading_change``   → ``heading_change_per_sec``
+* ``heading_change`` → ``heading_change_per_sec``
 
 Speed, acceleration, and jerk are already expressed as rates (m/s, m/s², m/s³)
 and require no further normalisation.
@@ -46,11 +45,9 @@ if str(SRC_ROOT) not in sys.path:
 # a clean angular rate (deg/s) that is comparable across runs with different
 # window lengths.
 #
-# `displacement` and `path_length` are intentionally left unnormalised:
-# they scale with window length in roughly the same way ADE does (ADE is
-# already a per-step average), so the raw values preserve a consistent
-# relationship with the target across runs. Normalising them would produce
-# near-duplicates of `mean_speed`, which is already in the feature set.
+# `displacement` and `path_length` are intentionally left out of this
+# replacement because `path_efficiency` already captures their naturally
+# normalised relationship.
 _WINDOW_FEATURES = ["heading_change"]
 _DURATION_COL = "duration"
 
@@ -58,9 +55,9 @@ _DURATION_COL = "duration"
 def _add_normalised_features(df: pd.DataFrame) -> pd.DataFrame:
     """Adds per-second normalised variants of window-accumulating features.
 
-    New columns are named ``{feature}_per_sec`` and placed immediately after
-    their unnormalised counterparts. Rows where ``duration`` is zero or missing
-    yield NaN for the normalised value.
+    New columns are named ``{feature}_per_sec`` and replace their unnormalised
+    counterparts. Rows where ``duration`` is zero or missing yield NaN for the
+    normalised value.
     """
     if _DURATION_COL not in df.columns:
         return df
@@ -68,10 +65,16 @@ def _add_normalised_features(df: pd.DataFrame) -> pd.DataFrame:
     for feat in _WINDOW_FEATURES:
         if feat not in df.columns:
             continue
+        norm_col = f"{feat}_per_sec"
         normed = df[feat] / df[_DURATION_COL].replace(0, float("nan"))
-        # Insert the normalised column right after the original.
-        insert_at = df.columns.get_loc(feat) + 1
-        df.insert(insert_at, f"{feat}_per_sec", normed)
+        if norm_col in df.columns:
+            df[norm_col] = normed
+        else:
+            # Insert the normalised column right after the original before
+            # dropping the raw accumulator.
+            insert_at = df.columns.get_loc(feat) + 1
+            df.insert(insert_at, norm_col, normed)
+        df.drop(columns=[feat], inplace=True)
 
     return df
 
