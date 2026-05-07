@@ -64,6 +64,62 @@ INSPECTION_SUMMARY_COLUMNS = [
 ]
 
 
+def _cluster_spec_manifest_candidates(data_context_root: Path) -> list[Path]:
+    return sorted(
+        path.resolve()
+        for path in data_context_root.glob("cluster_spec__*/manifest.json")
+        if path.is_file()
+    )
+
+
+def _select_single_manifest(candidates: list[Path], *, context: str) -> Path:
+    if not candidates:
+        raise FileNotFoundError(f"No cluster-spec manifest found for {context}.")
+    if len(candidates) > 1:
+        candidate_list = "\n".join(f"- {path}" for path in candidates)
+        raise ValueError(
+            f"Multiple cluster-spec manifests found for {context}. "
+            "Set CLUSTER_SPEC_DIRNAME to one of these directories:\n"
+            f"{candidate_list}"
+        )
+    return candidates[0]
+
+
+def resolve_cluster_spec_manifest_path(
+    data_context_root: Path,
+    cluster_spec_dirname: str | None,
+) -> Path:
+    """Resolve a cluster-spec manifest, tolerating stale hash suffixes when unambiguous."""
+
+    resolved_data_context_root = Path(data_context_root).expanduser().resolve()
+    if cluster_spec_dirname is None or not str(cluster_spec_dirname).strip():
+        return _select_single_manifest(
+            _cluster_spec_manifest_candidates(resolved_data_context_root),
+            context=str(resolved_data_context_root),
+        )
+
+    requested_dirname = str(cluster_spec_dirname).strip()
+    requested_manifest = resolved_data_context_root / requested_dirname / "manifest.json"
+    if requested_manifest.exists():
+        return requested_manifest.resolve()
+
+    readable_slug = requested_dirname.rsplit("__", 1)[0]
+    if readable_slug == requested_dirname:
+        raise FileNotFoundError(
+            f"Cluster-spec manifest does not exist and no hash suffix could be relaxed: {requested_manifest}"
+        )
+
+    matching_candidates = sorted(
+        path.resolve()
+        for path in resolved_data_context_root.glob(f"{readable_slug}__*/manifest.json")
+        if path.is_file()
+    )
+    return _select_single_manifest(
+        matching_candidates,
+        context=f"readable cluster-spec slug {readable_slug!r}",
+    )
+
+
 @dataclass
 class ClusterInspectionBundle:
     manifest_path: Path

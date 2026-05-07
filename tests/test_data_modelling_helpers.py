@@ -1479,6 +1479,47 @@ def test_build_scene_step_key_frame_dedupes_scene_steps_and_falls_back_to_scene_
     }
 
 
+def test_resolve_cluster_spec_manifest_path_auto_selects_single_export(tmp_path):
+    cluster_root = tmp_path / "cluster_spec__groups-easy__abc123"
+    cluster_root.mkdir()
+    manifest_path = cluster_root / "manifest.json"
+    manifest_path.write_text("{}")
+
+    resolved_path = feature_effect_pr_cluster_inspection.resolve_cluster_spec_manifest_path(
+        tmp_path,
+        None,
+    )
+
+    assert resolved_path == manifest_path.resolve()
+
+
+def test_resolve_cluster_spec_manifest_path_relaxes_stale_hash_suffix(tmp_path):
+    cluster_root = tmp_path / "cluster_spec__groups-easy__newhash"
+    cluster_root.mkdir()
+    manifest_path = cluster_root / "manifest.json"
+    manifest_path.write_text("{}")
+
+    resolved_path = feature_effect_pr_cluster_inspection.resolve_cluster_spec_manifest_path(
+        tmp_path,
+        "cluster_spec__groups-easy__oldhash",
+    )
+
+    assert resolved_path == manifest_path.resolve()
+
+
+def test_resolve_cluster_spec_manifest_path_rejects_ambiguous_auto_selection(tmp_path):
+    for dirname in ["cluster_spec__groups-easy__aaa", "cluster_spec__groups-hard__bbb"]:
+        cluster_root = tmp_path / dirname
+        cluster_root.mkdir()
+        (cluster_root / "manifest.json").write_text("{}")
+
+    with pytest.raises(ValueError, match="Multiple cluster-spec manifests"):
+        feature_effect_pr_cluster_inspection.resolve_cluster_spec_manifest_path(
+            tmp_path,
+            None,
+        )
+
+
 def test_load_cluster_inspection_selection_supports_all_and_explicit_cluster_ids(tmp_path):
     clustered_df, cluster_scores_df = _sample_cluster_export_inputs()
     export_layout = {

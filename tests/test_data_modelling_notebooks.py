@@ -88,7 +88,7 @@ def test_feature_effect_pr_cluster_inspection_notebook_references_exported_clust
     assert "CLUSTER_SPEC_DIRNAME" in source
     assert "load_run_context" in source
     assert "resolve_feature_effect_regime_export_context" in source
-    assert "default_cluster_spec_manifest_path" in source
+    assert "resolve_cluster_spec_manifest_path" in source
     assert "cluster_spec_manifest_path" in source
     assert "cluster_ids" in source
     assert "distribution_matrix_max_columns" in source
