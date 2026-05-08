@@ -49,4 +49,15 @@ docs/current_pipeline_overview*.pdf
 *.egg-info/
 *.pt
 
+# Shared trajectory metric CSVs for downstream notebooks
+!results/trajectory_prediction/trajectory_metrics_joined/
+!results/trajectory_prediction/trajectory_metrics_joined/sweep_large_30ep_1seed/
+!results/trajectory_prediction/trajectory_metrics_joined/sweep_large_30ep_1seed/eval_epoch_30_combined.csv
+!results/trajectory_prediction/trajectory_metrics_joined/sweep_small_30ep_3seeds/
+!results/trajectory_prediction/trajectory_metrics_joined/sweep_small_30ep_3seeds/eval_epoch_30_seed_mean.csv
+!results/trajectory_prediction/trajectory_metrics_joined/full_trainval_12ep_3seeds/
+!results/trajectory_prediction/trajectory_metrics_joined/full_trainval_12ep_3seeds/eval_epoch_12_seed_mean.csv
+!results/trajectory_prediction/trajectory_metrics_joined/full_trainval_12ep_1seed/
+!results/trajectory_prediction/trajectory_metrics_joined/full_trainval_12ep_1seed/eval_epoch_12.csv
+
 # Data (heavy files tracked separately in data/.gitignore)
