@@ -61,6 +61,17 @@ def test_feature_effect_performance_regimes_notebook_references_export_first_clu
     assert "viz_umap_n_neighbors" in source
     assert "viz_umap_min_dist" in source
     assert "trustworthiness_neighbor_values" in source
+    assert "min_cluster_size_fractions" in source
+    assert "min_cluster_size_floor" in source
+    assert "min_samples_values" in source
+    assert "optics_xi_values" in source
+    assert "plot_candidate_score_heatmap_grid" in source
+    assert "plot_algorithm_candidate_umap" in source
+    assert "plot_optics_reachability_grid" in source
+    assert "candidate_score_heatmap_grid" in source
+    assert "algorithm_candidate_umap" in source
+    assert "optics_reachability_grid" in source
+    assert "raw_algorithm_comparison_grid" not in source
     assert "UMAP_TRUSTWORTHINESS_PLOT_PATHS" in source
     assert "resolve_feature_effect_regime_export_context" in source
     assert "build_feature_effect_regime_export_layout" in source

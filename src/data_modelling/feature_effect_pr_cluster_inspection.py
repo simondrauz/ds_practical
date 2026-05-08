@@ -187,6 +187,61 @@ def _candidate_label_col(algorithm: str, cluster_space: str) -> str:
     return f"cluster_{algorithm}_{cluster_space}"
 
 
+def _resolve_candidate_label_col_for_inspection(
+    *,
+    cluster_scores_df: pd.DataFrame | None,
+    cluster_assignments_df: pd.DataFrame,
+    performance_group: str,
+    algorithm: str,
+    cluster_space: str,
+) -> str:
+    """Resolve the selected candidate column while preserving legacy exports."""
+    if cluster_scores_df is not None and not cluster_scores_df.empty:
+        matching_scores_df = cluster_scores_df.loc[
+            (cluster_scores_df["performance_group"].astype(str) == performance_group)
+            & (cluster_scores_df["algorithm"].astype(str).str.lower() == algorithm)
+            & (cluster_scores_df["cluster_space"].astype(str).str.lower() == cluster_space)
+        ].copy()
+        selected_scores_df = matching_scores_df.loc[
+            matching_scores_df["selected_for_group"].astype(bool)
+        ].copy()
+        if selected_scores_df.empty:
+            fallback_sort_cols = [
+                col
+                for col in ["quality_issue_count", "dbcv_raw_effect_space", "noise_fraction", "n_clusters"]
+                if col in matching_scores_df.columns
+            ]
+            fallback_ascending = [
+                {"quality_issue_count": True, "dbcv_raw_effect_space": False, "noise_fraction": True, "n_clusters": True}[col]
+                for col in fallback_sort_cols
+            ]
+            selected_scores_df = matching_scores_df.sort_values(
+                fallback_sort_cols or ["candidate_label_col"],
+                ascending=fallback_ascending or [True],
+                na_position="last",
+            ).head(1)
+        if selected_scores_df.empty:
+            raise ValueError(
+                "No clustering candidate was found for "
+                f"group={performance_group!r}, algorithm={algorithm!r}, cluster_space={cluster_space!r}."
+            )
+        if len(selected_scores_df) > 1:
+            selected_scores_df = selected_scores_df.sort_values(
+                ["quality_issue_count", "dbcv_raw_effect_space", "noise_fraction"],
+                ascending=[True, False, True],
+                na_position="last",
+            )
+        candidate_label_col = str(selected_scores_df.iloc[0]["candidate_label_col"])
+        if candidate_label_col not in cluster_assignments_df.columns:
+            raise KeyError(f"Cluster assignments is missing selected candidate label column: {candidate_label_col}")
+        return candidate_label_col
+
+    legacy_candidate_label_col = _candidate_label_col(algorithm, cluster_space)
+    if legacy_candidate_label_col not in cluster_assignments_df.columns:
+        raise KeyError(f"Cluster assignments is missing candidate label column: {legacy_candidate_label_col}")
+    return legacy_candidate_label_col
+
+
 def _cluster_display_label(cluster_id: int) -> str:
     return NOISE_LABEL if int(cluster_id) == -1 else f"Cluster {int(cluster_id)}"
 
@@ -609,11 +664,18 @@ def load_cluster_inspection_selection(
         artifact_type="cluster_feature_effect_profiles",
         fallback_filename="cluster_feature_effect_profiles.csv",
     )
+    cluster_scores_path = _artifact_path_from_manifest(
+        manifest_path,
+        manifest_data,
+        artifact_type="cluster_scores",
+        fallback_filename="cluster_scores.csv",
+    )
 
     cluster_assignments_df = pd.read_csv(cluster_assignments_path)
     cluster_catalog_df = pd.read_csv(cluster_catalog_path)
     global_ranking_df = pd.read_csv(global_ranking_path)
     cluster_feature_effect_profiles_df = pd.read_csv(cluster_feature_effect_profiles_path)
+    cluster_scores_df = pd.read_csv(cluster_scores_path) if cluster_scores_path.exists() else None
 
     run_context = manifest_data.get("run_context", {})
     model_id = str(run_context.get("model_id", "")).strip()
@@ -625,9 +687,13 @@ def load_cluster_inspection_selection(
     performance_group = str(resolved_config["performance_group"])
     algorithm = str(resolved_config["inspection_algorithm"])
     cluster_space = str(resolved_config["inspection_cluster_space"])
-    candidate_label_col = _candidate_label_col(algorithm, cluster_space)
-    if candidate_label_col not in cluster_assignments_df.columns:
-        raise KeyError(f"Cluster assignments is missing candidate label column: {candidate_label_col}")
+    candidate_label_col = _resolve_candidate_label_col_for_inspection(
+        cluster_scores_df=cluster_scores_df,
+        cluster_assignments_df=cluster_assignments_df,
+        performance_group=performance_group,
+        algorithm=algorithm,
+        cluster_space=cluster_space,
+    )
 
     group_assignments_df = cluster_assignments_df.loc[
         cluster_assignments_df["performance_group"].astype(str) == performance_group
@@ -643,6 +709,7 @@ def load_cluster_inspection_selection(
         (cluster_feature_effect_profiles_df["performance_group"].astype(str) == performance_group)
         & (cluster_feature_effect_profiles_df["algorithm"].astype(str).str.lower() == algorithm)
         & (cluster_feature_effect_profiles_df["cluster_space"].astype(str).str.lower() == cluster_space)
+        & (cluster_feature_effect_profiles_df["candidate_label_col"].astype(str) == candidate_label_col)
     ].copy()
     if candidate_profiles_df.empty:
         raise ValueError(
@@ -654,6 +721,7 @@ def load_cluster_inspection_selection(
         (cluster_catalog_df["performance_group"].astype(str) == performance_group)
         & (cluster_catalog_df["algorithm"].astype(str).str.lower() == algorithm)
         & (cluster_catalog_df["cluster_space"].astype(str).str.lower() == cluster_space)
+        & (cluster_catalog_df["candidate_label_col"].astype(str) == candidate_label_col)
     ].copy()
     if candidate_catalog_df.empty:
         raise ValueError(

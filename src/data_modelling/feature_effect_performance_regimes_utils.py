@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import warnings
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -60,8 +61,20 @@ _CLUSTER_SPEC_REQUIRED_KEYS = {
     "min_cluster_size",
     "min_samples",
     "optics_cluster_method",
-    "optics_xi",
     "distance_metric",
+}
+_CLUSTER_SPEC_OPTICS_XI_KEYS = {
+    "optics_xi",
+    "optics_xi_values",
+}
+_CLUSTER_SPEC_SWEEP_KEYS = {
+    "min_cluster_size_fractions",
+    "min_cluster_size_floor",
+    "min_samples_values",
+}
+_CLUSTER_SPEC_LEGACY_PARAMETER_KEYS = {
+    "min_cluster_size",
+    "min_samples",
 }
 _CLUSTER_SPEC_FORBIDDEN_KEYS = {
     "umap_candidate_dims": "Remove CLUSTER_SPEC['umap_candidate_dims']; the notebook derives candidate dimensions from the loaded feature-effect columns.",
@@ -238,6 +251,32 @@ def _resolve_fraction(value: Any, *, config_name: str) -> float:
     return resolved_value
 
 
+def _resolve_fraction_sequence(value: Any, *, config_name: str) -> list[float]:
+    if not isinstance(value, (list, tuple)) or not value:
+        raise ValueError(f"{config_name} must be a non-empty list of fractions, got {value!r}.")
+    resolved_values = [
+        _resolve_fraction(item, config_name=f"{config_name}[{idx}]")
+        for idx, item in enumerate(value)
+    ]
+    duplicate_values = sorted({item for item in resolved_values if resolved_values.count(item) > 1})
+    if duplicate_values:
+        raise ValueError(f"{config_name} contains duplicates: {duplicate_values}.")
+    return sorted(resolved_values)
+
+
+def _resolve_positive_int_sequence(value: Any, *, config_name: str) -> list[int]:
+    if not isinstance(value, (list, tuple)) or not value:
+        raise ValueError(f"{config_name} must be a non-empty list of positive integers, got {value!r}.")
+    resolved_values = [
+        _resolve_positive_int(item, config_name=f"{config_name}[{idx}]")
+        for idx, item in enumerate(value)
+    ]
+    duplicate_values = sorted({item for item in resolved_values if resolved_values.count(item) > 1})
+    if duplicate_values:
+        raise ValueError(f"{config_name} contains duplicates: {duplicate_values}.")
+    return sorted(resolved_values)
+
+
 def _resolve_non_empty_string(value: Any, *, config_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{config_name} must be a non-empty string, got {value!r}.")
@@ -283,15 +322,37 @@ def _summarize_group_mapping(group_mapping: Mapping[str, Any]) -> str:
     )
 
 
+def _summarize_sequence(values: Iterable[Any]) -> str:
+    return "-".join(_sanitize_slug_token(value) for value in values)
+
+
 def _build_cluster_spec_readable_slug(cluster_spec: Mapping[str, Any]) -> str:
     """Keep folder names human-readable while the hash guarantees uniqueness."""
     selected_dims = cluster_spec.get("umap_selected_n_components", {})
+    parameter_mode = cluster_spec.get("parameter_mode", "single")
+    if parameter_mode == "sweep":
+        parameter_fragment = "__".join(
+            [
+                f"mcs-fracs-{_summarize_sequence(cluster_spec['min_cluster_size_fractions'])}",
+                f"mcs-floor-{_sanitize_slug_token(cluster_spec['min_cluster_size_floor'])}",
+                f"ms-values-{_summarize_sequence(cluster_spec['min_samples_values'])}",
+            ]
+        )
+    else:
+        parameter_fragment = "__".join(
+            [
+                f"mcs-{_summarize_group_mapping(cluster_spec['min_cluster_size'])}",
+                f"ms-{_summarize_group_mapping(cluster_spec['min_samples'])}",
+            ]
+        )
     return "__".join(
         [
             f"groups-{'-'.join(_sanitize_slug_token(group) for group in cluster_spec['groups'])}",
             f"algs-{'-'.join(_sanitize_slug_token(algorithm) for algorithm in cluster_spec['algorithms'])}",
             f"umap-{'on' if cluster_spec['evaluate_umap_latent_space'] else 'off'}",
             f"dims-{_summarize_group_mapping(selected_dims) if selected_dims else 'none'}",
+            f"optics-xi-{_summarize_sequence(cluster_spec.get('optics_xi_values', [cluster_spec.get('optics_xi')]))}",
+            parameter_fragment,
         ]
     )
 
@@ -402,9 +463,10 @@ def build_feature_effect_regime_artifact_names(
             "feature_effect_global_ranking": "feature_effect_global_ranking.csv",
         },
         "plots": {
-            "raw_algorithm_comparison_grid": "algorithm_comparison_grid__space-raw.png",
-            "raw_algorithm_comparison_grid_no_noise": "algorithm_comparison_grid__space-raw__noise-excluded.png",
-            "umap_algorithm_comparison_grid": "algorithm_comparison_grid__space-umap.png",
+            "candidate_score_heatmap_grid": "candidate_score_heatmap_grid.png",
+            "algorithm_candidate_umap": "algorithm_candidate_umap.png",
+            "algorithm_candidate_umap_no_noise": "algorithm_candidate_umap__noise-excluded.png",
+            "optics_reachability_grid": "optics_reachability_grid.png",
             "umap_trustworthiness_curves": {
                 trustworthiness_view: (
                     f"umap_trustworthiness_curve__view-{_sanitize_slug_token(trustworthiness_view)}.png"
@@ -536,13 +598,36 @@ def resolve_cluster_spec(
     downstream step consumes one explicit, normalized contract.
     """
     _reject_forbidden_keys(cluster_spec, config_name="CLUSTER_SPEC", forbidden_keys=_CLUSTER_SPEC_FORBIDDEN_KEYS)
-    missing_keys = _CLUSTER_SPEC_REQUIRED_KEYS - set(cluster_spec)
+    base_required_keys = _CLUSTER_SPEC_REQUIRED_KEYS - _CLUSTER_SPEC_LEGACY_PARAMETER_KEYS
+    has_legacy_parameters = _CLUSTER_SPEC_LEGACY_PARAMETER_KEYS <= set(cluster_spec)
+    has_sweep_parameters = _CLUSTER_SPEC_SWEEP_KEYS <= set(cluster_spec)
+    has_optics_xi = "optics_xi" in cluster_spec
+    has_optics_xi_values = "optics_xi_values" in cluster_spec
+    if has_legacy_parameters and has_sweep_parameters:
+        raise ValueError(
+            "CLUSTER_SPEC must use either legacy single-candidate parameters "
+            "('min_cluster_size', 'min_samples') or sweep parameters "
+            "('min_cluster_size_fractions', 'min_cluster_size_floor', 'min_samples_values'), not both."
+        )
+    if has_optics_xi and has_optics_xi_values:
+        raise ValueError(
+            "CLUSTER_SPEC must use either 'optics_xi' or 'optics_xi_values', not both."
+        )
+    if not has_optics_xi and not has_optics_xi_values:
+        _raise_missing_keys("CLUSTER_SPEC", {"optics_xi_values"})
+    parameter_required_keys = _CLUSTER_SPEC_LEGACY_PARAMETER_KEYS if has_legacy_parameters else _CLUSTER_SPEC_SWEEP_KEYS
+    missing_keys = (base_required_keys | parameter_required_keys) - set(cluster_spec)
     if missing_keys:
         _raise_missing_keys("CLUSTER_SPEC", missing_keys)
     _reject_unknown_keys(
         cluster_spec,
         config_name="CLUSTER_SPEC",
-        allowed_keys=_CLUSTER_SPEC_REQUIRED_KEYS,
+        allowed_keys=(
+            base_required_keys
+            | _CLUSTER_SPEC_LEGACY_PARAMETER_KEYS
+            | _CLUSTER_SPEC_SWEEP_KEYS
+            | _CLUSTER_SPEC_OPTICS_XI_KEYS
+        ),
     )
 
     groups = _resolve_choice_sequence(
@@ -559,6 +644,12 @@ def resolve_cluster_spec(
         cluster_spec["evaluate_umap_latent_space"],
         config_name="CLUSTER_SPEC['evaluate_umap_latent_space']",
     )
+    parameter_mode = "single" if has_legacy_parameters else "sweep"
+    if parameter_mode == "sweep" and evaluate_umap_latent_space:
+        raise ValueError(
+            "Sweep-mode clustering currently supports raw feature-effect space only. "
+            "Set CLUSTER_SPEC['evaluate_umap_latent_space']=False or use legacy single-candidate parameters."
+        )
 
     if not effect_cols:
         raise ValueError(
@@ -613,9 +704,44 @@ def resolve_cluster_spec(
             f"got {optics_cluster_method!r}."
         )
 
+    if parameter_mode == "single":
+        parameter_config = {
+            "min_cluster_size": _resolve_group_specific_positive_ints(
+                cluster_spec["min_cluster_size"],
+                config_name="CLUSTER_SPEC['min_cluster_size']",
+                groups=groups,
+            ),
+            "min_samples": _resolve_group_specific_positive_ints(
+                cluster_spec["min_samples"],
+                config_name="CLUSTER_SPEC['min_samples']",
+                groups=groups,
+            ),
+            "min_cluster_size_fractions": [],
+            "min_cluster_size_floor": None,
+            "min_samples_values": [],
+        }
+    else:
+        parameter_config = {
+            "min_cluster_size": {},
+            "min_samples": {},
+            "min_cluster_size_fractions": _resolve_fraction_sequence(
+                cluster_spec["min_cluster_size_fractions"],
+                config_name="CLUSTER_SPEC['min_cluster_size_fractions']",
+            ),
+            "min_cluster_size_floor": _resolve_positive_int(
+                cluster_spec["min_cluster_size_floor"],
+                config_name="CLUSTER_SPEC['min_cluster_size_floor']",
+            ),
+            "min_samples_values": _resolve_positive_int_sequence(
+                cluster_spec["min_samples_values"],
+                config_name="CLUSTER_SPEC['min_samples_values']",
+            ),
+        }
+
     resolved_cluster_spec = {
         "groups": groups,
         "algorithms": algorithms,
+        "parameter_mode": parameter_mode,
         "evaluate_umap_latent_space": evaluate_umap_latent_space,
         "umap_candidate_dims": umap_candidate_dims,
         "umap_selected_n_components": umap_selected_n_components,
@@ -641,25 +767,36 @@ def resolve_cluster_spec(
             cluster_spec["random_state"],
             config_name="CLUSTER_SPEC['random_state']",
         ),
-        "min_cluster_size": _resolve_group_specific_positive_ints(
-            cluster_spec["min_cluster_size"],
-            config_name="CLUSTER_SPEC['min_cluster_size']",
-            groups=groups,
-        ),
-        "min_samples": _resolve_group_specific_positive_ints(
-            cluster_spec["min_samples"],
-            config_name="CLUSTER_SPEC['min_samples']",
-            groups=groups,
-        ),
         "optics_cluster_method": optics_cluster_method,
-        "optics_xi": _resolve_fraction(
-            cluster_spec["optics_xi"],
-            config_name="CLUSTER_SPEC['optics_xi']",
+        "optics_xi": (
+            _resolve_fraction(
+                cluster_spec["optics_xi"],
+                config_name="CLUSTER_SPEC['optics_xi']",
+            )
+            if has_optics_xi
+            else _resolve_fraction_sequence(
+                cluster_spec["optics_xi_values"],
+                config_name="CLUSTER_SPEC['optics_xi_values']",
+            )[0]
+        ),
+        "optics_xi_values": (
+            [
+                _resolve_fraction(
+                    cluster_spec["optics_xi"],
+                    config_name="CLUSTER_SPEC['optics_xi']",
+                )
+            ]
+            if has_optics_xi
+            else _resolve_fraction_sequence(
+                cluster_spec["optics_xi_values"],
+                config_name="CLUSTER_SPEC['optics_xi_values']",
+            )
         ),
         "distance_metric": _resolve_non_empty_string(
             cluster_spec["distance_metric"],
             config_name="CLUSTER_SPEC['distance_metric']",
         ),
+        **parameter_config,
     }
     return resolved_cluster_spec
 
@@ -747,8 +884,12 @@ def select_inspection_cluster_runs(
             & (cluster_scores_df["cluster_space"] == inspection_config["inspection_cluster_space"])
         ]
         .copy()
-        .sort_values("performance_group")
     )
+    if "selected_for_group" in inspected_cluster_runs_df.columns:
+        inspected_cluster_runs_df = inspected_cluster_runs_df.loc[
+            inspected_cluster_runs_df["selected_for_group"].astype(bool)
+        ].copy()
+    inspected_cluster_runs_df = inspected_cluster_runs_df.sort_values("performance_group")
     available_groups = set(cluster_scores_df["performance_group"])
     expected_groups = [group for group in cluster_spec["groups"] if group in available_groups]
     missing_groups = [
@@ -1274,11 +1415,12 @@ def evaluate_umap_dimensions(
 
     for n_components in candidate_dims:
         umap_model = umap_module.UMAP(
-            n_components=n_components,
-            n_neighbors=n_neighbors,
-            min_dist=cluster_spec["cluster_umap_min_dist"],
-            random_state=cluster_spec["random_state"],
-        )
+        n_components=n_components,
+        n_neighbors=n_neighbors,
+        min_dist=cluster_spec["cluster_umap_min_dist"],
+        random_state=cluster_spec["random_state"],
+        n_jobs=1,
+    )
         embedding = umap_model.fit_transform(X)
         embeddings[n_components] = embedding
         trust_scores: list[float] = []
@@ -1334,6 +1476,7 @@ def _compute_visual_umap_embedding(
         n_neighbors=n_neighbors,
         min_dist=cluster_spec["viz_umap_min_dist"],
         random_state=cluster_spec["random_state"],
+        n_jobs=1,
     )
     return umap_model.fit_transform(X)
 
@@ -1410,24 +1553,172 @@ def _fit_optics_labels(
         metric=metric,
         cluster_method=cluster_method,
     )
-    return clusterer.fit_predict(X)
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="divide by zero encountered in divide",
+            category=RuntimeWarning,
+            module="sklearn.cluster._optics",
+        )
+        return clusterer.fit_predict(X)
+
+
+def _format_fraction_slug(value: float) -> str:
+    return f"{float(value):.4g}".replace(".", "p")
+
+
+def _cluster_candidate_label_col(
+    *,
+    algorithm: str,
+    cluster_space: str,
+    min_cluster_size_fraction: float | None,
+    min_cluster_size: int,
+    min_samples: int,
+    optics_xi: float | None = None,
+    force_parameter_suffix: bool = False,
+) -> str:
+    base = f"cluster_{algorithm}_{cluster_space}"
+    if min_cluster_size_fraction is None and not force_parameter_suffix:
+        return base
+    if min_cluster_size_fraction is None:
+        candidate_col = f"{base}__mcs-{int(min_cluster_size)}__ms-{int(min_samples)}"
+    else:
+        candidate_col = (
+            f"{base}__mcs-frac-{_format_fraction_slug(min_cluster_size_fraction)}"
+            f"__mcs-{int(min_cluster_size)}__ms-{int(min_samples)}"
+        )
+    if algorithm == "optics" and optics_xi is not None:
+        candidate_col = f"{candidate_col}__xi-{_format_fraction_slug(optics_xi)}"
+    return candidate_col
+
+
+def _iter_group_cluster_parameter_candidates(
+    cluster_spec: Mapping[str, Any],
+    *,
+    performance_group: str,
+    group_size: int,
+) -> list[dict[str, Any]]:
+    """Return concrete clustering parameter candidates for one performance group."""
+    if cluster_spec.get("parameter_mode", "single") == "sweep":
+        candidates: list[dict[str, Any]] = []
+        for min_cluster_size_fraction in cluster_spec["min_cluster_size_fractions"]:
+            min_cluster_size = max(
+                int(cluster_spec["min_cluster_size_floor"]),
+                int(np.ceil(float(min_cluster_size_fraction) * int(group_size))),
+            )
+            for min_samples in cluster_spec["min_samples_values"]:
+                candidates.append(
+                    {
+                        "min_cluster_size_fraction": float(min_cluster_size_fraction),
+                        "min_cluster_size": int(min_cluster_size),
+                        "min_samples": int(min_samples),
+                    }
+                )
+        return candidates
+
+    return [
+        {
+            "min_cluster_size_fraction": None,
+            "min_cluster_size": _get_group_specific_int(
+                cluster_spec,
+                performance_group=performance_group,
+                param_name="min_cluster_size",
+            ),
+            "min_samples": _get_group_specific_int(
+                cluster_spec,
+                performance_group=performance_group,
+                param_name="min_samples",
+            ),
+        }
+    ]
+
+
+def _cluster_size_diagnostics(
+    labels: np.ndarray,
+    *,
+    group_size: int,
+    min_cluster_size: int,
+    algorithm: str = "",
+) -> dict[str, Any]:
+    non_noise_labels = [int(label) for label in labels if int(label) != -1]
+    cluster_sizes = [
+        int(np.sum(labels == cluster_id))
+        for cluster_id in sorted(set(non_noise_labels))
+    ]
+    n_clusters = len(cluster_sizes)
+    largest_cluster_size = max(cluster_sizes) if cluster_sizes else 0
+    smallest_cluster_size = min(cluster_sizes) if cluster_sizes else 0
+    largest_cluster_share = float(largest_cluster_size / group_size) if group_size else 0.0
+    boundary_limit = float(min_cluster_size) * 1.10
+    boundary_cluster_count = int(sum(cluster_size <= boundary_limit for cluster_size in cluster_sizes))
+    quality_flags = {
+        "quality_flag_too_many_clusters": bool(n_clusters > 20),
+        "quality_flag_high_noise": bool(float(np.sum(labels == -1) / group_size) > 0.60) if group_size else False,
+        "quality_flag_dominant_cluster": bool(largest_cluster_share > 0.80),
+        "quality_flag_many_boundary_clusters": bool(
+            n_clusters >= 4 and boundary_cluster_count >= np.ceil(n_clusters / 2)
+        ),
+    }
+    optics_xi_no_stable_valley = bool(
+        algorithm == "optics"
+        and (
+            n_clusters < 2
+            or quality_flags["quality_flag_high_noise"]
+            or quality_flags["quality_flag_dominant_cluster"]
+        )
+    )
+    quality_issue_count = int(sum(int(value) for value in quality_flags.values()))
+    if optics_xi_no_stable_valley:
+        if n_clusters == 0:
+            optics_xi_status = "no_non_noise_cluster"
+        elif n_clusters == 1 and quality_flags["quality_flag_high_noise"]:
+            optics_xi_status = "single_tiny_cluster_mostly_noise"
+        elif n_clusters == 1 and quality_flags["quality_flag_dominant_cluster"]:
+            optics_xi_status = "single_dominant_cluster"
+        elif n_clusters == 1:
+            optics_xi_status = "single_cluster"
+        else:
+            optics_xi_status = "unstable_candidate_shape"
+    elif algorithm == "optics":
+        optics_xi_status = "multi_cluster_candidate"
+    else:
+        optics_xi_status = ""
+    return {
+        "largest_cluster_size": int(largest_cluster_size),
+        "largest_cluster_share": largest_cluster_share,
+        "smallest_cluster_size": int(smallest_cluster_size),
+        **quality_flags,
+        "optics_xi_no_stable_valley": optics_xi_no_stable_valley,
+        "optics_xi_status": optics_xi_status,
+        "quality_issue_count": quality_issue_count,
+        "passes_conservative_quality_screen": bool(quality_issue_count == 0),
+    }
 
 
 def _select_best_group_run(group_scores_df: pd.DataFrame) -> int | None:
-    """Select the best valid clustering run with deterministic tie-breakers."""
-    valid_scores_df = group_scores_df.loc[group_scores_df["valid_for_selection"]].copy()
-    if valid_scores_df.empty:
+    """Select the best clustering run with deterministic quality-first tie-breakers."""
+    if group_scores_df.empty:
         return None
 
-    # Prefer stronger DBCV first, then less noise, then the notebook's fixed
-    # raw-before-UMAP and HDBSCAN-before-OPTICS tie-breakers for reproducibility.
-    valid_scores_df["cluster_space_priority"] = valid_scores_df["cluster_space"].map({"raw": 0, "umap": 1}).fillna(99)
-    valid_scores_df["algorithm_priority"] = valid_scores_df["algorithm"].map({"hdbscan": 0, "optics": 1}).fillna(99)
-    valid_scores_df = valid_scores_df.sort_values(
-        ["dbcv_cluster_space", "noise_fraction", "cluster_space_priority", "algorithm_priority"],
-        ascending=[False, True, True, True],
+    ranked_scores_df = group_scores_df.copy()
+    ranked_scores_df["valid_for_selection_priority"] = ranked_scores_df["valid_for_selection"].astype(bool).astype(int)
+    ranked_scores_df["dbcv_raw_effect_space_rank"] = ranked_scores_df["dbcv_raw_effect_space"].fillna(-np.inf)
+    ranked_scores_df["algorithm_priority"] = ranked_scores_df["algorithm"].map({"hdbscan": 0, "optics": 1}).fillna(99)
+    ranked_scores_df["cluster_space_priority"] = ranked_scores_df["cluster_space"].map({"raw": 0, "umap": 1}).fillna(99)
+    ranked_scores_df = ranked_scores_df.sort_values(
+        [
+            "valid_for_selection_priority",
+            "quality_issue_count",
+            "dbcv_raw_effect_space_rank",
+            "noise_fraction",
+            "n_clusters",
+            "algorithm_priority",
+            "cluster_space_priority",
+            "score_row_id",
+        ],
+        ascending=[False, True, False, True, True, True, True, True],
     )
-    return int(valid_scores_df.iloc[0]["score_row_id"])
+    return int(ranked_scores_df.iloc[0]["score_row_id"])
 
 
 def _rank_cluster_profiles(summary_df: pd.DataFrame) -> pd.DataFrame:
@@ -1582,13 +1873,6 @@ def run_step2_clustering(
         )
 
     clustered_df = analysis_df.copy()
-    for algorithm in cluster_spec["algorithms"]:
-        cluster_col = f"cluster_{algorithm}_raw"
-        clustered_df[cluster_col] = _coerce_label_series(len(clustered_df))
-        if cluster_spec["evaluate_umap_latent_space"]:
-            cluster_col = f"cluster_{algorithm}_umap"
-            clustered_df[cluster_col] = _coerce_label_series(len(clustered_df))
-
     clustered_df["viz_umap_x"] = np.nan
     clustered_df["viz_umap_y"] = np.nan
 
@@ -1603,21 +1887,19 @@ def run_step2_clustering(
         X_raw = group_df[effect_cols].to_numpy(dtype=float)
         group_size = len(group_df)
 
-        min_cluster_size = _get_group_specific_int(
+        parameter_candidates = _iter_group_cluster_parameter_candidates(
             cluster_spec,
             performance_group=performance_group,
-            param_name="min_cluster_size",
+            group_size=group_size,
         )
-        min_samples = _get_group_specific_int(
-            cluster_spec,
-            performance_group=performance_group,
-            param_name="min_samples",
+        max_requested_parameter = max(
+            max(candidate["min_cluster_size"], candidate["min_samples"])
+            for candidate in parameter_candidates
         )
-
-        if group_size < max(2, min_cluster_size, min_samples):
+        if group_size < max(2, max_requested_parameter):
             raise ValueError(
                 f"Performance group {performance_group!r} has too few rows for clustering. "
-                f"rows={group_size}, min_cluster_size={min_cluster_size}, min_samples={min_samples}"
+                f"rows={group_size}, max_requested_parameter={max_requested_parameter}"
             )
 
         viz_embedding = _compute_visual_umap_embedding(
@@ -1654,68 +1936,103 @@ def run_step2_clustering(
 
         group_score_row_ids: list[int] = []
         for cluster_space, (X_space, selected_dim) in spaces.items():
-            for algorithm in cluster_spec["algorithms"]:
-                if algorithm == "hdbscan":
-                    labels = _fit_hdbscan_labels(
-                        X_space,
-                        min_cluster_size=min_cluster_size,
-                        min_samples=min_samples,
-                        metric=cluster_spec["distance_metric"],
-                        hdbscan_module=hdbscan_module,
+            for parameter_candidate in parameter_candidates:
+                min_cluster_size = int(parameter_candidate["min_cluster_size"])
+                min_samples = int(parameter_candidate["min_samples"])
+                min_cluster_size_fraction = parameter_candidate["min_cluster_size_fraction"]
+                for algorithm in cluster_spec["algorithms"]:
+                    optics_xi_values = (
+                        cluster_spec["optics_xi_values"]
+                        if algorithm == "optics"
+                        else [None]
                     )
-                    min_samples_value = min_samples
-                elif algorithm == "optics":
-                    labels = _fit_optics_labels(
-                        X_space,
-                        min_samples=min_samples,
-                        min_cluster_size=min_cluster_size,
-                        xi=cluster_spec["optics_xi"],
-                        metric=cluster_spec["distance_metric"],
-                        optics_cls=optics_cls,
-                        cluster_method=cluster_spec["optics_cluster_method"],
-                    )
-                    min_samples_value = min_samples
-                else:
-                    raise ValueError(f"Unsupported clustering algorithm: {algorithm}")
+                    for optics_xi in optics_xi_values:
+                        if algorithm == "hdbscan":
+                            labels = _fit_hdbscan_labels(
+                                X_space,
+                                min_cluster_size=min_cluster_size,
+                                min_samples=min_samples,
+                                metric=cluster_spec["distance_metric"],
+                                hdbscan_module=hdbscan_module,
+                            )
+                            min_samples_value = min_samples
+                        elif algorithm == "optics":
+                            labels = _fit_optics_labels(
+                                X_space,
+                                min_samples=min_samples,
+                                min_cluster_size=min_cluster_size,
+                                xi=float(optics_xi),
+                                metric=cluster_spec["distance_metric"],
+                                optics_cls=optics_cls,
+                                cluster_method=cluster_spec["optics_cluster_method"],
+                            )
+                            min_samples_value = min_samples
+                        else:
+                            raise ValueError(f"Unsupported clustering algorithm: {algorithm}")
 
-                candidate_col = f"cluster_{algorithm}_{cluster_space}"
-                clustered_df.loc[group_mask, candidate_col] = pd.array(labels, dtype="Int64")
+                        candidate_col = _cluster_candidate_label_col(
+                            algorithm=algorithm,
+                            cluster_space=cluster_space,
+                            min_cluster_size_fraction=min_cluster_size_fraction,
+                            min_cluster_size=min_cluster_size,
+                            min_samples=min_samples_value,
+                            optics_xi=float(optics_xi) if optics_xi is not None else None,
+                            force_parameter_suffix=(
+                                cluster_spec.get("parameter_mode", "single") == "sweep"
+                                or (algorithm == "optics" and len(cluster_spec["optics_xi_values"]) > 1)
+                            ),
+                        )
+                        if candidate_col not in clustered_df.columns:
+                            clustered_df[candidate_col] = _coerce_label_series(len(clustered_df))
+                        clustered_df.loc[group_mask, candidate_col] = pd.array(labels, dtype="Int64")
 
-                non_noise_cluster_ids = sorted({int(label) for label in labels if int(label) != -1})
-                n_clusters = len(non_noise_cluster_ids)
-                noise_count = int((labels == -1).sum())
-                clustered_count = int((labels != -1).sum())
-                dbcv_cluster_space, valid_for_selection = _compute_dbcv_score(validity_index_fn, X_space, labels)
-                dbcv_raw_effect_space, valid_for_raw_effect_evaluation = _compute_dbcv_score(validity_index_fn, X_raw, labels)
-                group_score_row_ids.append(score_row_id)
-                score_rows.append(
-                    {
-                        "score_row_id": score_row_id,
-                        "performance_group": performance_group,
-                        "algorithm": algorithm,
-                        "cluster_space": cluster_space,
-                        "candidate_label_col": candidate_col,
-                        "input_dim": int(X_space.shape[1]),
-                        "group_size": int(group_size),
-                        "min_cluster_size": int(min_cluster_size),
-                        "min_samples": int(min_samples_value),
-                        "optics_xi": float(cluster_spec["optics_xi"]) if algorithm == "optics" else np.nan,
-                        "umap_selected_n_components": (
-                            int(selected_dim) if cluster_space == "umap" and selected_dim is not None else np.nan
-                        ),
-                        "n_clusters": int(n_clusters),
-                        "noise_count": int(noise_count),
-                        "noise_fraction": float(noise_count / group_size),
-                        "clustered_fraction": float(clustered_count / group_size),
-                        "dbcv": dbcv_cluster_space,
-                        "dbcv_cluster_space": dbcv_cluster_space,
-                        "dbcv_raw_effect_space": dbcv_raw_effect_space,
-                        "valid_for_selection": bool(valid_for_selection),
-                        "valid_for_raw_effect_evaluation": bool(valid_for_raw_effect_evaluation),
-                        "selected_for_group": False,
-                    }
-                )
-                score_row_id += 1
+                        non_noise_cluster_ids = sorted({int(label) for label in labels if int(label) != -1})
+                        n_clusters = len(non_noise_cluster_ids)
+                        noise_count = int((labels == -1).sum())
+                        clustered_count = int((labels != -1).sum())
+                        dbcv_cluster_space, valid_for_selection = _compute_dbcv_score(validity_index_fn, X_space, labels)
+                        dbcv_raw_effect_space, valid_for_raw_effect_evaluation = _compute_dbcv_score(validity_index_fn, X_raw, labels)
+                        size_diagnostics = _cluster_size_diagnostics(
+                            labels,
+                            group_size=group_size,
+                            min_cluster_size=min_cluster_size,
+                            algorithm=algorithm,
+                        )
+                        group_score_row_ids.append(score_row_id)
+                        score_rows.append(
+                            {
+                                "score_row_id": score_row_id,
+                                "performance_group": performance_group,
+                                "algorithm": algorithm,
+                                "cluster_space": cluster_space,
+                                "candidate_label_col": candidate_col,
+                                "input_dim": int(X_space.shape[1]),
+                                "group_size": int(group_size),
+                                "min_cluster_size_fraction": (
+                                    float(min_cluster_size_fraction)
+                                    if min_cluster_size_fraction is not None
+                                    else np.nan
+                                ),
+                                "min_cluster_size": int(min_cluster_size),
+                                "min_samples": int(min_samples_value),
+                                "optics_xi": float(optics_xi) if algorithm == "optics" else np.nan,
+                                "umap_selected_n_components": (
+                                    int(selected_dim) if cluster_space == "umap" and selected_dim is not None else np.nan
+                                ),
+                                "n_clusters": int(n_clusters),
+                                "noise_count": int(noise_count),
+                                "noise_fraction": float(noise_count / group_size),
+                                "clustered_fraction": float(clustered_count / group_size),
+                                "dbcv": dbcv_cluster_space,
+                                "dbcv_cluster_space": dbcv_cluster_space,
+                                "dbcv_raw_effect_space": dbcv_raw_effect_space,
+                                "valid_for_selection": bool(valid_for_selection),
+                                "valid_for_raw_effect_evaluation": bool(valid_for_raw_effect_evaluation),
+                                **size_diagnostics,
+                                "selected_for_group": False,
+                            }
+                        )
+                        score_row_id += 1
 
         group_scores_df = pd.DataFrame([row for row in score_rows if row["score_row_id"] in group_score_row_ids])
         best_score_row_id = _select_best_group_run(group_scores_df)
@@ -1735,8 +2052,18 @@ def run_step2_clustering(
         else _empty_trustworthiness_df()
     )
     cluster_scores_df = pd.DataFrame(score_rows).sort_values(
-        ["performance_group", "selected_for_group", "dbcv_cluster_space", "algorithm", "cluster_space"],
-        ascending=[True, False, False, True, True],
+        [
+            "performance_group",
+            "selected_for_group",
+            "quality_issue_count",
+            "dbcv_raw_effect_space",
+            "algorithm",
+            "cluster_space",
+            "min_cluster_size",
+            "min_samples",
+            "optics_xi",
+        ],
+        ascending=[True, False, True, False, True, True, True, True, True],
     )
     cluster_feature_effect_profiles_df = build_cluster_feature_effect_profiles(
         clustered_df,

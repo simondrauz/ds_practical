@@ -25,6 +25,10 @@ CLUSTER_FEATURE_EFFECT_PROFILES_FILENAME = "cluster_feature_effect_profiles.csv"
 CLUSTER_MEMBER_FILENAME_TEMPLATE = (
     "cluster_members__group-{performance_group}__alg-{algorithm}__space-{cluster_space}__label-{cluster_label}.csv"
 )
+CLUSTER_MEMBER_CANDIDATE_FILENAME_TEMPLATE = (
+    "cluster_members__group-{performance_group}__alg-{algorithm}__space-{cluster_space}"
+    "__candidate-{candidate_label_col}__label-{cluster_label}.csv"
+)
 DEFAULT_MEMBER_EXPORT_COLUMNS = [
     "row_id",
     "data_idx",
@@ -120,8 +124,18 @@ def _cluster_member_filename(
     performance_group: str,
     algorithm: str,
     cluster_space: str,
+    candidate_label_col: str,
     cluster_label: str,
 ) -> str:
+    legacy_candidate_label_col = f"cluster_{algorithm}_{cluster_space}"
+    if candidate_label_col != legacy_candidate_label_col:
+        return CLUSTER_MEMBER_CANDIDATE_FILENAME_TEMPLATE.format(
+            performance_group=_sanitize_slug_token(performance_group),
+            algorithm=_sanitize_slug_token(algorithm),
+            cluster_space=_sanitize_slug_token(cluster_space),
+            candidate_label_col=_sanitize_slug_token(candidate_label_col),
+            cluster_label=_sanitize_slug_token(cluster_label),
+        )
     return CLUSTER_MEMBER_FILENAME_TEMPLATE.format(
         performance_group=_sanitize_slug_token(performance_group),
         algorithm=_sanitize_slug_token(algorithm),
@@ -195,6 +209,7 @@ def write_cluster_exports(
             performance_group,
             algorithm,
             cluster_space,
+            candidate_label_col,
             cluster_label,
         )
         member_export_df.to_csv(member_path, index=False)
@@ -227,6 +242,7 @@ def write_cluster_exports(
                 "performance_group": performance_group,
                 "algorithm": algorithm,
                 "cluster_space": cluster_space,
+                "candidate_label_col": candidate_label_col,
                 "cluster_id": cluster_id,
                 "is_noise": bool(profile_row["is_noise"]),
                 "cluster_size": int(profile_row["cluster_size"]),
@@ -253,8 +269,16 @@ def write_cluster_exports(
     )
     if not cluster_catalog_df.empty:
         cluster_catalog_df = cluster_catalog_df.sort_values(
-            ["performance_group", "algorithm", "cluster_space", "is_noise", "cluster_rank_by_size", "cluster_id"],
-            ascending=[True, True, True, True, True, True],
+            [
+                "performance_group",
+                "algorithm",
+                "cluster_space",
+                "candidate_label_col",
+                "is_noise",
+                "cluster_rank_by_size",
+                "cluster_id",
+            ],
+            ascending=[True, True, True, True, True, True, True],
             na_position="last",
         ).reset_index(drop=True)
     cluster_catalog_df.to_csv(cluster_catalog_path, index=False)
