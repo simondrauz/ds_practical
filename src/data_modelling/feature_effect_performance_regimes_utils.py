@@ -403,6 +403,7 @@ def build_feature_effect_regime_artifact_names(
         },
         "plots": {
             "raw_algorithm_comparison_grid": "algorithm_comparison_grid__space-raw.png",
+            "raw_algorithm_comparison_grid_no_noise": "algorithm_comparison_grid__space-raw__noise-excluded.png",
             "umap_algorithm_comparison_grid": "algorithm_comparison_grid__space-umap.png",
             "umap_trustworthiness_curves": {
                 trustworthiness_view: (

@@ -1212,6 +1212,59 @@ def test_run_step2_clustering_separates_cluster_and_visual_umap_parameters(monke
     }
 
 
+def test_run_step2_clustering_can_skip_reduced_umap_while_keeping_visual_umap(monkeypatch):
+    umap_call_log: list[dict[str, float]] = []
+    _patch_feature_effect_regime_dependencies(monkeypatch, umap_call_log)
+
+    n_rows = 40
+    analysis_df = pd.DataFrame(
+        {
+            "row_id": list(range(n_rows)),
+            "performance_group": ["easy"] * n_rows,
+            "effect__speed": np.linspace(0.1, 4.0, n_rows),
+            "effect__heading": np.linspace(1.0, 5.0, n_rows),
+            "effect__distance": np.linspace(2.0, 6.0, n_rows),
+        }
+    )
+    cluster_spec = {
+        "groups": ["easy"],
+        "algorithms": ["hdbscan"],
+        "evaluate_umap_latent_space": False,
+        "umap_selected_n_components": {"easy": 2},
+        "trustworthiness_neighbor_values": [5, 10, 15],
+        "cluster_umap_n_neighbors": 30,
+        "cluster_umap_min_dist": 0.0,
+        "viz_umap_n_neighbors": 15,
+        "viz_umap_min_dist": 0.1,
+        "random_state": 42,
+        "min_cluster_size": 10,
+        "min_samples": 10,
+        "optics_cluster_method": "xi",
+        "optics_xi": 0.05,
+        "distance_metric": "euclidean",
+    }
+    cluster_spec = feature_effect_performance_regimes_utils.resolve_cluster_spec(
+        cluster_spec,
+        effect_cols=["effect__speed", "effect__heading", "effect__distance"],
+    )
+
+    clustering_results = feature_effect_performance_regimes_utils.run_step2_clustering(
+        analysis_df,
+        cluster_spec=cluster_spec,
+        performance_group_col="performance_group",
+        row_id_col="row_id",
+    )
+
+    assert umap_call_log == [
+        {"n_components": 2, "n_neighbors": 15, "min_dist": 0.1, "random_state": 42}
+    ]
+    assert "cluster_hdbscan_umap" not in clustering_results["clustered_df"].columns
+    assert clustering_results["trustworthiness_df"].empty
+    assert set(clustering_results["cluster_scores_df"]["cluster_space"]) == {"raw"}
+    assert clustering_results["clustered_df"].loc[0, "viz_umap_x"] == pytest.approx(15.1)
+    assert clustering_results["clustered_df"].loc[0, "viz_umap_y"] == pytest.approx(16.1)
+
+
 def test_build_feature_effect_regime_export_layout_is_stable_for_equivalent_resolved_cluster_spec(tmp_path):
     cluster_spec_scalar = _resolved_feature_effect_regime_cluster_spec(
         {
@@ -1343,6 +1396,10 @@ def test_build_feature_effect_regime_artifact_names_return_candidate_wide_export
     assert "cluster_profile_barplots" not in artifact_names["plots"]
     assert "cluster_profile_heatmaps" not in artifact_names["plots"]
     assert artifact_names["plots"]["raw_algorithm_comparison_grid"] == "algorithm_comparison_grid__space-raw.png"
+    assert (
+        artifact_names["plots"]["raw_algorithm_comparison_grid_no_noise"]
+        == "algorithm_comparison_grid__space-raw__noise-excluded.png"
+    )
     assert (
         artifact_names["plots"]["umap_trustworthiness_curves"]["mean_5_10_15"]
         == "umap_trustworthiness_curve__view-mean_5_10_15.png"
