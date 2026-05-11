@@ -24,9 +24,11 @@ from data_modelling.feature_effect_performance_regimes_utils import (
 
 VALID_CLUSTER_ALGORITHMS = ("hdbscan", "optics")
 WHOLE_GROUP_LABEL = "Whole performance group"
+ALL_GROUPS_LABEL = "All performance groups"
 NOISE_LABEL = "Noise"
 DEFAULT_NOISE_COLOR = "#9AA0A6"
 DEFAULT_BASELINE_COLOR = "#264653"
+DEFAULT_ALL_GROUPS_COLOR = "#5E3A6B"
 TARGET_ORIGINAL_UNITS_COL = "target_orig"
 SCENE_METRIC_PRIORITY = [
     "scene_num_agents",
@@ -422,7 +424,7 @@ def build_subset_style_map(subset_labels: list[str]) -> dict[str, dict[str, Any]
     non_noise_labels = [
         subset_label
         for subset_label in subset_labels
-        if subset_label not in {NOISE_LABEL, WHOLE_GROUP_LABEL}
+        if subset_label not in {NOISE_LABEL, WHOLE_GROUP_LABEL, ALL_GROUPS_LABEL}
     ]
     palette = sns.color_palette("Set2", n_colors=max(len(non_noise_labels), 1))
 
@@ -443,6 +445,11 @@ def build_subset_style_map(subset_labels: list[str]) -> dict[str, dict[str, Any]
         style_map[WHOLE_GROUP_LABEL] = {
             "color": DEFAULT_BASELINE_COLOR,
             "background": _blend_with_white(DEFAULT_BASELINE_COLOR, amount=0.93),
+        }
+    if ALL_GROUPS_LABEL in subset_labels:
+        style_map[ALL_GROUPS_LABEL] = {
+            "color": DEFAULT_ALL_GROUPS_COLOR,
+            "background": _blend_with_white(DEFAULT_ALL_GROUPS_COLOR, amount=0.93),
         }
     return style_map
 
@@ -1024,8 +1031,14 @@ def build_distribution_subset_frames(
     inspection_bundle: ClusterInspectionBundle,
     *,
     scene_level: bool,
+    include_all_groups: bool = False,
 ) -> list[tuple[str, pd.DataFrame]]:
-    """Return ordered subset frames for trajectory- or scene-level plots."""
+    """Return ordered subset frames for trajectory- or scene-level plots.
+
+    When ``include_all_groups`` is True, an additional baseline frame covering
+    every performance group is appended after the within-group baseline so the
+    cluster distributions can be compared against the dataset-wide range.
+    """
 
     subset_frames: list[tuple[str, pd.DataFrame]] = []
     for catalog_row in inspection_bundle.selected_catalog_df.to_dict(orient="records"):
@@ -1039,12 +1052,20 @@ def build_distribution_subset_frames(
             subset_df = resolve_scene_step_frame(subset_df)
         subset_frames.append((_cluster_display_label(cluster_id), subset_df))
 
-    # The whole performance group baseline is always appended last so the
-    # downstream overview matrices can keep one stable baseline row.
+    # Within-group baseline (current performance group only).
     baseline_df = inspection_bundle.group_assignments_df.copy()
     if scene_level:
         baseline_df = resolve_scene_step_frame(baseline_df)
     subset_frames.append((WHOLE_GROUP_LABEL, baseline_df))
+
+    # Dataset-wide baseline (every performance group). Appended last so the
+    # binning baseline used by _resolve_metric_plot_spec covers the widest
+    # observed range and downstream cluster histograms remain comparable.
+    if include_all_groups:
+        all_groups_df = inspection_bundle.cluster_assignments_df.copy()
+        if scene_level:
+            all_groups_df = resolve_scene_step_frame(all_groups_df)
+        subset_frames.append((ALL_GROUPS_LABEL, all_groups_df))
     return subset_frames
 
 
@@ -1236,6 +1257,162 @@ def _plot_metric_overview_matrix(
 
     fig.suptitle(plot_title, fontsize=16, fontweight="bold", y=1.01)
     plt.tight_layout()
+    plt.savefig(plot_path, dpi=180, bbox_inches="tight")
+    plt.show()
+    plt.close(fig)
+
+
+def plot_cluster_profile_beeswarm(
+    group_assignments_df: pd.DataFrame,
+    *,
+    candidate_label_col: str,
+    ordered_cluster_ids: list[int],
+    effect_cols: list[str],
+    top_k_features: int,
+    selected_profiles_df: pd.DataFrame,
+    performance_group: str,
+    algorithm: str,
+    cluster_space: str,
+    plot_path: Path,
+    effect_title_label: str,
+    effect_value_axis_label: str,
+    subset_style_map: Mapping[str, Mapping[str, Any]] | None = None,
+    max_points_per_cluster: int = 2000,
+    feature_value_reference_df: pd.DataFrame | None = None,
+    feature_value_scope_label: str | None = None,
+) -> None:
+    """Plot local feature-effect values as a beeswarm per cluster.
+
+    Points are colored by their normalised raw feature value (blue=low, red=high)
+    using the value range from ``feature_value_reference_df`` (defaults to
+    ``group_assignments_df`` — i.e. the current performance group). Pass the
+    full ``cluster_assignments_df`` to normalise across all performance groups.
+    """
+
+    subset_labels = [_cluster_display_label(cluster_id) for cluster_id in ordered_cluster_ids]
+    subset_style_map = subset_style_map or build_subset_style_map(subset_labels + [WHOLE_GROUP_LABEL])
+
+    reference_df = (
+        feature_value_reference_df if feature_value_reference_df is not None else group_assignments_df
+    )
+
+    profiles_by_cluster = {
+        int(row["cluster_id"]): row
+        for row in selected_profiles_df.to_dict(orient="records")
+    }
+
+    feat_cmap = plt.cm.RdBu_r
+    feature_value_ranges: dict[str, tuple[float, float]] = {}
+    for col in effect_cols:
+        feature_name = format_effect_feature_name(col)
+        if feature_name in reference_df.columns:
+            vals = pd.to_numeric(reference_df[feature_name], errors="coerce").dropna()
+            if len(vals) >= 2:
+                v_min, v_max = float(vals.min()), float(vals.max())
+                feature_value_ranges[feature_name] = (v_min, v_max if v_max > v_min else v_min + 1.0)
+            else:
+                feature_value_ranges[feature_name] = (0.0, 1.0)
+
+    rng = np.random.default_rng(42)
+    n_rows = len(ordered_cluster_ids)
+
+    fig = plt.figure(figsize=(11.5, max(4.8, 3.4 * n_rows)))
+    gs = fig.add_gridspec(n_rows, 2, width_ratios=[22, 1], hspace=0.55, wspace=0.08)
+
+    for axis_idx, cluster_id in enumerate(ordered_cluster_ids):
+        subset_label = _cluster_display_label(cluster_id)
+        subset_style = subset_style_map[subset_label]
+        cluster_color = mcolors.to_hex(subset_style["color"])
+
+        ax = fig.add_subplot(gs[axis_idx, 0])
+        ax.set_facecolor("white")
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ax.spines["bottom"].set_visible(True)
+        ax.spines["bottom"].set_color("#CCCCCC")
+        ax.tick_params(left=False)
+        ax.grid(axis="x", color="#E0E0E0", linewidth=0.8, zorder=0)
+
+        cluster_mask = (
+            pd.to_numeric(group_assignments_df[candidate_label_col], errors="coerce")
+            .astype("Int64")
+            == cluster_id
+        )
+        cluster_df = group_assignments_df.loc[cluster_mask].copy()
+        if len(cluster_df) > max_points_per_cluster:
+            cluster_df = cluster_df.sample(n=max_points_per_cluster, random_state=42)
+
+        profile_row = profiles_by_cluster.get(cluster_id, {})
+        available_effect_cols = [col for col in effect_cols if col in cluster_df.columns]
+        top_effect_cols = sorted(
+            available_effect_cols,
+            key=lambda col: abs(float(profile_row.get(col, 0))),
+            reverse=True,
+        )[:top_k_features]
+        top_effect_cols_display = list(reversed(top_effect_cols))
+        feature_labels = [format_effect_feature_name(col) for col in top_effect_cols_display]
+
+        if not top_effect_cols_display:
+            ax.text(0.5, 0.5, "No data", transform=ax.transAxes, ha="center", va="center", fontsize=10)
+            continue
+
+        for feat_idx, col in enumerate(top_effect_cols_display):
+            feature_name = format_effect_feature_name(col)
+            effect_vals = pd.to_numeric(cluster_df[col], errors="coerce")
+            feature_vals = (
+                pd.to_numeric(cluster_df[feature_name], errors="coerce")
+                if feature_name in cluster_df.columns
+                else pd.Series(np.nan, index=cluster_df.index)
+            )
+            valid_mask = effect_vals.notna()
+            effect_arr = effect_vals[valid_mask].to_numpy(dtype=float)
+            feature_arr = feature_vals[valid_mask].to_numpy(dtype=float)
+
+            v_min, v_max = feature_value_ranges.get(feature_name, (0.0, 1.0))
+            norm_feature = np.clip((feature_arr - v_min) / (v_max - v_min), 0.0, 1.0)
+            point_colors = feat_cmap(norm_feature)
+            point_colors[np.isnan(feature_arr)] = np.array([0.6, 0.6, 0.6, 1.0])
+
+            y_jitter = feat_idx + rng.uniform(-0.35, 0.35, size=len(effect_arr))
+            ax.scatter(effect_arr, y_jitter, c=point_colors, s=7, alpha=0.55, linewidths=0, zorder=2)
+
+        ax.axvline(0, color="#555555", linewidth=0.9, zorder=3)
+        for feat_idx, col in enumerate(top_effect_cols_display):
+            mean_val = float(profile_row.get(col, 0.0))
+            ax.plot(mean_val, feat_idx, marker="D", color="white", markersize=7, zorder=5)
+            ax.plot(mean_val, feat_idx, marker="D", color=cluster_color, markersize=4.5, zorder=6)
+
+        ax.set_yticks(range(len(feature_labels)))
+        ax.set_yticklabels(feature_labels, fontsize=10)
+        ax.set_ylim(-0.5, len(feature_labels) - 0.5)
+
+        cluster_size = int(profile_row.get("cluster_size", int(cluster_mask.sum())))
+        cluster_share = float(profile_row.get("cluster_size_share", 0.0))
+        ax.set_title(
+            f"{subset_label}  —  n={cluster_size:,}  ({cluster_share:.1%})",
+            fontsize=11, fontweight="bold", loc="left", color="#222222", pad=6,
+        )
+        ax.set_xlabel(effect_value_axis_label, fontsize=10)
+        ax.set_ylabel("")
+
+    cbar_ax = fig.add_subplot(gs[:, 1])
+    sm = plt.cm.ScalarMappable(cmap=feat_cmap, norm=plt.Normalize(vmin=0, vmax=1))
+    sm.set_array([])
+    cbar = fig.colorbar(sm, cax=cbar_ax)
+    cbar.set_ticks([0, 1])
+    cbar.set_ticklabels(["Low", "High"], fontsize=9)
+    scope_suffix = f" ({feature_value_scope_label})" if feature_value_scope_label else ""
+    cbar.set_label(f"Feature value{scope_suffix}", fontsize=9)
+    cbar.ax.yaxis.set_label_position("left")
+
+    fig.suptitle(
+        f"{effect_title_label} beeswarm – local effects  ·  {performance_group} ({algorithm}, space={cluster_space})",
+        fontsize=13,
+        fontweight="bold",
+        x=0.0,
+        ha="left",
+        y=1.01,
+    )
     plt.savefig(plot_path, dpi=180, bbox_inches="tight")
     plt.show()
     plt.close(fig)
