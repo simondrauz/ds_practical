@@ -36,7 +36,15 @@ from data_modelling.training_outputs import (
 
 def _patch_feature_effect_regime_dependencies(monkeypatch: pytest.MonkeyPatch, umap_call_log: list[dict[str, float]]) -> None:
     class DummyUMAP:
-        def __init__(self, *, n_components: int, n_neighbors: int, min_dist: float, random_state: int):
+        def __init__(
+            self,
+            *,
+            n_components: int,
+            n_neighbors: int,
+            min_dist: float,
+            random_state: int,
+            n_jobs: int = 1,
+        ):
             umap_call_log.append(
                 {
                     "n_components": int(n_components),
@@ -1120,6 +1128,64 @@ def test_resolve_cluster_spec_rejects_invalid_selected_umap_dim():
         )
 
 
+def test_resolve_cluster_spec_supports_raw_sweep_mode():
+    cluster_spec = feature_effect_performance_regimes_utils.resolve_cluster_spec(
+        {
+            "groups": ["easy", "medium"],
+            "algorithms": ["hdbscan", "optics"],
+            "evaluate_umap_latent_space": False,
+            "umap_selected_n_components": {"easy": 2, "medium": 2},
+            "trustworthiness_neighbor_values": [5, 10, 15],
+            "cluster_umap_n_neighbors": 30,
+            "cluster_umap_min_dist": 0.0,
+            "viz_umap_n_neighbors": 15,
+            "viz_umap_min_dist": 0.1,
+            "random_state": 42,
+            "min_cluster_size_fractions": [0.05, 0.02, 0.03],
+            "min_cluster_size_floor": 20,
+            "min_samples_values": [15, 5, 10],
+            "optics_cluster_method": "xi",
+            "optics_xi_values": [0.05, 0.01, 0.03],
+            "distance_metric": "euclidean",
+        },
+        effect_cols=["effect__speed", "effect__heading", "effect__distance"],
+    )
+
+    assert cluster_spec["parameter_mode"] == "sweep"
+    assert cluster_spec["min_cluster_size_fractions"] == [0.02, 0.03, 0.05]
+    assert cluster_spec["min_cluster_size_floor"] == 20
+    assert cluster_spec["min_samples_values"] == [5, 10, 15]
+    assert cluster_spec["optics_xi"] == 0.01
+    assert cluster_spec["optics_xi_values"] == [0.01, 0.03, 0.05]
+    assert cluster_spec["min_cluster_size"] == {}
+    assert cluster_spec["min_samples"] == {}
+
+
+def test_resolve_cluster_spec_rejects_sweep_with_umap_clustering():
+    with pytest.raises(ValueError, match="raw feature-effect space only"):
+        feature_effect_performance_regimes_utils.resolve_cluster_spec(
+            {
+                "groups": ["easy"],
+                "algorithms": ["hdbscan"],
+                "evaluate_umap_latent_space": True,
+                "umap_selected_n_components": {"easy": 2},
+                "trustworthiness_neighbor_values": [5, 10, 15],
+                "cluster_umap_n_neighbors": 30,
+                "cluster_umap_min_dist": 0.0,
+                "viz_umap_n_neighbors": 15,
+                "viz_umap_min_dist": 0.1,
+                "random_state": 42,
+                "min_cluster_size_fractions": [0.02],
+                "min_cluster_size_floor": 20,
+                "min_samples_values": [5],
+                "optics_cluster_method": "xi",
+                "optics_xi": 0.05,
+                "distance_metric": "euclidean",
+            },
+            effect_cols=["effect__speed", "effect__heading", "effect__distance"],
+        )
+
+
 def test_resolve_inspection_config_rejects_umap_space_when_disabled():
     cluster_spec = feature_effect_performance_regimes_utils.resolve_cluster_spec(
         {
@@ -1210,6 +1276,184 @@ def test_run_step2_clustering_separates_cluster_and_visual_umap_parameters(monke
         "nn_15",
         "mean_5_10_15",
     }
+
+
+def test_run_step2_clustering_can_skip_reduced_umap_while_keeping_visual_umap(monkeypatch):
+    umap_call_log: list[dict[str, float]] = []
+    _patch_feature_effect_regime_dependencies(monkeypatch, umap_call_log)
+
+    n_rows = 40
+    analysis_df = pd.DataFrame(
+        {
+            "row_id": list(range(n_rows)),
+            "performance_group": ["easy"] * n_rows,
+            "effect__speed": np.linspace(0.1, 4.0, n_rows),
+            "effect__heading": np.linspace(1.0, 5.0, n_rows),
+            "effect__distance": np.linspace(2.0, 6.0, n_rows),
+        }
+    )
+    cluster_spec = {
+        "groups": ["easy"],
+        "algorithms": ["hdbscan"],
+        "evaluate_umap_latent_space": False,
+        "umap_selected_n_components": {"easy": 2},
+        "trustworthiness_neighbor_values": [5, 10, 15],
+        "cluster_umap_n_neighbors": 30,
+        "cluster_umap_min_dist": 0.0,
+        "viz_umap_n_neighbors": 15,
+        "viz_umap_min_dist": 0.1,
+        "random_state": 42,
+        "min_cluster_size": 10,
+        "min_samples": 10,
+        "optics_cluster_method": "xi",
+        "optics_xi": 0.05,
+        "distance_metric": "euclidean",
+    }
+    cluster_spec = feature_effect_performance_regimes_utils.resolve_cluster_spec(
+        cluster_spec,
+        effect_cols=["effect__speed", "effect__heading", "effect__distance"],
+    )
+
+    clustering_results = feature_effect_performance_regimes_utils.run_step2_clustering(
+        analysis_df,
+        cluster_spec=cluster_spec,
+        performance_group_col="performance_group",
+        row_id_col="row_id",
+    )
+
+    assert umap_call_log == [
+        {"n_components": 2, "n_neighbors": 15, "min_dist": 0.1, "random_state": 42}
+    ]
+    assert "cluster_hdbscan_umap" not in clustering_results["clustered_df"].columns
+    assert clustering_results["trustworthiness_df"].empty
+    assert set(clustering_results["cluster_scores_df"]["cluster_space"]) == {"raw"}
+    assert clustering_results["clustered_df"].loc[0, "viz_umap_x"] == pytest.approx(15.1)
+    assert clustering_results["clustered_df"].loc[0, "viz_umap_y"] == pytest.approx(16.1)
+
+
+def test_run_step2_clustering_expands_raw_sweep_candidates(monkeypatch):
+    umap_call_log: list[dict[str, float]] = []
+    _patch_feature_effect_regime_dependencies(monkeypatch, umap_call_log)
+
+    n_rows = 100
+    analysis_df = pd.DataFrame(
+        {
+            "row_id": list(range(n_rows)),
+            "performance_group": ["easy"] * n_rows,
+            "effect__speed": np.linspace(0.1, 4.0, n_rows),
+            "effect__heading": np.linspace(1.0, 5.0, n_rows),
+            "effect__distance": np.linspace(2.0, 6.0, n_rows),
+        }
+    )
+    cluster_spec = feature_effect_performance_regimes_utils.resolve_cluster_spec(
+        {
+            "groups": ["easy"],
+            "algorithms": ["hdbscan", "optics"],
+            "evaluate_umap_latent_space": False,
+            "umap_selected_n_components": {"easy": 2},
+            "trustworthiness_neighbor_values": [5, 10, 15],
+            "cluster_umap_n_neighbors": 30,
+            "cluster_umap_min_dist": 0.0,
+            "viz_umap_n_neighbors": 15,
+            "viz_umap_min_dist": 0.1,
+            "random_state": 42,
+            "min_cluster_size_fractions": [0.02, 0.03],
+            "min_cluster_size_floor": 20,
+            "min_samples_values": [5, 10],
+            "optics_cluster_method": "xi",
+            "optics_xi_values": [0.02, 0.05],
+            "distance_metric": "euclidean",
+        },
+        effect_cols=["effect__speed", "effect__heading", "effect__distance"],
+    )
+
+    clustering_results = feature_effect_performance_regimes_utils.run_step2_clustering(
+        analysis_df,
+        cluster_spec=cluster_spec,
+        performance_group_col="performance_group",
+        row_id_col="row_id",
+    )
+
+    cluster_scores_df = clustering_results["cluster_scores_df"]
+    assert len(cluster_scores_df) == 12
+    assert cluster_scores_df["selected_for_group"].sum() == 1
+    assert cluster_scores_df["candidate_label_col"].is_unique
+    assert set(cluster_scores_df["cluster_space"]) == {"raw"}
+    assert set(cluster_scores_df["min_cluster_size_fraction"]) == {0.02, 0.03}
+    assert set(cluster_scores_df["min_cluster_size"]) == {20}
+    assert set(cluster_scores_df["min_samples"]) == {5, 10}
+    assert set(cluster_scores_df.loc[cluster_scores_df["algorithm"] == "optics", "optics_xi"]) == {0.02, 0.05}
+    assert all(col in clustering_results["clustered_df"].columns for col in cluster_scores_df["candidate_label_col"])
+    assert any("__mcs-frac-0p02__mcs-20__ms-5" in col for col in cluster_scores_df["candidate_label_col"])
+    assert any("__xi-0p02" in col for col in cluster_scores_df["candidate_label_col"])
+
+
+def test_cluster_quality_diagnostics_flags_problem_shapes():
+    high_noise = feature_effect_performance_regimes_utils._cluster_size_diagnostics(
+        np.array([0, 0, 0, -1, -1, -1, -1, -1, -1, -1]),
+        group_size=10,
+        min_cluster_size=3,
+    )
+    too_many_clusters = feature_effect_performance_regimes_utils._cluster_size_diagnostics(
+        np.arange(21),
+        group_size=21,
+        min_cluster_size=1,
+    )
+    dominant_cluster = feature_effect_performance_regimes_utils._cluster_size_diagnostics(
+        np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+        group_size=10,
+        min_cluster_size=1,
+    )
+    boundary_clusters = feature_effect_performance_regimes_utils._cluster_size_diagnostics(
+        np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 4]),
+        group_size=12,
+        min_cluster_size=2,
+    )
+    optics_single_cluster = feature_effect_performance_regimes_utils._cluster_size_diagnostics(
+        np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+        group_size=10,
+        min_cluster_size=2,
+        algorithm="optics",
+    )
+
+    assert high_noise["quality_flag_high_noise"]
+    assert too_many_clusters["quality_flag_too_many_clusters"]
+    assert dominant_cluster["quality_flag_dominant_cluster"]
+    assert boundary_clusters["quality_flag_many_boundary_clusters"]
+    assert optics_single_cluster["optics_xi_no_stable_valley"]
+    assert optics_single_cluster["optics_xi_status"] == "single_dominant_cluster"
+    assert not high_noise["passes_conservative_quality_screen"]
+
+
+def test_select_best_group_run_prefers_quality_before_dbcv():
+    group_scores_df = pd.DataFrame(
+        [
+            {
+                "score_row_id": 0,
+                "valid_for_selection": True,
+                "quality_issue_count": 1,
+                "dbcv_raw_effect_space": 0.95,
+                "noise_fraction": 0.0,
+                "n_clusters": 2,
+                "algorithm": "hdbscan",
+                "cluster_space": "raw",
+            },
+            {
+                "score_row_id": 1,
+                "valid_for_selection": True,
+                "quality_issue_count": 0,
+                "dbcv_raw_effect_space": 0.50,
+                "noise_fraction": 0.1,
+                "n_clusters": 3,
+                "algorithm": "optics",
+                "cluster_space": "raw",
+            },
+        ]
+    )
+
+    selected_score_row_id = feature_effect_performance_regimes_utils._select_best_group_run(group_scores_df)
+
+    assert selected_score_row_id == 1
 
 
 def test_build_feature_effect_regime_export_layout_is_stable_for_equivalent_resolved_cluster_spec(tmp_path):
@@ -1342,7 +1586,12 @@ def test_build_feature_effect_regime_artifact_names_return_candidate_wide_export
     assert artifact_names["tables"]["cluster_catalog"] == "cluster_catalog.csv"
     assert "cluster_profile_barplots" not in artifact_names["plots"]
     assert "cluster_profile_heatmaps" not in artifact_names["plots"]
-    assert artifact_names["plots"]["raw_algorithm_comparison_grid"] == "algorithm_comparison_grid__space-raw.png"
+    assert artifact_names["plots"]["candidate_score_heatmap_grid"] == "candidate_score_heatmap_grid.png"
+    assert artifact_names["plots"]["algorithm_candidate_umap"] == "algorithm_candidate_umap.png"
+    assert artifact_names["plots"]["algorithm_candidate_umap_no_noise"] == "algorithm_candidate_umap__noise-excluded.png"
+    assert artifact_names["plots"]["optics_reachability_grid"] == "optics_reachability_grid.png"
+    assert "raw_algorithm_comparison_grid" not in artifact_names["plots"]
+    assert "raw_algorithm_comparison_grid_no_noise" not in artifact_names["plots"]
     assert (
         artifact_names["plots"]["umap_trustworthiness_curves"]["mean_5_10_15"]
         == "umap_trustworthiness_curve__view-mean_5_10_15.png"
