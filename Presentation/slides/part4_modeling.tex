@@ -1,0 +1,66 @@
+%--- Part 4: Interpretable Modeling (8 min) ------------------------------------
+
+\section{Interpretable Modeling}
+
+%--- Slide 11 ------------------------------------------------------------------
+\begin{frame}{Why GAM + XGBoost?}
+  \begin{columns}
+    \begin{column}{0.48\textwidth}
+      \textbf{GAM (Penalized Splines)}
+      \begin{itemize}
+        \item Directly interpretable smooth effects
+        \item One spline per feature, no interaction terms
+        \item p-values for significance testing
+        % TODO: add further GAM motivation
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{XGBoost}
+      \begin{itemize}
+        \item Captures non-linearities and interactions
+        \item SHAP values for local + global interpretation
+        % TODO: add further XGBoost motivation
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Slide 12 ------------------------------------------------------------------
+\begin{frame}{Validating the Tuning Procedure — Nested Resampling}
+  \begin{itemize}
+    \item \textbf{Problem:} hyperparameter tuning risks overfitting to a
+          particular data split
+    \item \textbf{Solution:} nested cross-validation
+    \begin{itemize}
+      \item Outer folds: evaluate generalization of the full tuning procedure
+      \item Inner folds: tune hyperparameters on each outer-fold training set
+    \end{itemize}
+    \item OOF evaluation: inspect out-of-fold predictions for instability,
+          outlier folds, bias
+    \item \textbf{Conclusion:} tuning generalises stably $\to$ proceed to
+          full-data tuning + refit
+  \end{itemize}
+  \vspace{0.4em}
+  \footnotesize Final models are refit on \emph{all} data with optimal
+  hyperparameters — no held-out test set, because the goal is understanding,
+  not unbiased prediction.
+\end{frame}
+
+%--- Slide 13 ------------------------------------------------------------------
+\begin{frame}{GAM Variant Selection}
+  % TODO: table comparing Linear / Linear-log / Gamma GAM by RMSE
+  \begin{itemize}
+    \item Candidates: linear GAM, linear GAM on log-transformed target,
+          Gamma GAM
+    \item Selection criterion: lowest RMSE
+    \item \ldots
+  \end{itemize}
+\end{frame}
+
+%--- Slide 14 ------------------------------------------------------------------
+\begin{frame}{Final Model Performance (OOF)}
+  % TODO: OOF RMSE / R² table or bar chart for GAM and XGBoost
+  \begin{itemize}
+    \item \ldots
+  \end{itemize}
+\end{frame}

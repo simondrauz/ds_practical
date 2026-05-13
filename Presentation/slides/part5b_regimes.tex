@@ -1,0 +1,36 @@
+%--- Part 5b: Performance Regimes (6 min) --------------------------------------
+
+\section{Performance Regimes}
+
+%--- Slide 18 ------------------------------------------------------------------
+\begin{frame}{Performance Regime Methodology}
+  \begin{enumerate}
+    \item Divide trajectories into difficulty groups based on \texttt{ml\_ade}
+          (easy / medium / hard)
+    \item Run clustering on trajectory + scene characteristics per group
+    \begin{itemize}
+      \item Option A: original feature space
+      \item Option B: UMAP-reduced space
+            (dimensions chosen via trustworthiness score + elbow rule)
+    \end{itemize}
+    \item Assess clustering quality with DBCV score
+    \item Export identified clusters (performance regimes)
+  \end{enumerate}
+\end{frame}
+
+%--- Slide 19 ------------------------------------------------------------------
+\begin{frame}{Clustering Results}
+  % TODO: UMAP scatter coloured by cluster, DBCV scores per difficulty group
+  \begin{itemize}
+    \item \ldots
+  \end{itemize}
+\end{frame}
+
+%--- Slide 20 ------------------------------------------------------------------
+\begin{frame}{Regime Inspection — What Drives Error in Each Regime?}
+  % TODO: per-cluster SHAP / additive contribution summary;
+  %       feature value distributions per cluster
+  \begin{itemize}
+    \item \ldots
+  \end{itemize}
+\end{frame}

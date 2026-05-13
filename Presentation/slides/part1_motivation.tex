@@ -1,0 +1,31 @@
+%--- Part 1: Motivation (4 min) -------------------------------------------------
+
+\section{Motivation}
+
+%--- Slide 3 -------------------------------------------------------------------
+\begin{frame}{Trajectory Prediction in Autonomous Driving}
+  % TODO: brief intro to trajectory prediction task
+  % TODO: Trajectron++ architecture overview / key ideas
+  \begin{itemize}
+    \item \ldots
+  \end{itemize}
+\end{frame}
+
+%--- Slide 4 -------------------------------------------------------------------
+\begin{frame}{The Problem with Aggregate Metrics}
+  \begin{itemize}
+    \item A single average ADE hides large variation across trajectories
+    \item Some trajectories inherently hard, others trivially easy — but why?
+    \item No understanding of which trajectory or scene characteristics drive
+          per-trajectory prediction error
+  \end{itemize}
+  \vspace{0.5em}
+  \textbf{Three Research Questions:}
+  \begin{enumerate}
+    \item Which characteristics affect model performance?
+    \item Do distinct \emph{performance regimes} (recurring failure/success
+          patterns) exist?
+    \item How do model settings (history window, prediction horizon, attention
+          radius) affect performance?
+  \end{enumerate}
+\end{frame}
