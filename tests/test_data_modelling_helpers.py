@@ -73,6 +73,14 @@ def _patch_feature_effect_regime_dependencies(monkeypatch: pytest.MonkeyPatch, u
         def __init__(self, **kwargs):
             self.kwargs = kwargs
 
+        def fit(self, X: np.ndarray):
+            self.ordering_ = np.arange(len(X), dtype=int)
+            self.reachability_ = np.linspace(0.01, 1.0, len(X), dtype=float)
+            self.reachability_[0] = np.inf
+            self.predecessor_ = np.arange(len(X), dtype=int) - 1
+            self.core_distances_ = np.linspace(0.01, 1.0, len(X), dtype=float)
+            return self
+
         def fit_predict(self, X: np.ndarray) -> np.ndarray:
             midpoint = max(1, len(X) // 2)
             return np.array([0 if idx < midpoint else 1 for idx in range(len(X))], dtype=int)
@@ -80,8 +88,16 @@ def _patch_feature_effect_regime_dependencies(monkeypatch: pytest.MonkeyPatch, u
     def dummy_trustworthiness(X: np.ndarray, embedding: np.ndarray, *, n_neighbors: int) -> float:
         return float(n_neighbors) + (float(embedding.shape[1]) / 100.0)
 
-    def dummy_validity_index(X: np.ndarray, labels: np.ndarray) -> float:
+    def dummy_validity_index(X: np.ndarray, labels: np.ndarray, *, metric: str = "euclidean") -> float:
         return 0.42
+
+    def dummy_extract_optics_xi_labels(optics_model, *, xi: float, min_samples: int, min_cluster_size: int) -> np.ndarray:
+        midpoint = max(1, len(optics_model.ordering_) // 2)
+        return np.array([0 if idx < midpoint else 1 for idx in range(len(optics_model.ordering_))], dtype=int)
+
+    def dummy_extract_optics_dbscan_labels(optics_model, *, eps: float) -> np.ndarray:
+        midpoint = max(1, len(optics_model.ordering_) // 2)
+        return np.array([0 if idx < midpoint else 1 for idx in range(len(optics_model.ordering_))], dtype=int)
 
     dummy_umap_module = type("DummyUMAPModule", (), {"UMAP": DummyUMAP})
     dummy_hdbscan_module = type("DummyHDBSCANModule", (), {"HDBSCAN": DummyHDBSCAN})
@@ -89,6 +105,16 @@ def _patch_feature_effect_regime_dependencies(monkeypatch: pytest.MonkeyPatch, u
         feature_effect_performance_regimes_utils,
         "_require_step2_dependencies",
         lambda: (dummy_hdbscan_module, dummy_validity_index, dummy_umap_module, DummyOPTICS, dummy_trustworthiness),
+    )
+    monkeypatch.setattr(
+        feature_effect_performance_regimes_utils,
+        "_extract_optics_xi_labels",
+        dummy_extract_optics_xi_labels,
+    )
+    monkeypatch.setattr(
+        feature_effect_performance_regimes_utils,
+        "_extract_optics_dbscan_labels",
+        dummy_extract_optics_dbscan_labels,
     )
 
 
@@ -156,6 +182,9 @@ def _sample_cluster_export_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
                 "performance_group": "easy",
                 "algorithm": "hdbscan",
                 "cluster_space": "raw",
+                "distance_metric": "manhattan",
+                "optics_extraction_method": "",
+                "optics_eps": np.nan,
                 "candidate_label_col": "cluster_hdbscan_raw",
                 "input_dim": 2,
                 "group_size": 5,
@@ -1157,12 +1186,88 @@ def test_resolve_cluster_spec_supports_raw_sweep_mode():
     assert cluster_spec["min_samples_values"] == [5, 10, 15]
     assert cluster_spec["optics_xi"] == 0.01
     assert cluster_spec["optics_xi_values"] == [0.01, 0.03, 0.05]
+    assert cluster_spec["effect_representations"] == ["raw"]
+    assert cluster_spec["distance_metrics"] == {"hdbscan": ["euclidean"], "optics": ["euclidean"]}
+    assert cluster_spec["optics_extraction_methods"] == ["xi"]
+    assert cluster_spec["optics_eps_quantiles"] == []
+    assert cluster_spec["n_jobs"] == 1
+    assert cluster_spec["quality_screen"]["max_noise_fraction"] == pytest.approx(0.60)
     assert cluster_spec["min_cluster_size"] == {}
     assert cluster_spec["min_samples"] == {}
 
 
+def test_resolve_cluster_spec_supports_screen_extensions():
+    cluster_spec = feature_effect_performance_regimes_utils.resolve_cluster_spec(
+        {
+            "groups": ["easy", "medium", "hard"],
+            "algorithms": ["hdbscan", "optics"],
+            "effect_representations": ["raw", "normalized"],
+            "evaluate_umap_latent_space": False,
+            "umap_selected_n_components": {"easy": 3, "medium": 3, "hard": 3},
+            "trustworthiness_neighbor_values": [5, 10, 15],
+            "cluster_umap_n_neighbors": 30,
+            "cluster_umap_min_dist": 0.0,
+            "viz_umap_n_neighbors": 15,
+            "viz_umap_min_dist": 0.1,
+            "random_state": 42,
+            "min_cluster_size_fractions": [0.003, 0.005, 0.01, 0.02],
+            "min_cluster_size_floor": 10,
+            "min_samples_values": [2, 5, 10, 20],
+            "optics_cluster_method": "xi",
+            "optics_extraction_methods": ["xi", "dbscan_eps"],
+            "optics_xi_values": [0.01, 0.02, 0.05],
+            "optics_eps_quantiles": [0.20, 0.50, 0.80],
+            "distance_metric": "euclidean",
+            "distance_metrics": {
+                "hdbscan": ["euclidean", "manhattan"],
+                "optics": ["euclidean", "cosine"],
+            },
+            "n_jobs": 4,
+            "max_noise_fraction": 0.55,
+            "max_largest_cluster_share": 0.75,
+            "optics_max_largest_cluster_share": 0.85,
+            "max_cluster_count": 12,
+            "boundary_cluster_size_margin": 1.25,
+        },
+        effect_cols=["effect__speed", "effect__heading", "effect__distance"],
+    )
+
+    assert cluster_spec["effect_representations"] == ["raw", "normalized"]
+    assert cluster_spec["distance_metrics"] == {
+        "hdbscan": ["euclidean", "manhattan"],
+        "optics": ["euclidean", "cosine"],
+    }
+    assert cluster_spec["optics_extraction_methods"] == ["xi", "dbscan_eps"]
+    assert cluster_spec["optics_eps_quantiles"] == [0.2, 0.5, 0.8]
+    assert cluster_spec["n_jobs"] == 4
+    assert cluster_spec["quality_screen"] == {
+        "max_noise_fraction": 0.55,
+        "max_largest_cluster_share": 0.75,
+        "optics_max_largest_cluster_share": 0.85,
+        "max_cluster_count": 12,
+        "boundary_cluster_size_margin": 1.25,
+    }
+
+
+def test_build_effect_cluster_space_matrix_normalizes_rows_and_preserves_zero_rows():
+    X_raw = np.array([[3.0, 4.0], [0.0, 0.0], [-5.0, 0.0]])
+
+    normalized = feature_effect_performance_regimes_utils.build_effect_cluster_space_matrix(
+        X_raw,
+        "normalized",
+    )
+
+    np.testing.assert_allclose(normalized[0], [0.6, 0.8])
+    np.testing.assert_allclose(normalized[1], [0.0, 0.0])
+    np.testing.assert_allclose(normalized[2], [-1.0, 0.0])
+    np.testing.assert_allclose(
+        feature_effect_performance_regimes_utils.build_effect_cluster_space_matrix(X_raw, "raw"),
+        X_raw,
+    )
+
+
 def test_resolve_cluster_spec_rejects_sweep_with_umap_clustering():
-    with pytest.raises(ValueError, match="raw feature-effect space only"):
+    with pytest.raises(ValueError, match="direct feature-effect spaces only"):
         feature_effect_performance_regimes_utils.resolve_cluster_spec(
             {
                 "groups": ["easy"],
@@ -1388,6 +1493,99 @@ def test_run_step2_clustering_expands_raw_sweep_candidates(monkeypatch):
     assert any("__xi-0p02" in col for col in cluster_scores_df["candidate_label_col"])
 
 
+def test_run_step2_clustering_expands_representations_metrics_and_reuses_optics_ordering(monkeypatch):
+    umap_call_log: list[dict[str, float]] = []
+    _patch_feature_effect_regime_dependencies(monkeypatch, umap_call_log)
+    optics_fit_calls: list[dict[str, object]] = []
+
+    def fake_fit_optics_ordering(X, *, min_samples, min_cluster_size, metric, n_jobs, optics_cls):
+        optics_fit_calls.append(
+            {
+                "shape": tuple(X.shape),
+                "min_samples": min_samples,
+                "min_cluster_size": min_cluster_size,
+                "metric": metric,
+                "n_jobs": n_jobs,
+            }
+        )
+        model = type("DummyFittedOPTICS", (), {})()
+        model.ordering_ = np.arange(len(X), dtype=int)
+        model.reachability_ = np.linspace(0.01, 1.0, len(X), dtype=float)
+        model.reachability_[0] = np.inf
+        model.predecessor_ = np.arange(len(X), dtype=int) - 1
+        model.core_distances_ = np.linspace(0.01, 1.0, len(X), dtype=float)
+        return model
+
+    monkeypatch.setattr(
+        feature_effect_performance_regimes_utils,
+        "_fit_optics_ordering",
+        fake_fit_optics_ordering,
+    )
+
+    n_rows = 100
+    analysis_df = pd.DataFrame(
+        {
+            "row_id": list(range(n_rows)),
+            "performance_group": ["easy"] * n_rows,
+            "effect__speed": np.linspace(0.1, 4.0, n_rows),
+            "effect__heading": np.linspace(1.0, 5.0, n_rows),
+            "effect__distance": np.linspace(2.0, 6.0, n_rows),
+        }
+    )
+    cluster_spec = feature_effect_performance_regimes_utils.resolve_cluster_spec(
+        {
+            "groups": ["easy"],
+            "algorithms": ["hdbscan", "optics"],
+            "effect_representations": ["raw", "normalized"],
+            "evaluate_umap_latent_space": False,
+            "umap_selected_n_components": {"easy": 2},
+            "trustworthiness_neighbor_values": [5, 10, 15],
+            "cluster_umap_n_neighbors": 30,
+            "cluster_umap_min_dist": 0.0,
+            "viz_umap_n_neighbors": 15,
+            "viz_umap_min_dist": 0.1,
+            "random_state": 42,
+            "min_cluster_size_fractions": [0.20],
+            "min_cluster_size_floor": 20,
+            "min_samples_values": [5],
+            "optics_cluster_method": "xi",
+            "optics_extraction_methods": ["xi", "dbscan_eps"],
+            "optics_xi_values": [0.02, 0.05],
+            "optics_eps_quantiles": [0.25, 0.75],
+            "distance_metric": "euclidean",
+            "distance_metrics": {
+                "hdbscan": ["euclidean", "manhattan"],
+                "optics": ["euclidean", "cosine"],
+            },
+            "n_jobs": 3,
+        },
+        effect_cols=["effect__speed", "effect__heading", "effect__distance"],
+    )
+
+    clustering_results = feature_effect_performance_regimes_utils.run_step2_clustering(
+        analysis_df,
+        cluster_spec=cluster_spec,
+        performance_group_col="performance_group",
+        row_id_col="row_id",
+    )
+
+    cluster_scores_df = clustering_results["cluster_scores_df"]
+    assert len(cluster_scores_df) == 20
+    assert len(optics_fit_calls) == 4
+    assert {call["metric"] for call in optics_fit_calls} == {"euclidean", "cosine"}
+    assert {call["n_jobs"] for call in optics_fit_calls} == {3}
+    assert cluster_scores_df["candidate_label_col"].is_unique
+    assert set(cluster_scores_df["cluster_space"]) == {"raw", "normalized"}
+    assert set(cluster_scores_df["distance_metric"]) == {"euclidean", "manhattan", "cosine"}
+    assert set(cluster_scores_df.loc[cluster_scores_df["algorithm"] == "optics", "optics_extraction_method"]) == {
+        "xi",
+        "dbscan_eps",
+    }
+    assert cluster_scores_df.loc[cluster_scores_df["optics_extraction_method"] == "dbscan_eps", "optics_eps"].notna().all()
+    assert any("__metric-manhattan" in col for col in cluster_scores_df["candidate_label_col"])
+    assert any("__eps-" in col for col in cluster_scores_df["candidate_label_col"])
+
+
 def test_cluster_quality_diagnostics_flags_problem_shapes():
     high_noise = feature_effect_performance_regimes_utils._cluster_size_diagnostics(
         np.array([0, 0, 0, -1, -1, -1, -1, -1, -1, -1]),
@@ -1423,6 +1621,47 @@ def test_cluster_quality_diagnostics_flags_problem_shapes():
     assert optics_single_cluster["optics_xi_no_stable_valley"]
     assert optics_single_cluster["optics_xi_status"] == "single_dominant_cluster"
     assert not high_noise["passes_conservative_quality_screen"]
+
+
+def test_cluster_quality_diagnostics_accepts_custom_screen_thresholds():
+    relaxed_high_noise = feature_effect_performance_regimes_utils._cluster_size_diagnostics(
+        np.array([0, 0, 0, -1, -1, -1, -1, -1, -1, -1]),
+        group_size=10,
+        min_cluster_size=3,
+        quality_screen={"max_noise_fraction": 0.80},
+    )
+    relaxed_optics_dominance = feature_effect_performance_regimes_utils._cluster_size_diagnostics(
+        np.array([0, 0, 0, 0, 0, 0, 0, 0, 1, 1]),
+        group_size=10,
+        min_cluster_size=1,
+        algorithm="optics",
+        quality_screen={
+            "max_largest_cluster_share": 0.70,
+            "optics_max_largest_cluster_share": 0.85,
+        },
+    )
+
+    assert not relaxed_high_noise["quality_flag_high_noise"]
+    assert not relaxed_optics_dominance["quality_flag_dominant_cluster"]
+
+
+def test_compute_dbcv_score_passes_requested_metric_alias():
+    seen_metrics: list[str] = []
+
+    def fake_validity_index(X: np.ndarray, labels: np.ndarray, *, metric: str = "euclidean") -> float:
+        seen_metrics.append(metric)
+        return 0.5
+
+    score, valid = feature_effect_performance_regimes_utils._compute_dbcv_score(
+        fake_validity_index,
+        np.array([[0.0], [1.0], [2.0], [3.0]]),
+        np.array([0, 0, 1, 1]),
+        metric="manhattan",
+    )
+
+    assert score == pytest.approx(0.5)
+    assert valid
+    assert seen_metrics == ["cityblock"]
 
 
 def test_select_best_group_run_prefers_quality_before_dbcv():
@@ -1557,6 +1796,55 @@ def test_resolve_feature_effect_regime_export_context_splits_on_non_cluster_inpu
     assert "target-ml_ade_log" in base_context["data_context_slug"]
 
 
+def test_build_feature_effect_regime_export_layout_caps_long_cluster_spec_dirnames(tmp_path):
+    cluster_spec = feature_effect_performance_regimes_utils.resolve_cluster_spec(
+        {
+            "groups": ["easy", "medium", "hard"],
+            "algorithms": ["hdbscan", "optics"],
+            "effect_representations": ["raw", "normalized"],
+            "evaluate_umap_latent_space": False,
+            "umap_selected_n_components": {"easy": 3, "medium": 3, "hard": 3},
+            "trustworthiness_neighbor_values": [5, 10, 15],
+            "cluster_umap_n_neighbors": 30,
+            "cluster_umap_min_dist": 0.0,
+            "viz_umap_n_neighbors": 15,
+            "viz_umap_min_dist": 0.1,
+            "random_state": 42,
+            "min_cluster_size_fractions": [0.002, 0.003, 0.005, 0.0075, 0.01, 0.015, 0.02, 0.03],
+            "min_cluster_size_floor": 10,
+            "min_samples_values": [2, 3, 5, 8, 10, 15, 20, 30],
+            "optics_cluster_method": "xi",
+            "optics_extraction_methods": ["xi", "dbscan_eps"],
+            "optics_xi_values": [0.005, 0.01, 0.02, 0.03, 0.05, 0.08],
+            "optics_eps_quantiles": [0.10, 0.20, 0.35, 0.50, 0.70, 0.90],
+            "distance_metric": "euclidean",
+            "distance_metrics": {
+                "hdbscan": ["euclidean", "manhattan"],
+                "optics": ["euclidean", "manhattan", "cosine"],
+            },
+        },
+        effect_cols=["effect__speed", "effect__heading", "effect__distance"],
+    )
+    export_context = feature_effect_performance_regimes_utils.resolve_feature_effect_regime_export_context(
+        model_id="xgboost",
+        run_name="run_a",
+        target_col="ml_ade_log",
+        eval_csv_name="eval_epoch_12.csv",
+        lower_is_better=True,
+        performance_group_col="performance_group",
+        results_root=tmp_path / "results",
+    )
+
+    layout = feature_effect_performance_regimes_utils.build_feature_effect_regime_export_layout(
+        export_context=export_context,
+        cluster_spec=cluster_spec,
+    )
+
+    assert len(layout["cluster_spec_dirname"]) <= feature_effect_performance_regimes_utils.CLUSTER_SPEC_DIRNAME_MAX_CHARS
+    assert layout["tables_dir"].is_dir()
+    assert layout["plots_dir"].is_dir()
+
+
 def test_build_feature_effect_regime_artifact_names_return_candidate_wide_export_targets():
     cluster_spec = _resolved_feature_effect_regime_cluster_spec(
         {
@@ -1681,6 +1969,9 @@ def test_build_cluster_feature_effect_profiles_include_noise_and_cluster_metadat
     assert pd.isna(profile_df.loc[profile_df["cluster_id"] == -1, "cluster_rank_by_size"].iloc[0])
     assert profile_df.loc[profile_df["cluster_id"] == 0, "effect__speed"].iloc[0] == pytest.approx(0.7)
     assert profile_df.loc[profile_df["cluster_id"] == -1, "is_noise"].iloc[0]
+    assert set(profile_df["distance_metric"]) == {"manhattan"}
+    assert set(profile_df["optics_extraction_method"]) == {""}
+    assert profile_df["optics_eps"].isna().all()
     assert "dominant_feature_name" not in profile_df.columns
 
 
@@ -1704,6 +1995,9 @@ def test_write_cluster_exports_generates_catalog_member_files_and_artifact_recor
     catalog_df = outputs["cluster_catalog_df"]
     assert catalog_df["cluster_id"].astype(int).tolist() == [0, 1, -1]
     assert catalog_df["cluster_label"].tolist() == ["cluster_0", "cluster_1", "noise"]
+    assert catalog_df["distance_metric"].tolist() == ["manhattan", "manhattan", "manhattan"]
+    assert catalog_df["optics_extraction_method"].tolist() == ["", "", ""]
+    assert catalog_df["optics_eps"].isna().all()
     assert catalog_df["unique_scene_step_count"].tolist() == [1, 2, 1]
     assert catalog_df["unique_scene_count"].tolist() == [1, 2, 1]
 
@@ -1735,6 +2029,8 @@ def test_write_cluster_exports_generates_catalog_member_files_and_artifact_recor
     assert artifact_types.count("cluster_catalog") == 1
     assert artifact_types.count("cluster_feature_effect_profiles") == 1
     assert artifact_types.count("cluster_members") == 3
+    member_artifacts = [artifact for artifact in outputs["artifact_records"] if artifact["artifact_type"] == "cluster_members"]
+    assert {artifact["distance_metric"] for artifact in member_artifacts} == {"manhattan"}
 
 
 def test_build_scene_step_key_frame_dedupes_scene_steps_and_falls_back_to_scene_id():

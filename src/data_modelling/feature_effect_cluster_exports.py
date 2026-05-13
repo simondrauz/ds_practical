@@ -184,18 +184,33 @@ def write_cluster_exports(
             "absolute_path": str(cluster_feature_effect_profiles_path.resolve()),
         }
     ]
+    performance_group_series = clustered_df[performance_group_col].astype(str)
+    group_frame_cache: dict[str, pd.DataFrame] = {}
+    label_series_cache: dict[tuple[str, str], pd.Series] = {}
 
     for profile_row in cluster_feature_effect_profiles_df.to_dict(orient="records"):
         performance_group = str(profile_row["performance_group"])
         algorithm = str(profile_row["algorithm"])
         cluster_space = str(profile_row["cluster_space"])
+        distance_metric = str(profile_row.get("distance_metric", "euclidean"))
+        optics_extraction_method = str(profile_row.get("optics_extraction_method", ""))
+        optics_eps = profile_row.get("optics_eps", pd.NA)
         candidate_label_col = str(profile_row["candidate_label_col"])
         cluster_id = int(profile_row["cluster_id"])
         cluster_label = str(profile_row["cluster_label"])
-        group_df = clustered_df.loc[clustered_df[performance_group_col].astype(str) == performance_group].copy()
-        member_df = group_df.loc[
-            pd.to_numeric(group_df[candidate_label_col], errors="coerce").astype("Int64") == cluster_id
-        ].copy()
+        if performance_group not in group_frame_cache:
+            group_frame_cache[performance_group] = clustered_df.loc[
+                performance_group_series == performance_group
+            ].copy()
+        group_df = group_frame_cache[performance_group]
+
+        label_cache_key = (performance_group, candidate_label_col)
+        if label_cache_key not in label_series_cache:
+            label_series_cache[label_cache_key] = pd.to_numeric(
+                group_df[candidate_label_col],
+                errors="coerce",
+            ).astype("Int64")
+        member_df = group_df.loc[label_series_cache[label_cache_key] == cluster_id]
         if member_df.empty:
             continue
 
@@ -221,6 +236,9 @@ def write_cluster_exports(
                 "performance_group": performance_group,
                 "algorithm": algorithm,
                 "cluster_space": cluster_space,
+                "distance_metric": distance_metric,
+                "optics_extraction_method": optics_extraction_method,
+                "optics_eps": optics_eps,
                 "candidate_label_col": candidate_label_col,
                 "cluster_id": cluster_id,
                 "cluster_label": cluster_label,
@@ -242,6 +260,9 @@ def write_cluster_exports(
                 "performance_group": performance_group,
                 "algorithm": algorithm,
                 "cluster_space": cluster_space,
+                "distance_metric": distance_metric,
+                "optics_extraction_method": optics_extraction_method,
+                "optics_eps": optics_eps,
                 "candidate_label_col": candidate_label_col,
                 "cluster_id": cluster_id,
                 "is_noise": bool(profile_row["is_noise"]),
@@ -255,6 +276,9 @@ def write_cluster_exports(
             "performance_group",
             "algorithm",
             "cluster_space",
+            "distance_metric",
+            "optics_extraction_method",
+            "optics_eps",
             "candidate_label_col",
             "cluster_id",
             "cluster_label",
@@ -273,12 +297,15 @@ def write_cluster_exports(
                 "performance_group",
                 "algorithm",
                 "cluster_space",
+                "distance_metric",
+                "optics_extraction_method",
+                "optics_eps",
                 "candidate_label_col",
                 "is_noise",
                 "cluster_rank_by_size",
                 "cluster_id",
             ],
-            ascending=[True, True, True, True, True, True, True],
+            ascending=[True, True, True, True, True, True, True, True, True, True],
             na_position="last",
         ).reset_index(drop=True)
     cluster_catalog_df.to_csv(cluster_catalog_path, index=False)
