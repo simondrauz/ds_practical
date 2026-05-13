@@ -1,0 +1,43 @@
+%--- Part 2: Analysis Pipeline (4 min) -----------------------------------------
+
+\section{Analysis Pipeline}
+
+%--- Slide 5 -------------------------------------------------------------------
+\begin{frame}{Two Analysis Paths}
+  % TODO: pipeline diagram (TikZ or figure)
+  \begin{columns}
+    \begin{column}{0.48\textwidth}
+      \textbf{Track 1 — Full Dataset}\\[0.4em]
+      Train Trajectron++ $\to$ per-trajectory ADE\\
+      $\to$ join trajectory + scene characteristics\\
+      $\to$ interpretable models $\to$ feature effects\\
+      $\to$ performance regime clustering\\
+      $\to$ cluster inspection
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Track 2 — Mini Dataset (Settings Sweep)}\\[0.4em]
+      Cartesian sweep over model settings\\
+      $\to$ combine runs\\
+      $\to$ interpretable models\\
+      $\to$ feature effects with settings as predictors\\
+      \hspace{1em}(trajectory/scene chars as controls)
+    \end{column}
+  \end{columns}
+  \vspace{0.5em}
+  \footnotesize Clustering + cluster inspection run only on the full-dataset path.
+\end{frame}
+
+%--- Slide 6 -------------------------------------------------------------------
+\begin{frame}{Trajectron++ Modification}
+  \begin{itemize}
+    \item Standard training: batch-averaged loss
+    \item Modification: write one row per trajectory
+          \texttt{(data\_idx, scene\_path, agent\_id, scene\_ts, ml\_ade,
+          ml\_fde, min\_ade\_5, nll\_mean, \ldots)}
+    \item \texttt{data\_idx}: stable trajdata identifier used to join
+          evaluation output with computed characteristics
+    \item Identity validation: reconstruction check ensures the join
+          corresponds to the exact same evaluation context (split, temporal
+          window, etc.)
+  \end{itemize}
+\end{frame}

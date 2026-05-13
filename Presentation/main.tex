@@ -1,0 +1,142 @@
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND THEMES
+%----------------------------------------------------------------------------------------
+
+\documentclass[aspectratio=169]{beamer}
+\mode<presentation> {
+	\usetheme{Boadilla}
+}
+\definecolor{lmugreen}{RGB}{0, 136, 58}
+\usecolortheme[named=lmugreen]{structure}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb}
+\usepackage{float}
+\usepackage{hyperref}
+\newcommand{\gray}{\rowcolor[gray]{.90}}
+\usepackage{verbatim}
+\usepackage{textpos}
+\usepackage[default]{sourcesanspro}
+\usepackage{cases}
+
+% Caption
+\usepackage{caption}
+\DeclareCaptionFont{tiny}{\tiny}
+\captionsetup{font=scriptsize,labelfont=scriptsize,justification=centering}
+
+% Automatic section outline slide
+\AtBeginSection[]{
+	\begin{frame}[noframenumbering, plain]
+	\frametitle{Outline}
+	\setcounter{tocdepth}{1}
+	\tableofcontents[currentsection]
+\end{frame}
+}
+
+% Remove navigation symbols
+\beamertemplatenavigationsymbolsempty
+
+% R listings
+\usepackage{listings}
+\lstset{
+language=R,
+basicstyle=\scriptsize\ttfamily,
+commentstyle=\ttfamily\color{gray},
+backgroundcolor=\color{white},
+showspaces=false,
+showstringspaces=false,
+showtabs=false,
+tabsize=2,
+captionpos=b,
+breaklines=false,
+breakatwhitespace=false,
+title=\lstname,
+escapeinside={},
+keywordstyle={},
+morekeywords={},
+belowskip = -1.2 \baselineskip,
+}
+
+%----------------------------------------------------------------------------------------
+%	TITLE PAGE
+%----------------------------------------------------------------------------------------
+
+\addtobeamertemplate{frametitle}{}{%
+	\begin{textblock*}{100mm}(0.88\textwidth,-0.5cm)
+		\includegraphics[height=1cm,width=2cm]{lmu_logo}
+\end{textblock*}}
+
+\title[Trajectron++ Analysis]{Understanding Trajectron++: \\
+A Interpretable Performance Analysis Pipeline}
+
+\author[Drauz \& Matrullo]{Simon Drauz and Zoe Matrullo}
+\institute[LMU]{LMU Munich}
+
+%----------------------------------------------------------------------------------------
+%	DOCUMENT
+%----------------------------------------------------------------------------------------
+
+\begin{document}
+
+%--- Slide 1: Title -------------------------------------------------------------
+{
+\usebackgroundtemplate{\includegraphics[width=\paperwidth]{lmu-background.pdf}}
+\begin{frame}
+\begin{columns}
+	\begin{column}{0.4\textwidth}
+		\vspace*{3cm}
+		\textbf{\textcolor{white}{\Large 
+		\\ Understanding Trajectron++:\\
+A Per-Trajectory Performance Analysis \\}}
+		\vspace{1cm}
+		\textcolor{white}{\footnotesize Simon Drauz and Zoe Matrullo \\
+			\today}
+	\end{column}
+	\begin{column}{0.49\textwidth}
+		\vspace*{2cm}
+		\begin{center}
+			\includegraphics[width=1\textwidth]{showcase_figure.png}
+		\end{center}
+	\end{column}
+\end{columns}
+\end{frame}
+}
+
+%--- Slide 2: Outline -----------------------------------------------------------
+\input{slides/part0_outline}
+
+%--- Part 1: Motivation ---------------------------------------------------------
+\input{slides/part1_motivation}
+
+%--- Part 2: Analysis Pipeline --------------------------------------------------
+\input{slides/part2_pipeline}
+
+%--- Part 3: Data Preparation ---------------------------------------------------
+\input{slides/part3_data_prep}
+
+%--- Part 4: Interpretable Modeling ---------------------------------------------
+\input{slides/part4_modeling}
+
+%--- Part 5a: Feature Effects & Importance -------------------------------------
+\input{slides/part5a_feature_effects}
+
+%--- Part 5b: Performance Regimes ----------------------------------------------
+\input{slides/part5b_regimes}
+
+%--- Part 5c: Model Settings Analysis ------------------------------------------
+\input{slides/part5c_settings}
+
+%--- Part 6: Conclusions --------------------------------------------------------
+\input{slides/part6_conclusions}
+
+%--- References -----------------------------------------------------------------
+% Uncomment once \cite{} commands are added to the slides
+%\begin{frame}[allowframebreaks]
+%	\frametitle{References}
+%	\bibliographystyle{plain}
+%	\bibliography{literature.bib}
+%\end{frame}
+
+\end{document}

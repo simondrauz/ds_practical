@@ -1,0 +1,31 @@
+%--- Part 5c: Model Settings Analysis (4 min) ----------------------------------
+
+\section{Model Settings Analysis}
+
+%--- Slide 21 ------------------------------------------------------------------
+\begin{frame}{Settings Sweep Setup}
+  \begin{itemize}
+    \item Dataset: nuScenes mini (full dataset too expensive for repeated runs)
+    \item Cartesian sweep over:
+    \begin{itemize}
+      \item \texttt{history\_sec}
+      \item \texttt{prediction\_sec}
+      \item \texttt{attention\_radius\_m}
+    \end{itemize}
+    \item Pooled model: model setting variables + trajectory/scene features
+          as control variables
+    \item Feature normalization: setting-agnostic versions to avoid
+          mechanical confounding
+          (e.g.\ \texttt{mean\_path\_length\_per\_second} instead of
+          \texttt{path\_length})
+  \end{itemize}
+\end{frame}
+
+%--- Slide 22 ------------------------------------------------------------------
+\begin{frame}{Effect of Model Settings}
+  % TODO: feature effect plots for history_sec, prediction_sec,
+  %       attention_radius_m (GAM smooth / ALE)
+  \begin{itemize}
+    \item \ldots
+  \end{itemize}
+\end{frame}
