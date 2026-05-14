@@ -60,4 +60,20 @@ docs/current_pipeline_overview*.pdf
 !results/trajectory_prediction/trajectory_metrics_joined/full_trainval_12ep_1seed/
 !results/trajectory_prediction/trajectory_metrics_joined/full_trainval_12ep_1seed/eval_epoch_12.csv
 
+# Selected plot artifacts for committed pipeline result snapshots
+!results/interpretable_model/
+!results/interpretable_model/**/
+results/interpretable_model/**/*
+!results/interpretable_model/**/
+!results/interpretable_model/**/full_trainval_12ep_1seed/**/plots/
+!results/interpretable_model/**/full_trainval_12ep_1seed/**/plots/**
+!results/interpretable_model/**/full_trainval_12ep_1seed_MI_correct/**/plots/
+!results/interpretable_model/**/full_trainval_12ep_1seed_MI_correct/**/plots/**
+!results/interpretable_model/**/full_trainval_12ep_1seed_VIF_only/**/plots/
+!results/interpretable_model/**/full_trainval_12ep_1seed_VIF_only/**/plots/**
+!results/interpretable_model/**/full_trainval_12ep_1seed_vif_only_no_collision/**/plots/
+!results/interpretable_model/**/full_trainval_12ep_1seed_vif_only_no_collision/**/plots/**
+!results/interpretable_model/**/sweep_large_30ep_1seed/**/plots/
+!results/interpretable_model/**/sweep_large_30ep_1seed/**/plots/**
+
 # Data (heavy files tracked separately in data/.gitignore)
