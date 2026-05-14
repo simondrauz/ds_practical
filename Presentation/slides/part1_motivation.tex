@@ -2,30 +2,98 @@
 
 \section{Motivation}
 
-%--- Slide 3 -------------------------------------------------------------------
-\begin{frame}{Trajectory Prediction in Autonomous Driving}
-  % TODO: brief intro to trajectory prediction task
-  % TODO: Trajectron++ architecture overview / key ideas
-  \begin{itemize}
-    \item \ldots
-  \end{itemize}
+%--- Slide: Trajectory Prediction for Autonomous Driving -----------------------
+\begin{frame}{Trajectory Prediction for Autonomous Driving}
+  \begin{columns}
+    \begin{column}{0.55\textwidth}
+      \textbf{Task:} forecast the future $(x, y)$ positions of surrounding
+      agents---pedestrians, cyclists, vehicles---from their observed past
+      movements.
+      \vspace{0.5em}
+      \begin{itemize}[<+->]
+        \item Essential for \emph{safe path planning} and collision avoidance
+              in autonomous vehicles
+        \item Inherently \emph{multimodal}: many plausible futures exist
+              (a pedestrian may turn left or right)
+        \item Agents \emph{interact} with each other and react to the
+              scene layout
+        \item Scene context matters: open squares behave very differently
+              from narrow corridors
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \vspace{0.5em}
+      \begin{center}
+        % TODO: replace with a trajectory prediction figure (e.g. nuScenes scene
+        % with predicted trajectories overlaid)
+        \textit{[figure placeholder]}
+      \end{center}
+    \end{column}
+  \end{columns}
 \end{frame}
 
-%--- Slide 4 -------------------------------------------------------------------
+%--- Slide: Federated Learning for Trajectory Prediction ----------------------
+\begin{frame}{Federated Learning for Trajectory Prediction}
+  \begin{columns}
+    \begin{column}{0.54\textwidth}
+      \textbf{What is Federated Learning?}\\[0.3em]
+      Train a shared model across many clients (cameras, cities, operators)
+      \emph{without moving raw data}---clients share model updates, not video.
+      \vspace{0.5em}
+      \begin{itemize}[<+->]
+        \item Video data is privacy-sensitive and cannot be centralized
+        \item Trajectory data is naturally distributed across many sites
+        \item Each site has \emph{unique motion patterns} (non-IID):
+              a single global model may not fit all environments
+        \item \textbf{Personalization:} share a common encoder, keep
+              local prediction heads per site
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.43\textwidth}
+      \onslide<2->{
+      \textbf{Pipeline:}\\[0.4em]
+      \small
+      \begin{tabular}{l}
+        Video stream \\
+        $\downarrow$ Detection \& Tracking \\
+        $\downarrow$ Trajectories $(x, y, t)$ \\
+        $\downarrow$ Local model training \\
+        $\downarrow$ Server aggregation \\
+        $\downarrow$ Personalised prediction
+      \end{tabular}
+      }
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Slide: Research Questions -------------------------------------------------
 \begin{frame}{The Problem with Aggregate Metrics}
-  \begin{itemize}
-    \item A single average ADE hides large variation across trajectories
-    \item Some trajectories inherently hard, others trivially easy — but why?
-    \item No understanding of which trajectory or scene characteristics drive
-          per-trajectory prediction error
-  \end{itemize}
-  \vspace{0.5em}
-  \textbf{Three Research Questions:}
-  \begin{enumerate}
-    \item Which characteristics affect model performance?
-    \item Do distinct \emph{performance regimes} (recurring failure/success
-          patterns) exist?
-    \item How do model settings (history window, prediction horizon, attention
-          radius) affect performance?
-  \end{enumerate}
+  \begin{columns}
+    \begin{column}{0.52\textwidth}
+      Before scaling to FL, we need to understand model behaviour
+      on a single dataset.
+      \vspace{0.4em}
+      \begin{itemize}[<+->]
+        \item A single average ADE/FDE hides large variation across trajectories
+        \item Some trajectories are inherently hard, others trivially
+              easy---but \emph{why?}
+        \item No understanding of which trajectory or scene characteristics
+              drive per-trajectory prediction error
+      \end{itemize}
+      \vspace{0.5em}
+      \onslide<4->{$\Rightarrow$ Aggregate metrics cannot guide personalisation
+      decisions in FL.}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \onslide<5->{\textbf{Three Research Questions:}}
+      \begin{enumerate}
+        \item<5-> Which trajectory and scene characteristics affect model
+              performance?
+        \item<6-> Do distinct \emph{performance regimes} (recurring failure /
+              success patterns) exist?
+        \item<7-> How do model settings (history window, prediction horizon,
+              attention radius) affect performance?
+      \end{enumerate}
+    \end{column}
+  \end{columns}
 \end{frame}
