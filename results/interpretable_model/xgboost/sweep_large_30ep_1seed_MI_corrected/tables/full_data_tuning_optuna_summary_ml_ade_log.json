@@ -1,0 +1,25 @@
+{
+  "model_id": "xgboost",
+  "run_name": "sweep_large_30ep_1seed_MI_corrected",
+  "target_col": "ml_ade_log",
+  "tuning_metric_name": "rmse",
+  "best_params": {
+    "learning_rate": 0.04102051822037473,
+    "max_depth": 12,
+    "min_child_weight": 22,
+    "subsample": 0.8070091419786368,
+    "colsample_bytree": 0.8895164161417118,
+    "gamma": 0.007674141863847128,
+    "reg_alpha": 0.00010510695705466914,
+    "reg_lambda": 3.474456698082926
+  },
+  "best_iteration": 3997,
+  "best_cv_score": 0.08252570184053763,
+  "tuning_config": {
+    "nfold": 3,
+    "n_trials": 40,
+    "max_boost_rounds": 4000,
+    "early_stopping_rounds": 100,
+    "random_state": 42
+  }
+}

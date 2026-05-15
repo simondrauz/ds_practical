@@ -1,0 +1,74 @@
+{
+  "status": "completed",
+  "updated_at": "2026-05-15T06:40:05",
+  "run_name": "full_trainval_12ep_1seed_MI_correct",
+  "eval_csv_name": "eval_epoch_12.csv",
+  "target_col_override": null,
+  "models": [
+    "xgboost",
+    "gam"
+  ],
+  "cluster_sweep_mode": "promising_moderate",
+  "inference_mode": "missing",
+  "kernel_name": "python3",
+  "jobs": [
+    {
+      "model_id": "xgboost",
+      "run_name": "full_trainval_12ep_1seed_MI_correct",
+      "target_col": "ml_ade_log",
+      "feature_effects_path": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/results/interpretable_model/xgboost/full_trainval_12ep_1seed_MI_correct/tables/feature_effects_ml_ade_log.csv",
+      "feature_effect_importance_path": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/results/interpretable_model/xgboost/full_trainval_12ep_1seed_MI_correct/tables/feature_effect_importance_ml_ade_log.csv",
+      "steps": [
+        {
+          "label": "model_inference_analysis[xgboost]",
+          "source_notebook": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/src/data_modelling/model_inference_analysis.ipynb",
+          "executed_notebook": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/results/interpretable_model/notebook_runs/overnight_feature_effect_regimes/20260515_010539__full_trainval_12ep_1seed_MI_correct__promising_moderate/xgboost__full_trainval_12ep_1seed_MI_correct/01_model_inference_analysis__xgboost.ipynb",
+          "status": "completed",
+          "started_at": "2026-05-15T01:05:39",
+          "completed_at": "2026-05-15T01:37:22",
+          "duration_seconds": 1903.124,
+          "error": null
+        },
+        {
+          "label": "feature_effect_performance_regimes[xgboost:promising_moderate]",
+          "source_notebook": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/src/data_modelling/feature_effect_performance_regimes.ipynb",
+          "executed_notebook": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/results/interpretable_model/notebook_runs/overnight_feature_effect_regimes/20260515_010539__full_trainval_12ep_1seed_MI_correct__promising_moderate/xgboost__full_trainval_12ep_1seed_MI_correct/02_feature_effect_performance_regimes__xgboost__promising_moderate.ipynb",
+          "status": "completed",
+          "started_at": "2026-05-15T01:37:22",
+          "completed_at": "2026-05-15T04:24:19",
+          "duration_seconds": 10016.311,
+          "error": null
+        }
+      ]
+    },
+    {
+      "model_id": "gam",
+      "run_name": "full_trainval_12ep_1seed_MI_correct",
+      "target_col": "ml_ade_log",
+      "feature_effects_path": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/tables/feature_effects_ml_ade_log.csv",
+      "feature_effect_importance_path": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/tables/feature_effect_importance_ml_ade_log.csv",
+      "steps": [
+        {
+          "label": "model_inference_analysis[gam]",
+          "source_notebook": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/src/data_modelling/model_inference_analysis.ipynb",
+          "executed_notebook": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/results/interpretable_model/notebook_runs/overnight_feature_effect_regimes/20260515_010539__full_trainval_12ep_1seed_MI_correct__promising_moderate/gam__full_trainval_12ep_1seed_MI_correct/01_model_inference_analysis__gam.ipynb",
+          "status": "completed",
+          "started_at": "2026-05-15T04:24:19",
+          "completed_at": "2026-05-15T04:24:24",
+          "duration_seconds": 5.211,
+          "error": null
+        },
+        {
+          "label": "feature_effect_performance_regimes[gam:promising_moderate]",
+          "source_notebook": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/src/data_modelling/feature_effect_performance_regimes.ipynb",
+          "executed_notebook": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/results/interpretable_model/notebook_runs/overnight_feature_effect_regimes/20260515_010539__full_trainval_12ep_1seed_MI_correct__promising_moderate/gam__full_trainval_12ep_1seed_MI_correct/02_feature_effect_performance_regimes__gam__promising_moderate.ipynb",
+          "status": "completed",
+          "started_at": "2026-05-15T04:24:24",
+          "completed_at": "2026-05-15T06:40:05",
+          "duration_seconds": 8141.335,
+          "error": null
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "run_name": "sweep_large_30ep_1seed_MI_corrected",
+  "raw_run_name": "sweep_large_30ep_1seed",
+  "exported_run_name": "sweep_large_30ep_1seed_MI_corrected",
+  "eval_csv_name": "eval_epoch_30_combined.csv",
+  "target_col": "ml_ade",
+  "transformed_target_col": "ml_ade_log",
+  "include_model_settings_as_features": true,
+  "apply_mi_filter": true,
+  "exclude_has_collision": false,
+  "model_setting_cols": [
+    "attention_radius_m",
+    "history_sec",
+    "prediction_sec"
+  ],
+  "model_feature_cols": [
+    "max_speed",
+    "std_speed",
+    "heading_change_per_sec",
+    "min_neighbor_distance",
+    "mean_acceleration",
+    "attention_radius_m",
+    "history_sec",
+    "prediction_sec"
+  ],
+  "model_setting_metadata_cols": []
+}

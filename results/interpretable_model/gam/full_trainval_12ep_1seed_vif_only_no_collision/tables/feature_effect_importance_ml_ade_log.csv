@@ -1,0 +1,7 @@
+feature,global_rank,p_value,neg_log10_p_value,significant_0_05,importance_metric,importance_value,importance_ascending
+heading_change_per_sec,1,1.1102230246251565e-16,15.954589770191003,True,p_value,1.1102230246251565e-16,True
+mean_acceleration,2,1.1102230246251565e-16,15.954589770191003,True,p_value,1.1102230246251565e-16,True
+min_neighbor_distance,3,1.1102230246251565e-16,15.954589770191003,True,p_value,1.1102230246251565e-16,True
+std_speed,4,1.1102230246251565e-16,15.954589770191003,True,p_value,1.1102230246251565e-16,True
+scene_num_VEHICLE,5,6.661338147750939e-16,15.176438519807359,True,p_value,6.661338147750939e-16,True
+scene_density_VEHICLE,6,0.7962971049561027,0.09892486320615126,False,p_value,0.7962971049561027,True

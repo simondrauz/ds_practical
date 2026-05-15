@@ -36,12 +36,46 @@ results/trajectory_prediction/experiment_sets/
 results/trajectory_prediction/seeded_experiments/
 results/trajectory_prediction/overnight_runs/
 results/_archive/
+results_old/
+results_cleanup_manifests/
 results/evaluation/metrics/*.csv
 results/evaluation/plots/characterization/*.png
 # Results artifacts
 results/**/plots/
 results/**/*.csv
 results/interpretable_model/
+
+# Curated result artifacts for collaborators. Keep broad result ignores above,
+# then explicitly expose compact summaries, plots, notebook exports, and
+# prepared data for the maintained runs.
+!results/interpretable_model/
+!results/interpretable_model/**/
+results/interpretable_model/**/*.csv
+results/interpretable_model/**/*.json
+results/interpretable_model/**/*.ipynb
+results/interpretable_model/**/*.png
+results/interpretable_model/**/*.pkl
+!results/interpretable_model/**/plots/
+!results/interpretable_model/**/plots/*.png
+!results/interpretable_model/prepared_data/**/prepared_data_ml_ade.csv
+!results/interpretable_model/prepared_data/**/prepared_data_ml_ade.metadata.json
+!results/interpretable_model/notebook_runs/**/*.ipynb
+!results/interpretable_model/notebook_runs/**/*.json
+!results/interpretable_model/**/tables/run_manifest_ml_ade_log.json
+!results/interpretable_model/**/tables/full_data_tuning_optuna_summary_ml_ade_log.json
+!results/interpretable_model/**/tables/nested_cv_optuna_ml_ade_log.csv
+!results/interpretable_model/**/tables/nested_cv_optuna_summary_ml_ade_log.csv
+!results/interpretable_model/**/tables/metrics_oof_ml_ade_log.csv
+!results/interpretable_model/**/tables/nested_variant_comparison_ml_ade_log.csv
+!results/interpretable_model/**/tables/feature_effects_ml_ade_log.csv
+!results/interpretable_model/**/tables/feature_effect_importance_ml_ade_log.csv
+!results/interpretable_model/**/tables/performance_group_summary.csv
+!results/interpretable_model/**/tables/feature_effect_global_ranking.csv
+!results/interpretable_model/**/tables/cluster_catalog.csv
+!results/interpretable_model/**/tables/cluster_feature_effect_profiles.csv
+!results/interpretable_model/**/tables/cluster_scores.csv
+!results/interpretable_model/**/tables/umap_trustworthiness.csv
+!results/interpretable_model/feature_effect_performance_regimes/**/manifest.json
 docs/current_pipeline_overview*.svg
 docs/current_pipeline_overview*.png
 docs/current_pipeline_overview*.pdf

@@ -1,0 +1,64 @@
+{
+  "model_id": "gam",
+  "run_name": "full_trainval_12ep_1seed_MI_correct",
+  "target_col": "ml_ade_log",
+  "feature_cols": [
+    "std_speed",
+    "max_speed",
+    "heading_change_per_sec",
+    "mean_acceleration"
+  ],
+  "artifact_root": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct",
+  "plots_dir": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/plots",
+  "tables_dir": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/tables",
+  "nested_resampling": {
+    "nested_cv_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/tables/nested_cv_optuna_ml_ade_log.csv",
+    "nested_cv_summary_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/tables/nested_cv_optuna_summary_ml_ade_log.csv",
+    "oof_predictions_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/tables/oof_predictions_ml_ade_log.csv",
+    "oof_metrics_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/tables/metrics_oof_ml_ade_log.csv",
+    "model_data_with_oof_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/tables/model_data_with_oof_ml_ade_log.csv"
+  },
+  "final_model": {
+    "model_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/gam_model_ml_ade_log.pkl",
+    "scaler_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/gam_scaler_ml_ade_log.pkl",
+    "full_data_tuning_trials_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/tables/full_data_tuning_optuna_trials_ml_ade_log.csv",
+    "full_data_tuning_summary_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/tables/full_data_tuning_optuna_summary_ml_ade_log.json",
+    "nested_variant_comparison_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/tables/nested_variant_comparison_ml_ade_log.csv",
+    "nested_variant_comparison_plot_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_MI_correct/plots/nested_variant_comparison_ml_ade_log.png",
+    "selected_variant_model_id": "gam-linear-log",
+    "selected_variant_manifest_path": "../../results/interpretable_model/gam-linear-log/full_trainval_12ep_1seed_MI_correct/tables/run_manifest_ml_ade_log.json",
+    "selected_variant_name": "LinearGAM (log)",
+    "selected_variant_model_kind": "linear",
+    "selected_variant_target_mode": "log",
+    "selected_variant_nested_summary": {
+      "outer_rmse_mean": 0.4449488374927915,
+      "outer_rmse_std": 0.01729896136780577,
+      "outer_mae_mean": 0.24953230977227,
+      "outer_mae_std": 0.004019978913169089,
+      "outer_r2_mean": 0.49806219171419447,
+      "outer_r2_std": 0.03473570362105811
+    },
+    "selected_best_params": {
+      "n_splines": 50,
+      "spline_order": 4,
+      "lam": 39.10981714215716
+    },
+    "selected_full_data_best_cv_rmse": 0.430860437925172,
+    "exported_model_name": "LinearGAM (log)",
+    "exported_model_kind": "linear",
+    "exported_model_target_mode": "log",
+    "exported_model_selection_metric_name": "mean_outer_rmse",
+    "exported_model_selection_metric_value": 0.4449488374927915
+  },
+  "analysis": {
+    "poor_well_quantile": 0.2
+  },
+  "raw_target_col": "ml_ade",
+  "log_target_col": "ml_ade_log",
+  "winning_variant_model_id": "gam-linear-log",
+  "winning_variant_name": "LinearGAM (log)",
+  "winning_variant_model_kind": "linear",
+  "winning_variant_target_mode": "log",
+  "selection_metric_name": "mean_outer_rmse",
+  "selection_metric_value": 0.4449488374927915
+}

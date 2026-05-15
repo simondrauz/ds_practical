@@ -1,0 +1,112 @@
+{
+  "model_id": "gam",
+  "run_name": "full_trainval_12ep_1seed_vif_only_no_collision",
+  "target_col": "ml_ade_log",
+  "raw_target_col": "ml_ade",
+  "log_target_col": "ml_ade_log",
+  "selection_metric_name": "mean_outer_rmse",
+  "selection_metric_value": 0.43988182212993715,
+  "variant_results": [
+    {
+      "variant_model_id": "gam-linear-log",
+      "variant_name": "LinearGAM (log)",
+      "model_kind": "linear",
+      "target_mode": "log",
+      "status": "completed",
+      "selection_metric_name": "mean_outer_rmse",
+      "selection_metric_value": 0.44400160014330387,
+      "outer_r2_mean": 0.5056950209352605,
+      "outer_r2_std": 0.006844757599674358,
+      "outer_mae_mean": 0.25541436270417583,
+      "outer_mae_std": 0.002565972241226108,
+      "outer_rmse_mean": 0.44400160014330387,
+      "outer_rmse_std": 0.008712360485104494,
+      "nested_cv_path": "../../results/interpretable_model/gam-linear-log/full_trainval_12ep_1seed_vif_only_no_collision/tables/nested_cv_optuna_ml_ade_log.csv",
+      "nested_cv_summary_path": "../../results/interpretable_model/gam-linear-log/full_trainval_12ep_1seed_vif_only_no_collision/tables/nested_cv_optuna_summary_ml_ade_log.csv",
+      "oof_predictions_path": "../../results/interpretable_model/gam-linear-log/full_trainval_12ep_1seed_vif_only_no_collision/tables/oof_predictions_ml_ade_log.csv",
+      "oof_metrics_path": "../../results/interpretable_model/gam-linear-log/full_trainval_12ep_1seed_vif_only_no_collision/tables/metrics_oof_ml_ade_log.csv",
+      "model_data_with_oof_path": "../../results/interpretable_model/gam-linear-log/full_trainval_12ep_1seed_vif_only_no_collision/tables/model_data_with_oof_ml_ade_log.csv",
+      "manifest_path": "../../results/interpretable_model/gam-linear-log/full_trainval_12ep_1seed_vif_only_no_collision/tables/run_manifest_ml_ade_log.json"
+    },
+    {
+      "variant_model_id": "gam-linear",
+      "variant_name": "LinearGAM (no log)",
+      "model_kind": "linear",
+      "target_mode": "raw",
+      "status": "completed",
+      "selection_metric_name": "mean_outer_rmse",
+      "selection_metric_value": 0.43988182212993715,
+      "outer_r2_mean": 0.5148599804403493,
+      "outer_r2_std": 0.009816995943479382,
+      "outer_mae_mean": 0.2683506505881928,
+      "outer_mae_std": 0.0017631365759933557,
+      "outer_rmse_mean": 0.43988182212993715,
+      "outer_rmse_std": 0.010785743274909112,
+      "nested_cv_path": "../../results/interpretable_model/gam-linear/full_trainval_12ep_1seed_vif_only_no_collision/tables/nested_cv_optuna_ml_ade_log.csv",
+      "nested_cv_summary_path": "../../results/interpretable_model/gam-linear/full_trainval_12ep_1seed_vif_only_no_collision/tables/nested_cv_optuna_summary_ml_ade_log.csv",
+      "oof_predictions_path": "../../results/interpretable_model/gam-linear/full_trainval_12ep_1seed_vif_only_no_collision/tables/oof_predictions_ml_ade_log.csv",
+      "oof_metrics_path": "../../results/interpretable_model/gam-linear/full_trainval_12ep_1seed_vif_only_no_collision/tables/metrics_oof_ml_ade_log.csv",
+      "model_data_with_oof_path": "../../results/interpretable_model/gam-linear/full_trainval_12ep_1seed_vif_only_no_collision/tables/model_data_with_oof_ml_ade_log.csv",
+      "manifest_path": "../../results/interpretable_model/gam-linear/full_trainval_12ep_1seed_vif_only_no_collision/tables/run_manifest_ml_ade_log.json"
+    },
+    {
+      "variant_model_id": "gam-gamma",
+      "variant_name": "GammaGAM",
+      "model_kind": "gamma",
+      "target_mode": "raw",
+      "status": "completed",
+      "selection_metric_name": "mean_outer_rmse",
+      "selection_metric_value": 0.47491367990308264,
+      "outer_r2_mean": 0.4344219847107699,
+      "outer_r2_std": 0.018942848011833834,
+      "outer_mae_mean": 0.2770448433872603,
+      "outer_mae_std": 0.004003460057377353,
+      "outer_rmse_mean": 0.47491367990308264,
+      "outer_rmse_std": 0.012828305437813678,
+      "nested_cv_path": "../../results/interpretable_model/gam-gamma/full_trainval_12ep_1seed_vif_only_no_collision/tables/nested_cv_optuna_ml_ade_log.csv",
+      "nested_cv_summary_path": "../../results/interpretable_model/gam-gamma/full_trainval_12ep_1seed_vif_only_no_collision/tables/nested_cv_optuna_summary_ml_ade_log.csv",
+      "oof_predictions_path": "../../results/interpretable_model/gam-gamma/full_trainval_12ep_1seed_vif_only_no_collision/tables/oof_predictions_ml_ade_log.csv",
+      "oof_metrics_path": "../../results/interpretable_model/gam-gamma/full_trainval_12ep_1seed_vif_only_no_collision/tables/metrics_oof_ml_ade_log.csv",
+      "model_data_with_oof_path": "../../results/interpretable_model/gam-gamma/full_trainval_12ep_1seed_vif_only_no_collision/tables/model_data_with_oof_ml_ade_log.csv",
+      "manifest_path": "../../results/interpretable_model/gam-gamma/full_trainval_12ep_1seed_vif_only_no_collision/tables/run_manifest_ml_ade_log.json"
+    }
+  ],
+  "nested_variant_comparison_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/tables/nested_variant_comparison_ml_ade_log.csv",
+  "nested_variant_comparison_plot_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/plots/nested_variant_comparison_ml_ade_log.png",
+  "selected_variant_model_id": "gam-linear",
+  "selected_variant_manifest_path": "../../results/interpretable_model/gam-linear/full_trainval_12ep_1seed_vif_only_no_collision/tables/run_manifest_ml_ade_log.json",
+  "selected_variant_name": "LinearGAM (no log)",
+  "selected_variant_model_kind": "linear",
+  "selected_variant_target_mode": "raw",
+  "selected_variant_nested_summary": {
+    "outer_rmse_mean": 0.43988182212993715,
+    "outer_rmse_std": 0.010785743274909112,
+    "outer_mae_mean": 0.2683506505881928,
+    "outer_mae_std": 0.0017631365759933557,
+    "outer_r2_mean": 0.5148599804403493,
+    "outer_r2_std": 0.009816995943479382
+  },
+  "selected_best_params": {
+    "n_splines": 50,
+    "spline_order": 4,
+    "lam": 39.10981714215716
+  },
+  "full_data_best_cv_rmse": 0.43940399188767665,
+  "tuning_config": {
+    "nfold": 3,
+    "n_trials": 15,
+    "n_splines_range": [
+      10,
+      50
+    ],
+    "spline_order_range": [
+      3,
+      4
+    ],
+    "lam_range": [
+      0.001,
+      1000.0
+    ],
+    "random_state": 42
+  }
+}

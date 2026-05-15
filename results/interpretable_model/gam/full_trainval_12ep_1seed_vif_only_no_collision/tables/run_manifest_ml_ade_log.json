@@ -1,0 +1,66 @@
+{
+  "model_id": "gam",
+  "run_name": "full_trainval_12ep_1seed_vif_only_no_collision",
+  "target_col": "ml_ade_log",
+  "feature_cols": [
+    "std_speed",
+    "mean_acceleration",
+    "min_neighbor_distance",
+    "heading_change_per_sec",
+    "scene_num_VEHICLE",
+    "scene_density_VEHICLE"
+  ],
+  "artifact_root": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision",
+  "plots_dir": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/plots",
+  "tables_dir": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/tables",
+  "nested_resampling": {
+    "nested_cv_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/tables/nested_cv_optuna_ml_ade_log.csv",
+    "nested_cv_summary_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/tables/nested_cv_optuna_summary_ml_ade_log.csv",
+    "oof_predictions_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/tables/oof_predictions_ml_ade_log.csv",
+    "oof_metrics_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/tables/metrics_oof_ml_ade_log.csv",
+    "model_data_with_oof_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/tables/model_data_with_oof_ml_ade_log.csv"
+  },
+  "final_model": {
+    "model_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/gam_model_ml_ade_log.pkl",
+    "scaler_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/gam_scaler_ml_ade_log.pkl",
+    "full_data_tuning_trials_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/tables/full_data_tuning_optuna_trials_ml_ade_log.csv",
+    "full_data_tuning_summary_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/tables/full_data_tuning_optuna_summary_ml_ade_log.json",
+    "nested_variant_comparison_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/tables/nested_variant_comparison_ml_ade_log.csv",
+    "nested_variant_comparison_plot_path": "../../results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/plots/nested_variant_comparison_ml_ade_log.png",
+    "selected_variant_model_id": "gam-linear",
+    "selected_variant_manifest_path": "../../results/interpretable_model/gam-linear/full_trainval_12ep_1seed_vif_only_no_collision/tables/run_manifest_ml_ade_log.json",
+    "selected_variant_name": "LinearGAM (no log)",
+    "selected_variant_model_kind": "linear",
+    "selected_variant_target_mode": "raw",
+    "selected_variant_nested_summary": {
+      "outer_rmse_mean": 0.43988182212993715,
+      "outer_rmse_std": 0.010785743274909112,
+      "outer_mae_mean": 0.2683506505881928,
+      "outer_mae_std": 0.0017631365759933557,
+      "outer_r2_mean": 0.5148599804403493,
+      "outer_r2_std": 0.009816995943479382
+    },
+    "selected_best_params": {
+      "n_splines": 50,
+      "spline_order": 4,
+      "lam": 39.10981714215716
+    },
+    "selected_full_data_best_cv_rmse": 0.43940399188767665,
+    "exported_model_name": "LinearGAM (no log)",
+    "exported_model_kind": "linear",
+    "exported_model_target_mode": "raw",
+    "exported_model_selection_metric_name": "mean_outer_rmse",
+    "exported_model_selection_metric_value": 0.43988182212993715
+  },
+  "analysis": {
+    "poor_well_quantile": 0.2
+  },
+  "raw_target_col": "ml_ade",
+  "log_target_col": "ml_ade_log",
+  "winning_variant_model_id": "gam-linear",
+  "winning_variant_name": "LinearGAM (no log)",
+  "winning_variant_model_kind": "linear",
+  "winning_variant_target_mode": "raw",
+  "selection_metric_name": "mean_outer_rmse",
+  "selection_metric_value": 0.43988182212993715
+}
