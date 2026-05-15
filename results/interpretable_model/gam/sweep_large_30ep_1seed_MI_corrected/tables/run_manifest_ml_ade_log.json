@@ -1,0 +1,68 @@
+{
+  "model_id": "gam",
+  "run_name": "sweep_large_30ep_1seed_MI_corrected",
+  "target_col": "ml_ade_log",
+  "feature_cols": [
+    "max_speed",
+    "std_speed",
+    "heading_change_per_sec",
+    "min_neighbor_distance",
+    "mean_acceleration",
+    "attention_radius_m",
+    "history_sec",
+    "prediction_sec"
+  ],
+  "artifact_root": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected",
+  "plots_dir": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/plots",
+  "tables_dir": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/tables",
+  "nested_resampling": {
+    "nested_cv_path": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/tables/nested_cv_optuna_ml_ade_log.csv",
+    "nested_cv_summary_path": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/tables/nested_cv_optuna_summary_ml_ade_log.csv",
+    "oof_predictions_path": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/tables/oof_predictions_ml_ade_log.csv",
+    "oof_metrics_path": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/tables/metrics_oof_ml_ade_log.csv",
+    "model_data_with_oof_path": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/tables/model_data_with_oof_ml_ade_log.csv"
+  },
+  "final_model": {
+    "model_path": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/gam_model_ml_ade_log.pkl",
+    "scaler_path": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/gam_scaler_ml_ade_log.pkl",
+    "full_data_tuning_trials_path": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/tables/full_data_tuning_optuna_trials_ml_ade_log.csv",
+    "full_data_tuning_summary_path": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/tables/full_data_tuning_optuna_summary_ml_ade_log.json",
+    "nested_variant_comparison_path": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/tables/nested_variant_comparison_ml_ade_log.csv",
+    "nested_variant_comparison_plot_path": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/plots/nested_variant_comparison_ml_ade_log.png",
+    "selected_variant_model_id": "gam-gamma",
+    "selected_variant_manifest_path": "../../results/interpretable_model/gam-gamma/sweep_large_30ep_1seed_MI_corrected/tables/run_manifest_ml_ade_log.json",
+    "selected_variant_name": "GammaGAM",
+    "selected_variant_model_kind": "gamma",
+    "selected_variant_target_mode": "raw",
+    "selected_variant_nested_summary": {
+      "outer_rmse_mean": 0.24301850006982062,
+      "outer_rmse_std": 0.0032949245144801922,
+      "outer_mae_mean": 0.15255107446020819,
+      "outer_mae_std": 0.0009704497948908035,
+      "outer_r2_mean": 0.6583299138284215,
+      "outer_r2_std": 0.0069674120624270966
+    },
+    "selected_best_params": {
+      "n_splines": 49,
+      "spline_order": 3,
+      "lam": 3.154749242854612
+    },
+    "selected_full_data_best_cv_rmse": 0.24370273625170705,
+    "exported_model_name": "GammaGAM",
+    "exported_model_kind": "gamma",
+    "exported_model_target_mode": "raw",
+    "exported_model_selection_metric_name": "mean_outer_rmse",
+    "exported_model_selection_metric_value": 0.24301850006982062
+  },
+  "analysis": {
+    "poor_well_quantile": 0.2
+  },
+  "raw_target_col": "ml_ade",
+  "log_target_col": "ml_ade_log",
+  "winning_variant_model_id": "gam-gamma",
+  "winning_variant_name": "GammaGAM",
+  "winning_variant_model_kind": "gamma",
+  "winning_variant_target_mode": "raw",
+  "selection_metric_name": "mean_outer_rmse",
+  "selection_metric_value": 0.24301850006982062
+}

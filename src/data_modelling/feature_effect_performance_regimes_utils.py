@@ -17,8 +17,12 @@ from .prepared_data import IDENTITY_COLS, MODEL_SETTING_COLS
 EFFECT_PREFIX = "effect__"
 VALID_PERFORMANCE_GROUPS = ("easy", "medium", "hard")
 VALID_CLUSTER_ALGORITHMS = ("hdbscan", "optics")
-VALID_CLUSTER_SPACES = ("raw", "umap")
+VALID_CLUSTER_SPACES = ("raw", "normalized", "umap")
+VALID_EFFECT_REPRESENTATIONS = ("raw", "normalized")
+VALID_OPTICS_EXTRACTION_METHODS = ("xi", "dbscan_eps")
 VALID_CLUSTER_PROFILE_SORT_KEYS = ("cluster_size", "cluster_rank_by_size")
+CLUSTER_SPEC_DIRNAME_PREFIX = "cluster_spec__"
+CLUSTER_SPEC_DIRNAME_MAX_CHARS = 240
 
 TRUSTWORTHINESS_COLUMNS = [
     "performance_group",
@@ -32,6 +36,9 @@ CLUSTER_FEATURE_EFFECT_PROFILE_PREFIX_COLUMNS = [
     "performance_group",
     "algorithm",
     "cluster_space",
+    "distance_metric",
+    "optics_extraction_method",
+    "optics_eps",
     "candidate_label_col",
     "cluster_id",
     "cluster_label",
@@ -71,6 +78,18 @@ _CLUSTER_SPEC_SWEEP_KEYS = {
     "min_cluster_size_fractions",
     "min_cluster_size_floor",
     "min_samples_values",
+}
+_CLUSTER_SPEC_OPTIONAL_KEYS = {
+    "effect_representations",
+    "distance_metrics",
+    "optics_extraction_methods",
+    "optics_eps_quantiles",
+    "n_jobs",
+    "max_noise_fraction",
+    "max_largest_cluster_share",
+    "optics_max_largest_cluster_share",
+    "max_cluster_count",
+    "boundary_cluster_size_margin",
 }
 _CLUSTER_SPEC_LEGACY_PARAMETER_KEYS = {
     "min_cluster_size",
@@ -231,6 +250,15 @@ def _resolve_positive_int(value: Any, *, config_name: str) -> int:
     return resolved_value
 
 
+def _resolve_n_jobs(value: Any, *, config_name: str) -> int:
+    resolved_value = _resolve_int(value, config_name=config_name)
+    if resolved_value == -1:
+        return resolved_value
+    if resolved_value < 1:
+        raise ValueError(f"{config_name} must be -1 or >= 1, got {resolved_value}.")
+    return resolved_value
+
+
 def _resolve_non_negative_float(value: Any, *, config_name: str) -> float:
     try:
         resolved_value = float(value)
@@ -283,6 +311,19 @@ def _resolve_non_empty_string(value: Any, *, config_name: str) -> str:
     return value.strip()
 
 
+def _resolve_non_empty_string_sequence(value: Any, *, config_name: str) -> list[str]:
+    if not isinstance(value, (list, tuple)) or not value:
+        raise ValueError(f"{config_name} must be a non-empty list of strings, got {value!r}.")
+    resolved_values = [
+        _resolve_non_empty_string(item, config_name=f"{config_name}[{idx}]")
+        for idx, item in enumerate(value)
+    ]
+    duplicate_values = sorted({item for item in resolved_values if resolved_values.count(item) > 1})
+    if duplicate_values:
+        raise ValueError(f"{config_name} contains duplicates: {duplicate_values}.")
+    return resolved_values
+
+
 def _normalize_json_value(value: Any) -> Any:
     """Convert notebook/runtime values into stable JSON-compatible primitives."""
     if isinstance(value, Path):
@@ -326,18 +367,48 @@ def _summarize_sequence(values: Iterable[Any]) -> str:
     return "-".join(_sanitize_slug_token(value) for value in values)
 
 
+def _summarize_sequence_compact(values: Iterable[Any], *, max_items: int = 4) -> str:
+    values_list = list(values)
+    if len(values_list) <= max_items:
+        return _summarize_sequence(values_list)
+    return f"{len(values_list)}vals-{_short_stable_hash(values_list, length=6)}"
+
+
+def _cap_slug_length(slug: str, *, max_length: int, stable_value: Any) -> str:
+    if len(slug) <= max_length:
+        return slug
+    suffix = f"trunc-{_short_stable_hash(stable_value, length=8)}"
+    keep_length = max_length - len(suffix) - 2
+    if keep_length <= 0:
+        return suffix[:max_length]
+    return f"{slug[:keep_length].rstrip('_-')}__{suffix}"
+
+
 def _build_cluster_spec_readable_slug(cluster_spec: Mapping[str, Any]) -> str:
     """Keep folder names human-readable while the hash guarantees uniqueness."""
     selected_dims = cluster_spec.get("umap_selected_n_components", {})
     parameter_mode = cluster_spec.get("parameter_mode", "single")
     if parameter_mode == "sweep":
-        parameter_fragment = "__".join(
-            [
-                f"mcs-fracs-{_summarize_sequence(cluster_spec['min_cluster_size_fractions'])}",
-                f"mcs-floor-{_sanitize_slug_token(cluster_spec['min_cluster_size_floor'])}",
-                f"ms-values-{_summarize_sequence(cluster_spec['min_samples_values'])}",
-            ]
-        )
+        min_cluster_size_fractions = list(cluster_spec["min_cluster_size_fractions"])
+        min_samples_values = list(cluster_spec["min_samples_values"])
+        if len(min_cluster_size_fractions) > 4 or len(min_samples_values) > 4:
+            parameter_fragment = "-".join(
+                [
+                    f"sweep-mcs{len(min_cluster_size_fractions)}",
+                    _short_stable_hash(min_cluster_size_fractions, length=6),
+                    f"floor{_sanitize_slug_token(cluster_spec['min_cluster_size_floor'])}",
+                    f"ms{len(min_samples_values)}",
+                    _short_stable_hash(min_samples_values, length=6),
+                ]
+            )
+        else:
+            parameter_fragment = "__".join(
+                [
+                    f"mcs-fracs-{_summarize_sequence(min_cluster_size_fractions)}",
+                    f"mcs-floor-{_sanitize_slug_token(cluster_spec['min_cluster_size_floor'])}",
+                    f"ms-values-{_summarize_sequence(min_samples_values)}",
+                ]
+            )
     else:
         parameter_fragment = "__".join(
             [
@@ -345,15 +416,29 @@ def _build_cluster_spec_readable_slug(cluster_spec: Mapping[str, Any]) -> str:
                 f"ms-{_summarize_group_mapping(cluster_spec['min_samples'])}",
             ]
         )
-    return "__".join(
+    readable_slug = "__".join(
         [
             f"groups-{'-'.join(_sanitize_slug_token(group) for group in cluster_spec['groups'])}",
             f"algs-{'-'.join(_sanitize_slug_token(algorithm) for algorithm in cluster_spec['algorithms'])}",
+            f"spaces-{_summarize_sequence(cluster_spec.get('effect_representations', ['raw']))}",
+            f"metrics-{_short_stable_hash(cluster_spec.get('distance_metrics', cluster_spec.get('distance_metric')), length=8)}",
             f"umap-{'on' if cluster_spec['evaluate_umap_latent_space'] else 'off'}",
             f"dims-{_summarize_group_mapping(selected_dims) if selected_dims else 'none'}",
-            f"optics-xi-{_summarize_sequence(cluster_spec.get('optics_xi_values', [cluster_spec.get('optics_xi')]))}",
+            f"optics-xi-{_summarize_sequence_compact(cluster_spec.get('optics_xi_values', [cluster_spec.get('optics_xi')]))}",
+            f"optics-ext-{_summarize_sequence(cluster_spec.get('optics_extraction_methods', ['xi']))}",
             parameter_fragment,
         ]
+    )
+    max_readable_slug_length = (
+        CLUSTER_SPEC_DIRNAME_MAX_CHARS
+        - len(CLUSTER_SPEC_DIRNAME_PREFIX)
+        - 2
+        - 12
+    )
+    return _cap_slug_length(
+        readable_slug,
+        max_length=max_readable_slug_length,
+        stable_value=cluster_spec,
     )
 
 
@@ -422,7 +507,7 @@ def build_feature_effect_regime_export_layout(
     """Build the canonical cluster-spec-scoped export layout for one notebook run."""
     cluster_spec_hash = _short_stable_hash(cluster_spec)
     cluster_spec_readable_slug = _build_cluster_spec_readable_slug(cluster_spec)
-    cluster_spec_dirname = f"cluster_spec__{cluster_spec_readable_slug}__{cluster_spec_hash}"
+    cluster_spec_dirname = f"{CLUSTER_SPEC_DIRNAME_PREFIX}{cluster_spec_readable_slug}__{cluster_spec_hash}"
     cluster_spec_root = Path(export_context["data_context_root"]) / cluster_spec_dirname
     tables_dir = cluster_spec_root / "tables"
     plots_dir = cluster_spec_root / "plots"
@@ -553,6 +638,93 @@ def _resolve_choice_sequence(
     return resolved_values
 
 
+def _resolve_effect_representations(value: Any) -> list[str]:
+    raw_values = value if value is not None else ["raw"]
+    resolved_values = _resolve_choice_sequence(
+        raw_values,
+        config_name="CLUSTER_SPEC['effect_representations']",
+        allowed_values=VALID_EFFECT_REPRESENTATIONS,
+    )
+    if "raw" not in resolved_values:
+        raise ValueError(
+            "CLUSTER_SPEC['effect_representations'] must include 'raw' so every run "
+            "has a direct signed-effect baseline."
+        )
+    return resolved_values
+
+
+def _resolve_distance_metrics_by_algorithm(
+    value: Any,
+    *,
+    algorithms: list[str],
+    fallback_metric: str,
+) -> dict[str, list[str]]:
+    if value is None:
+        return {algorithm: [fallback_metric] for algorithm in algorithms}
+
+    if isinstance(value, Mapping):
+        extra_algorithms = sorted(set(value) - set(algorithms))
+        if extra_algorithms:
+            raise ValueError(
+                "CLUSTER_SPEC['distance_metrics'] contains algorithms not enabled in "
+                f"CLUSTER_SPEC['algorithms']: {extra_algorithms}."
+            )
+        missing_algorithms = sorted(set(algorithms) - set(value))
+        if missing_algorithms:
+            raise ValueError(
+                "CLUSTER_SPEC['distance_metrics'] is missing metric lists for "
+                f"enabled algorithms: {missing_algorithms}."
+            )
+        return {
+            algorithm: _resolve_non_empty_string_sequence(
+                value[algorithm],
+                config_name=f"CLUSTER_SPEC['distance_metrics'][{algorithm!r}]",
+            )
+            for algorithm in algorithms
+        }
+
+    metrics = _resolve_non_empty_string_sequence(
+        value,
+        config_name="CLUSTER_SPEC['distance_metrics']",
+    )
+    return {algorithm: metrics for algorithm in algorithms}
+
+
+def _resolve_optics_extraction_methods(value: Any | None) -> list[str]:
+    raw_values = value if value is not None else ["xi"]
+    return _resolve_choice_sequence(
+        raw_values,
+        config_name="CLUSTER_SPEC['optics_extraction_methods']",
+        allowed_values=VALID_OPTICS_EXTRACTION_METHODS,
+    )
+
+
+def _resolve_quality_screen_config(cluster_spec: Mapping[str, Any]) -> dict[str, float | int]:
+    max_largest_cluster_share = _resolve_fraction(
+        cluster_spec.get("max_largest_cluster_share", 0.80),
+        config_name="CLUSTER_SPEC['max_largest_cluster_share']",
+    )
+    return {
+        "max_noise_fraction": _resolve_fraction(
+            cluster_spec.get("max_noise_fraction", 0.60),
+            config_name="CLUSTER_SPEC['max_noise_fraction']",
+        ),
+        "max_largest_cluster_share": max_largest_cluster_share,
+        "optics_max_largest_cluster_share": _resolve_fraction(
+            cluster_spec.get("optics_max_largest_cluster_share", max_largest_cluster_share),
+            config_name="CLUSTER_SPEC['optics_max_largest_cluster_share']",
+        ),
+        "max_cluster_count": _resolve_positive_int(
+            cluster_spec.get("max_cluster_count", 20),
+            config_name="CLUSTER_SPEC['max_cluster_count']",
+        ),
+        "boundary_cluster_size_margin": _resolve_non_negative_float(
+            cluster_spec.get("boundary_cluster_size_margin", 1.10),
+            config_name="CLUSTER_SPEC['boundary_cluster_size_margin']",
+        ),
+    }
+
+
 def _resolve_group_specific_positive_ints(
     value: Any,
     *,
@@ -627,6 +799,7 @@ def resolve_cluster_spec(
             | _CLUSTER_SPEC_LEGACY_PARAMETER_KEYS
             | _CLUSTER_SPEC_SWEEP_KEYS
             | _CLUSTER_SPEC_OPTICS_XI_KEYS
+            | _CLUSTER_SPEC_OPTIONAL_KEYS
         ),
     )
 
@@ -640,6 +813,21 @@ def resolve_cluster_spec(
         config_name="CLUSTER_SPEC['algorithms']",
         allowed_values=VALID_CLUSTER_ALGORITHMS,
     )
+    effect_representations = _resolve_effect_representations(
+        cluster_spec.get("effect_representations")
+    )
+    distance_metric = _resolve_non_empty_string(
+        cluster_spec["distance_metric"],
+        config_name="CLUSTER_SPEC['distance_metric']",
+    )
+    distance_metrics_by_algorithm = _resolve_distance_metrics_by_algorithm(
+        cluster_spec.get("distance_metrics"),
+        algorithms=algorithms,
+        fallback_metric=distance_metric,
+    )
+    optics_extraction_methods = _resolve_optics_extraction_methods(
+        cluster_spec.get("optics_extraction_methods")
+    )
     evaluate_umap_latent_space = _resolve_bool(
         cluster_spec["evaluate_umap_latent_space"],
         config_name="CLUSTER_SPEC['evaluate_umap_latent_space']",
@@ -647,7 +835,7 @@ def resolve_cluster_spec(
     parameter_mode = "single" if has_legacy_parameters else "sweep"
     if parameter_mode == "sweep" and evaluate_umap_latent_space:
         raise ValueError(
-            "Sweep-mode clustering currently supports raw feature-effect space only. "
+            "Sweep-mode clustering currently supports direct feature-effect spaces only. "
             "Set CLUSTER_SPEC['evaluate_umap_latent_space']=False or use legacy single-candidate parameters."
         )
 
@@ -703,6 +891,18 @@ def resolve_cluster_spec(
             "CLUSTER_SPEC['optics_cluster_method'] must be 'xi' or 'dbscan', "
             f"got {optics_cluster_method!r}."
         )
+    if "optics" in algorithms and "dbscan_eps" in optics_extraction_methods:
+        if "optics_eps_quantiles" not in cluster_spec:
+            raise ValueError(
+                "CLUSTER_SPEC['optics_eps_quantiles'] is required when "
+                "CLUSTER_SPEC['optics_extraction_methods'] includes 'dbscan_eps'."
+            )
+        optics_eps_quantiles = _resolve_fraction_sequence(
+            cluster_spec["optics_eps_quantiles"],
+            config_name="CLUSTER_SPEC['optics_eps_quantiles']",
+        )
+    else:
+        optics_eps_quantiles = []
 
     if parameter_mode == "single":
         parameter_config = {
@@ -742,6 +942,7 @@ def resolve_cluster_spec(
         "groups": groups,
         "algorithms": algorithms,
         "parameter_mode": parameter_mode,
+        "effect_representations": effect_representations,
         "evaluate_umap_latent_space": evaluate_umap_latent_space,
         "umap_candidate_dims": umap_candidate_dims,
         "umap_selected_n_components": umap_selected_n_components,
@@ -768,6 +969,7 @@ def resolve_cluster_spec(
             config_name="CLUSTER_SPEC['random_state']",
         ),
         "optics_cluster_method": optics_cluster_method,
+        "optics_extraction_methods": optics_extraction_methods,
         "optics_xi": (
             _resolve_fraction(
                 cluster_spec["optics_xi"],
@@ -792,10 +994,14 @@ def resolve_cluster_spec(
                 config_name="CLUSTER_SPEC['optics_xi_values']",
             )
         ),
-        "distance_metric": _resolve_non_empty_string(
-            cluster_spec["distance_metric"],
-            config_name="CLUSTER_SPEC['distance_metric']",
+        "distance_metric": distance_metric,
+        "distance_metrics": distance_metrics_by_algorithm,
+        "optics_eps_quantiles": optics_eps_quantiles,
+        "n_jobs": _resolve_n_jobs(
+            cluster_spec.get("n_jobs", 1),
+            config_name="CLUSTER_SPEC['n_jobs']",
         ),
+        "quality_screen": _resolve_quality_screen_config(cluster_spec),
         **parameter_config,
     }
     return resolved_cluster_spec
@@ -831,8 +1037,17 @@ def resolve_inspection_config(
     )
     if inspection_cluster_space not in VALID_CLUSTER_SPACES:
         raise ValueError(
-            "INSPECTION_CONFIG['inspection_cluster_space'] must be 'raw' or 'umap', "
+            "INSPECTION_CONFIG['inspection_cluster_space'] must be one of "
+            f"{list(VALID_CLUSTER_SPACES)}, "
             f"got {inspection_cluster_space!r}."
+        )
+    if (
+        inspection_cluster_space in VALID_EFFECT_REPRESENTATIONS
+        and inspection_cluster_space not in cluster_spec.get("effect_representations", ["raw"])
+    ):
+        raise ValueError(
+            f"INSPECTION_CONFIG['inspection_cluster_space']={inspection_cluster_space!r} is not enabled in "
+            f"CLUSTER_SPEC['effect_representations']={cluster_spec.get('effect_representations', ['raw'])}."
         )
     if inspection_cluster_space == "umap" and not cluster_spec["evaluate_umap_latent_space"]:
         raise ValueError(
@@ -1361,7 +1576,13 @@ def _coerce_label_series(length: int) -> pd.Series:
     return pd.Series(pd.array([pd.NA] * length, dtype="Int64"))
 
 
-def _compute_dbcv_score(validity_index_fn, X: np.ndarray, labels: np.ndarray) -> tuple[float, bool]:
+def _compute_dbcv_score(
+    validity_index_fn,
+    X: np.ndarray,
+    labels: np.ndarray,
+    *,
+    metric: str = "euclidean",
+) -> tuple[float, bool]:
     """Compute DBCV and record whether the score is valid for model selection."""
     non_noise_clusters = sorted({int(label) for label in labels if int(label) != -1})
     if len(non_noise_clusters) < 2:
@@ -1369,7 +1590,18 @@ def _compute_dbcv_score(validity_index_fn, X: np.ndarray, labels: np.ndarray) ->
     try:
         # hdbscan.validity.validity_index expects a float64 buffer; UMAP embeddings are float32 by default.
         X_for_dbcv = np.ascontiguousarray(X, dtype=np.float64)
-        return float(validity_index_fn(X_for_dbcv, labels)), True
+        dbcv_metric = {"manhattan": "cityblock", "l1": "cityblock"}.get(metric, metric)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="invalid value encountered in scalar divide",
+                category=RuntimeWarning,
+                module="hdbscan.validity",
+            )
+            score = float(validity_index_fn(X_for_dbcv, labels, metric=dbcv_metric))
+        if not np.isfinite(score):
+            return float("nan"), False
+        return score, True
     except Exception:
         return float("nan"), False
 
@@ -1481,6 +1713,17 @@ def _compute_visual_umap_embedding(
     return umap_model.fit_transform(X)
 
 
+def build_effect_cluster_space_matrix(X_raw: np.ndarray, cluster_space: str) -> np.ndarray:
+    """Return the feature-effect matrix used for one clustering representation."""
+    if cluster_space == "raw":
+        return np.asarray(X_raw, dtype=float)
+    if cluster_space == "normalized":
+        X = np.asarray(X_raw, dtype=float)
+        row_norms = np.linalg.norm(X, axis=1, keepdims=True)
+        return np.divide(X, row_norms, out=np.zeros_like(X, dtype=float), where=row_norms > 0)
+    raise ValueError(f"Unsupported feature-effect cluster representation: {cluster_space!r}.")
+
+
 def evaluate_umap_trustworthiness_by_group(
     analysis_df: pd.DataFrame,
     *,
@@ -1522,6 +1765,7 @@ def _fit_hdbscan_labels(
     min_cluster_size: int,
     min_samples: int,
     metric: str,
+    n_jobs: int,
     hdbscan_module,
 ) -> np.ndarray:
     """Fit one HDBSCAN run and return the cluster labels."""
@@ -1529,29 +1773,30 @@ def _fit_hdbscan_labels(
         min_cluster_size=min_cluster_size,
         min_samples=min_samples,
         metric=metric,
+        core_dist_n_jobs=n_jobs,
         cluster_selection_method="eom",
         allow_single_cluster=False,
     )
     return clusterer.fit_predict(X)
 
 
-def _fit_optics_labels(
+def _fit_optics_ordering(
     X: np.ndarray,
     *,
     min_samples: int,
     min_cluster_size: int,
-    xi: float,
     metric: str,
+    n_jobs: int,
     optics_cls,
-    cluster_method: str,
-) -> np.ndarray:
-    """Fit one OPTICS run and return the cluster labels."""
+) -> Any:
+    """Fit one OPTICS ordering that can be reused by multiple extraction methods."""
     clusterer = optics_cls(
         min_samples=min_samples,
         min_cluster_size=min_cluster_size,
-        xi=xi,
+        xi=0.05,
         metric=metric,
-        cluster_method=cluster_method,
+        n_jobs=n_jobs,
+        cluster_method="xi",
     )
     with warnings.catch_warnings():
         warnings.filterwarnings(
@@ -1560,11 +1805,63 @@ def _fit_optics_labels(
             category=RuntimeWarning,
             module="sklearn.cluster._optics",
         )
-        return clusterer.fit_predict(X)
+        return clusterer.fit(X)
+
+
+def _extract_optics_xi_labels(
+    optics_model: Any,
+    *,
+    xi: float,
+    min_samples: int,
+    min_cluster_size: int,
+) -> np.ndarray:
+    """Extract OPTICS labels from an already-fit ordering using xi valleys."""
+    from sklearn.cluster import cluster_optics_xi
+
+    labels, _ = cluster_optics_xi(
+        reachability=optics_model.reachability_,
+        predecessor=optics_model.predecessor_,
+        ordering=optics_model.ordering_,
+        min_samples=min_samples,
+        min_cluster_size=min_cluster_size,
+        xi=xi,
+    )
+    return np.asarray(labels, dtype=int)
+
+
+def _extract_optics_dbscan_labels(optics_model: Any, *, eps: float) -> np.ndarray:
+    """Extract OPTICS labels with DBSCAN-style reachability thresholding."""
+    from sklearn.cluster import cluster_optics_dbscan
+
+    labels = cluster_optics_dbscan(
+        reachability=optics_model.reachability_,
+        core_distances=optics_model.core_distances_,
+        ordering=optics_model.ordering_,
+        eps=eps,
+    )
+    return np.asarray(labels, dtype=int)
+
+
+def _resolve_optics_eps_values(optics_model: Any, eps_quantiles: Iterable[float]) -> list[float]:
+    """Resolve finite reachability quantiles into unique DBSCAN-eps thresholds."""
+    finite_reachability = np.asarray(optics_model.reachability_, dtype=float)
+    finite_reachability = finite_reachability[np.isfinite(finite_reachability)]
+    if finite_reachability.size == 0:
+        return []
+    eps_values = []
+    for eps_quantile in eps_quantiles:
+        eps = float(np.quantile(finite_reachability, float(eps_quantile)))
+        if np.isfinite(eps) and eps > 0:
+            eps_values.append(eps)
+    return sorted(set(eps_values))
 
 
 def _format_fraction_slug(value: float) -> str:
     return f"{float(value):.4g}".replace(".", "p")
+
+
+def _format_metric_slug(value: str) -> str:
+    return _sanitize_slug_token(value).replace("_", "-")
 
 
 def _cluster_candidate_label_col(
@@ -1574,21 +1871,30 @@ def _cluster_candidate_label_col(
     min_cluster_size_fraction: float | None,
     min_cluster_size: int,
     min_samples: int,
+    distance_metric: str,
     optics_xi: float | None = None,
+    optics_eps: float | None = None,
+    optics_extraction_method: str | None = None,
     force_parameter_suffix: bool = False,
+    force_metric_suffix: bool = False,
 ) -> str:
     base = f"cluster_{algorithm}_{cluster_space}"
     if min_cluster_size_fraction is None and not force_parameter_suffix:
-        return base
-    if min_cluster_size_fraction is None:
+        candidate_col = base
+    elif min_cluster_size_fraction is None:
         candidate_col = f"{base}__mcs-{int(min_cluster_size)}__ms-{int(min_samples)}"
     else:
         candidate_col = (
             f"{base}__mcs-frac-{_format_fraction_slug(min_cluster_size_fraction)}"
             f"__mcs-{int(min_cluster_size)}__ms-{int(min_samples)}"
         )
-    if algorithm == "optics" and optics_xi is not None:
-        candidate_col = f"{candidate_col}__xi-{_format_fraction_slug(optics_xi)}"
+    if force_metric_suffix or distance_metric != "euclidean":
+        candidate_col = f"{candidate_col}__metric-{_format_metric_slug(distance_metric)}"
+    if algorithm == "optics":
+        if optics_extraction_method == "xi" and optics_xi is not None:
+            candidate_col = f"{candidate_col}__xi-{_format_fraction_slug(optics_xi)}"
+        elif optics_extraction_method == "dbscan_eps" and optics_eps is not None:
+            candidate_col = f"{candidate_col}__eps-{_format_fraction_slug(optics_eps)}"
     return candidate_col
 
 
@@ -1639,7 +1945,17 @@ def _cluster_size_diagnostics(
     group_size: int,
     min_cluster_size: int,
     algorithm: str = "",
+    quality_screen: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    quality_screen = quality_screen or {}
+    max_noise_fraction = float(quality_screen.get("max_noise_fraction", 0.60))
+    max_largest_cluster_share = float(quality_screen.get("max_largest_cluster_share", 0.80))
+    if algorithm == "optics":
+        max_largest_cluster_share = float(
+            quality_screen.get("optics_max_largest_cluster_share", max_largest_cluster_share)
+        )
+    max_cluster_count = int(quality_screen.get("max_cluster_count", 20))
+    boundary_cluster_size_margin = float(quality_screen.get("boundary_cluster_size_margin", 1.10))
     non_noise_labels = [int(label) for label in labels if int(label) != -1]
     cluster_sizes = [
         int(np.sum(labels == cluster_id))
@@ -1649,12 +1965,12 @@ def _cluster_size_diagnostics(
     largest_cluster_size = max(cluster_sizes) if cluster_sizes else 0
     smallest_cluster_size = min(cluster_sizes) if cluster_sizes else 0
     largest_cluster_share = float(largest_cluster_size / group_size) if group_size else 0.0
-    boundary_limit = float(min_cluster_size) * 1.10
+    boundary_limit = float(min_cluster_size) * boundary_cluster_size_margin
     boundary_cluster_count = int(sum(cluster_size <= boundary_limit for cluster_size in cluster_sizes))
     quality_flags = {
-        "quality_flag_too_many_clusters": bool(n_clusters > 20),
-        "quality_flag_high_noise": bool(float(np.sum(labels == -1) / group_size) > 0.60) if group_size else False,
-        "quality_flag_dominant_cluster": bool(largest_cluster_share > 0.80),
+        "quality_flag_too_many_clusters": bool(n_clusters > max_cluster_count),
+        "quality_flag_high_noise": bool(float(np.sum(labels == -1) / group_size) > max_noise_fraction) if group_size else False,
+        "quality_flag_dominant_cluster": bool(largest_cluster_share > max_largest_cluster_share),
         "quality_flag_many_boundary_clusters": bool(
             n_clusters >= 4 and boundary_cluster_count >= np.ceil(n_clusters / 2)
         ),
@@ -1704,7 +2020,15 @@ def _select_best_group_run(group_scores_df: pd.DataFrame) -> int | None:
     ranked_scores_df["valid_for_selection_priority"] = ranked_scores_df["valid_for_selection"].astype(bool).astype(int)
     ranked_scores_df["dbcv_raw_effect_space_rank"] = ranked_scores_df["dbcv_raw_effect_space"].fillna(-np.inf)
     ranked_scores_df["algorithm_priority"] = ranked_scores_df["algorithm"].map({"hdbscan": 0, "optics": 1}).fillna(99)
-    ranked_scores_df["cluster_space_priority"] = ranked_scores_df["cluster_space"].map({"raw": 0, "umap": 1}).fillna(99)
+    ranked_scores_df["cluster_space_priority"] = ranked_scores_df["cluster_space"].map({"raw": 0, "normalized": 1, "umap": 2}).fillna(99)
+    ranked_scores_df["distance_metric_priority"] = ranked_scores_df.get(
+        "distance_metric",
+        pd.Series(["euclidean"] * len(ranked_scores_df), index=ranked_scores_df.index),
+    ).map({"euclidean": 0, "manhattan": 1, "cityblock": 1, "cosine": 2}).fillna(50)
+    ranked_scores_df["optics_extraction_priority"] = ranked_scores_df.get(
+        "optics_extraction_method",
+        pd.Series([""] * len(ranked_scores_df), index=ranked_scores_df.index),
+    ).map({"": 0, "xi": 1, "dbscan_eps": 2}).fillna(50)
     ranked_scores_df = ranked_scores_df.sort_values(
         [
             "valid_for_selection_priority",
@@ -1714,9 +2038,11 @@ def _select_best_group_run(group_scores_df: pd.DataFrame) -> int | None:
             "n_clusters",
             "algorithm_priority",
             "cluster_space_priority",
+            "distance_metric_priority",
+            "optics_extraction_priority",
             "score_row_id",
         ],
-        ascending=[False, True, False, True, True, True, True, True],
+        ascending=[False, True, False, True, True, True, True, True, True, True],
     )
     return int(ranked_scores_df.iloc[0]["score_row_id"])
 
@@ -1755,6 +2081,9 @@ def _build_cluster_feature_effect_summary(
     performance_group: str,
     algorithm: str,
     cluster_space: str,
+    distance_metric: str,
+    optics_extraction_method: str | None,
+    optics_eps: float | None,
     candidate_label_col: str,
     effect_cols: list[str],
     include_noise: bool,
@@ -1773,6 +2102,9 @@ def _build_cluster_feature_effect_summary(
             "performance_group": performance_group,
             "algorithm": algorithm,
             "cluster_space": cluster_space,
+            "distance_metric": distance_metric,
+            "optics_extraction_method": optics_extraction_method or "",
+            "optics_eps": float(optics_eps) if optics_eps is not None and not pd.isna(optics_eps) else np.nan,
             "candidate_label_col": candidate_label_col,
             "cluster_id": cluster_id,
             "cluster_label": _cluster_label(cluster_id),
@@ -1831,6 +2163,9 @@ def build_cluster_feature_effect_profiles(
             performance_group=performance_group,
             algorithm=str(cluster_run["algorithm"]),
             cluster_space=str(cluster_run["cluster_space"]),
+            distance_metric=str(cluster_run.get("distance_metric", "euclidean")),
+            optics_extraction_method=str(cluster_run.get("optics_extraction_method", "")),
+            optics_eps=cluster_run.get("optics_eps", np.nan),
             candidate_label_col=label_col,
             effect_cols=effect_cols,
             include_noise=include_noise,
@@ -1840,8 +2175,18 @@ def build_cluster_feature_effect_profiles(
 
     if summary_frames:
         return pd.concat(summary_frames, ignore_index=True).sort_values(
-            ["performance_group", "algorithm", "cluster_space", "is_noise", "cluster_rank_by_size", "cluster_id"],
-            ascending=[True, True, True, True, True, True],
+            [
+                "performance_group",
+                "algorithm",
+                "cluster_space",
+                "distance_metric",
+                "optics_extraction_method",
+                "optics_eps",
+                "is_noise",
+                "cluster_rank_by_size",
+                "cluster_id",
+            ],
+            ascending=[True, True, True, True, True, True, True, True, True],
             na_position="last",
         ).reset_index(drop=True)
 
@@ -1930,9 +2275,33 @@ def run_step2_clustering(
             if selected_umap_dim is not None:
                 selected_umap_embedding = umap_embeddings[selected_umap_dim]
 
-        spaces: dict[str, tuple[np.ndarray, int | None]] = {"raw": (X_raw, None)}
+        spaces: dict[str, tuple[np.ndarray, int | None]] = {
+            cluster_space: (build_effect_cluster_space_matrix(X_raw, cluster_space), None)
+            for cluster_space in cluster_spec.get("effect_representations", ["raw"])
+        }
         if selected_umap_embedding is not None and selected_umap_dim is not None:
             spaces["umap"] = (selected_umap_embedding, selected_umap_dim)
+
+        distance_metrics_by_algorithm = cluster_spec.get(
+            "distance_metrics",
+            {algorithm: [cluster_spec["distance_metric"]] for algorithm in cluster_spec["algorithms"]},
+        )
+        has_multiple_spaces = len(spaces) > 1
+        has_multiple_metrics = any(
+            len(distance_metrics_by_algorithm.get(algorithm, [cluster_spec["distance_metric"]])) > 1
+            for algorithm in cluster_spec["algorithms"]
+        )
+        has_multiple_optics_extractions = (
+            "optics" in cluster_spec["algorithms"]
+            and len(cluster_spec.get("optics_extraction_methods", ["xi"])) > 1
+        )
+        force_parameter_suffix = (
+            cluster_spec.get("parameter_mode", "single") == "sweep"
+            or has_multiple_spaces
+            or has_multiple_metrics
+            or has_multiple_optics_extractions
+        )
+        quality_screen = cluster_spec.get("quality_screen", {})
 
         group_score_row_ids: list[int] = []
         for cluster_space, (X_space, selected_dim) in spaces.items():
@@ -1941,98 +2310,183 @@ def run_step2_clustering(
                 min_samples = int(parameter_candidate["min_samples"])
                 min_cluster_size_fraction = parameter_candidate["min_cluster_size_fraction"]
                 for algorithm in cluster_spec["algorithms"]:
-                    optics_xi_values = (
-                        cluster_spec["optics_xi_values"]
-                        if algorithm == "optics"
-                        else [None]
-                    )
-                    for optics_xi in optics_xi_values:
+                    for distance_metric in distance_metrics_by_algorithm.get(algorithm, [cluster_spec["distance_metric"]]):
                         if algorithm == "hdbscan":
-                            labels = _fit_hdbscan_labels(
-                                X_space,
-                                min_cluster_size=min_cluster_size,
-                                min_samples=min_samples,
-                                metric=cluster_spec["distance_metric"],
-                                hdbscan_module=hdbscan_module,
-                            )
-                            min_samples_value = min_samples
+                            try:
+                                extraction_candidates = [
+                                    {
+                                        "labels": _fit_hdbscan_labels(
+                                            X_space,
+                                            min_cluster_size=min_cluster_size,
+                                            min_samples=min_samples,
+                                            metric=str(distance_metric),
+                                            n_jobs=int(cluster_spec.get("n_jobs", 1)),
+                                            hdbscan_module=hdbscan_module,
+                                        ),
+                                        "optics_xi": np.nan,
+                                        "optics_eps": np.nan,
+                                        "optics_extraction_method": "",
+                                    }
+                                ]
+                            except Exception as exc:
+                                warnings.warn(
+                                    "Skipping HDBSCAN candidate after fit failure "
+                                    f"(group={performance_group}, space={cluster_space}, "
+                                    f"metric={distance_metric}, min_cluster_size={min_cluster_size}, "
+                                    f"min_samples={min_samples}): {exc}",
+                                    RuntimeWarning,
+                                    stacklevel=2,
+                                )
+                                continue
                         elif algorithm == "optics":
-                            labels = _fit_optics_labels(
-                                X_space,
-                                min_samples=min_samples,
-                                min_cluster_size=min_cluster_size,
-                                xi=float(optics_xi),
-                                metric=cluster_spec["distance_metric"],
-                                optics_cls=optics_cls,
-                                cluster_method=cluster_spec["optics_cluster_method"],
-                            )
-                            min_samples_value = min_samples
+                            try:
+                                optics_model = _fit_optics_ordering(
+                                    X_space,
+                                    min_samples=min_samples,
+                                    min_cluster_size=min_cluster_size,
+                                    metric=str(distance_metric),
+                                    n_jobs=int(cluster_spec.get("n_jobs", 1)),
+                                    optics_cls=optics_cls,
+                                )
+                            except Exception as exc:
+                                warnings.warn(
+                                    "Skipping OPTICS ordering after fit failure "
+                                    f"(group={performance_group}, space={cluster_space}, "
+                                    f"metric={distance_metric}, min_cluster_size={min_cluster_size}, "
+                                    f"min_samples={min_samples}): {exc}",
+                                    RuntimeWarning,
+                                    stacklevel=2,
+                                )
+                                continue
+
+                            extraction_candidates = []
+                            if "xi" in cluster_spec.get("optics_extraction_methods", ["xi"]):
+                                for optics_xi in cluster_spec["optics_xi_values"]:
+                                    extraction_candidates.append(
+                                        {
+                                            "labels": _extract_optics_xi_labels(
+                                                optics_model,
+                                                xi=float(optics_xi),
+                                                min_samples=min_samples,
+                                                min_cluster_size=min_cluster_size,
+                                            ),
+                                            "optics_xi": float(optics_xi),
+                                            "optics_eps": np.nan,
+                                            "optics_extraction_method": "xi",
+                                        }
+                                    )
+                            if "dbscan_eps" in cluster_spec.get("optics_extraction_methods", ["xi"]):
+                                for optics_eps in _resolve_optics_eps_values(
+                                    optics_model,
+                                    cluster_spec.get("optics_eps_quantiles", []),
+                                ):
+                                    extraction_candidates.append(
+                                        {
+                                            "labels": _extract_optics_dbscan_labels(
+                                                optics_model,
+                                                eps=float(optics_eps),
+                                            ),
+                                            "optics_xi": np.nan,
+                                            "optics_eps": float(optics_eps),
+                                            "optics_extraction_method": "dbscan_eps",
+                                        }
+                                    )
                         else:
                             raise ValueError(f"Unsupported clustering algorithm: {algorithm}")
 
-                        candidate_col = _cluster_candidate_label_col(
-                            algorithm=algorithm,
-                            cluster_space=cluster_space,
-                            min_cluster_size_fraction=min_cluster_size_fraction,
-                            min_cluster_size=min_cluster_size,
-                            min_samples=min_samples_value,
-                            optics_xi=float(optics_xi) if optics_xi is not None else None,
-                            force_parameter_suffix=(
-                                cluster_spec.get("parameter_mode", "single") == "sweep"
-                                or (algorithm == "optics" and len(cluster_spec["optics_xi_values"]) > 1)
-                            ),
-                        )
-                        if candidate_col not in clustered_df.columns:
-                            clustered_df[candidate_col] = _coerce_label_series(len(clustered_df))
-                        clustered_df.loc[group_mask, candidate_col] = pd.array(labels, dtype="Int64")
+                        for extraction_candidate in extraction_candidates:
+                            labels = np.asarray(extraction_candidate["labels"], dtype=int)
+                            optics_xi = extraction_candidate["optics_xi"]
+                            optics_eps = extraction_candidate["optics_eps"]
+                            optics_extraction_method = str(extraction_candidate["optics_extraction_method"])
 
-                        non_noise_cluster_ids = sorted({int(label) for label in labels if int(label) != -1})
-                        n_clusters = len(non_noise_cluster_ids)
-                        noise_count = int((labels == -1).sum())
-                        clustered_count = int((labels != -1).sum())
-                        dbcv_cluster_space, valid_for_selection = _compute_dbcv_score(validity_index_fn, X_space, labels)
-                        dbcv_raw_effect_space, valid_for_raw_effect_evaluation = _compute_dbcv_score(validity_index_fn, X_raw, labels)
-                        size_diagnostics = _cluster_size_diagnostics(
-                            labels,
-                            group_size=group_size,
-                            min_cluster_size=min_cluster_size,
-                            algorithm=algorithm,
-                        )
-                        group_score_row_ids.append(score_row_id)
-                        score_rows.append(
-                            {
-                                "score_row_id": score_row_id,
-                                "performance_group": performance_group,
-                                "algorithm": algorithm,
-                                "cluster_space": cluster_space,
-                                "candidate_label_col": candidate_col,
-                                "input_dim": int(X_space.shape[1]),
-                                "group_size": int(group_size),
-                                "min_cluster_size_fraction": (
-                                    float(min_cluster_size_fraction)
-                                    if min_cluster_size_fraction is not None
-                                    else np.nan
-                                ),
-                                "min_cluster_size": int(min_cluster_size),
-                                "min_samples": int(min_samples_value),
-                                "optics_xi": float(optics_xi) if algorithm == "optics" else np.nan,
-                                "umap_selected_n_components": (
-                                    int(selected_dim) if cluster_space == "umap" and selected_dim is not None else np.nan
-                                ),
-                                "n_clusters": int(n_clusters),
-                                "noise_count": int(noise_count),
-                                "noise_fraction": float(noise_count / group_size),
-                                "clustered_fraction": float(clustered_count / group_size),
-                                "dbcv": dbcv_cluster_space,
-                                "dbcv_cluster_space": dbcv_cluster_space,
-                                "dbcv_raw_effect_space": dbcv_raw_effect_space,
-                                "valid_for_selection": bool(valid_for_selection),
-                                "valid_for_raw_effect_evaluation": bool(valid_for_raw_effect_evaluation),
-                                **size_diagnostics,
-                                "selected_for_group": False,
-                            }
-                        )
-                        score_row_id += 1
+                            candidate_col = _cluster_candidate_label_col(
+                                algorithm=algorithm,
+                                cluster_space=cluster_space,
+                                min_cluster_size_fraction=min_cluster_size_fraction,
+                                min_cluster_size=min_cluster_size,
+                                min_samples=min_samples,
+                                distance_metric=str(distance_metric),
+                                optics_xi=float(optics_xi) if not pd.isna(optics_xi) else None,
+                                optics_eps=float(optics_eps) if not pd.isna(optics_eps) else None,
+                                optics_extraction_method=optics_extraction_method,
+                                force_parameter_suffix=force_parameter_suffix,
+                                force_metric_suffix=has_multiple_metrics,
+                            )
+                            if candidate_col not in clustered_df.columns:
+                                clustered_df[candidate_col] = _coerce_label_series(len(clustered_df))
+                            clustered_df.loc[group_mask, candidate_col] = pd.array(labels, dtype="Int64")
+
+                            non_noise_cluster_ids = sorted({int(label) for label in labels if int(label) != -1})
+                            n_clusters = len(non_noise_cluster_ids)
+                            noise_count = int((labels == -1).sum())
+                            clustered_count = int((labels != -1).sum())
+                            dbcv_cluster_space, valid_for_cluster_space_evaluation = _compute_dbcv_score(
+                                validity_index_fn,
+                                X_space,
+                                labels,
+                                metric=str(distance_metric),
+                            )
+                            dbcv_raw_effect_space, valid_for_raw_effect_evaluation = _compute_dbcv_score(
+                                validity_index_fn,
+                                X_raw,
+                                labels,
+                                metric="euclidean",
+                            )
+                            size_diagnostics = _cluster_size_diagnostics(
+                                labels,
+                                group_size=group_size,
+                                min_cluster_size=min_cluster_size,
+                                algorithm=algorithm,
+                                quality_screen=quality_screen,
+                            )
+                            group_score_row_ids.append(score_row_id)
+                            score_rows.append(
+                                {
+                                    "score_row_id": score_row_id,
+                                    "performance_group": performance_group,
+                                    "algorithm": algorithm,
+                                    "cluster_space": cluster_space,
+                                    "distance_metric": str(distance_metric),
+                                    "optics_extraction_method": optics_extraction_method,
+                                    "optics_eps": (
+                                        float(optics_eps)
+                                        if not pd.isna(optics_eps)
+                                        else np.nan
+                                    ),
+                                    "candidate_label_col": candidate_col,
+                                    "input_dim": int(X_space.shape[1]),
+                                    "group_size": int(group_size),
+                                    "min_cluster_size_fraction": (
+                                        float(min_cluster_size_fraction)
+                                        if min_cluster_size_fraction is not None
+                                        else np.nan
+                                    ),
+                                    "min_cluster_size": int(min_cluster_size),
+                                    "min_samples": int(min_samples),
+                                    "optics_xi": (
+                                        float(optics_xi)
+                                        if not pd.isna(optics_xi)
+                                        else np.nan
+                                    ),
+                                    "umap_selected_n_components": (
+                                        int(selected_dim) if cluster_space == "umap" and selected_dim is not None else np.nan
+                                    ),
+                                    "n_clusters": int(n_clusters),
+                                    "noise_count": int(noise_count),
+                                    "noise_fraction": float(noise_count / group_size),
+                                    "clustered_fraction": float(clustered_count / group_size),
+                                    "dbcv": dbcv_cluster_space,
+                                    "dbcv_cluster_space": dbcv_cluster_space,
+                                    "dbcv_raw_effect_space": dbcv_raw_effect_space,
+                                    "valid_for_selection": bool(valid_for_raw_effect_evaluation),
+                                    "valid_for_cluster_space_evaluation": bool(valid_for_cluster_space_evaluation),
+                                    "valid_for_raw_effect_evaluation": bool(valid_for_raw_effect_evaluation),
+                                    **size_diagnostics,
+                                    "selected_for_group": False,
+                                }
+                            )
+                            score_row_id += 1
 
         group_scores_df = pd.DataFrame([row for row in score_rows if row["score_row_id"] in group_score_row_ids])
         best_score_row_id = _select_best_group_run(group_scores_df)
@@ -2059,15 +2513,21 @@ def run_step2_clustering(
             "dbcv_raw_effect_space",
             "algorithm",
             "cluster_space",
+            "distance_metric",
             "min_cluster_size",
             "min_samples",
+            "optics_extraction_method",
             "optics_xi",
+            "optics_eps",
         ],
-        ascending=[True, False, True, False, True, True, True, True, True],
+        ascending=[True, False, True, False, True, True, True, True, True, True, True, True],
     )
+    profile_cluster_runs_df = cluster_scores_df.loc[
+        cluster_scores_df["selected_for_group"].astype(bool)
+    ].copy()
     cluster_feature_effect_profiles_df = build_cluster_feature_effect_profiles(
         clustered_df,
-        cluster_scores_df,
+        profile_cluster_runs_df,
         performance_group_col=performance_group_col,
         effect_cols=effect_cols,
         include_noise=True,

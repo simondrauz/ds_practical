@@ -1,0 +1,7 @@
+feature,global_rank,mean_abs_shap,importance_metric,importance_value,importance_ascending
+std_speed,1,0.12919283326801273,mean_abs_shap,0.12919283326801273,False
+heading_change_per_sec,2,0.06988021689067689,mean_abs_shap,0.06988021689067689,False
+min_neighbor_distance,3,0.02711027287127603,mean_abs_shap,0.02711027287127603,False
+mean_acceleration,4,0.026804008107357724,mean_abs_shap,0.026804008107357724,False
+scene_density_VEHICLE,5,0.020447998333766638,mean_abs_shap,0.020447998333766638,False
+scene_num_VEHICLE,6,0.01588863169638567,mean_abs_shap,0.01588863169638567,False

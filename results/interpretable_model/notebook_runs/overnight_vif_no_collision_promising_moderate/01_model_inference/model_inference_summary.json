@@ -1,0 +1,40 @@
+{
+  "status": "completed",
+  "updated_at": "2026-05-14T08:03:32",
+  "run_name": "full_trainval_12ep_1seed_vif_only_no_collision",
+  "target_col_override": null,
+  "models": [
+    "xgboost",
+    "gam"
+  ],
+  "inference_mode": "missing",
+  "kernel_name": "python3",
+  "jobs": [
+    {
+      "model_id": "xgboost",
+      "run_name": "full_trainval_12ep_1seed_vif_only_no_collision",
+      "target_col": "ml_ade_log",
+      "status": "skipped",
+      "feature_effects_path": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/results/interpretable_model/xgboost/full_trainval_12ep_1seed_vif_only_no_collision/tables/feature_effects_ml_ade_log.csv",
+      "feature_effect_importance_path": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/results/interpretable_model/xgboost/full_trainval_12ep_1seed_vif_only_no_collision/tables/feature_effect_importance_ml_ade_log.csv",
+      "executed_notebook": null,
+      "started_at": null,
+      "completed_at": null,
+      "duration_seconds": null,
+      "error": null
+    },
+    {
+      "model_id": "gam",
+      "run_name": "full_trainval_12ep_1seed_vif_only_no_collision",
+      "target_col": "ml_ade_log",
+      "status": "skipped",
+      "feature_effects_path": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/tables/feature_effects_ml_ade_log.csv",
+      "feature_effect_importance_path": "/Users/simondrauz/Lokale Dokumente/Repositories/ds_practical/results/interpretable_model/gam/full_trainval_12ep_1seed_vif_only_no_collision/tables/feature_effect_importance_ml_ade_log.csv",
+      "executed_notebook": null,
+      "started_at": null,
+      "completed_at": null,
+      "duration_seconds": null,
+      "error": null
+    }
+  ]
+}

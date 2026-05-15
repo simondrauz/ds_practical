@@ -1,0 +1,25 @@
+{
+  "run_name": "full_trainval_12ep_1seed_vif_only_no_collision",
+  "raw_run_name": "full_trainval_12ep_1seed",
+  "exported_run_name": "full_trainval_12ep_1seed_vif_only_no_collision",
+  "eval_csv_name": "eval_epoch_12.csv",
+  "target_col": "ml_ade",
+  "transformed_target_col": "ml_ade_log",
+  "include_model_settings_as_features": false,
+  "apply_mi_filter": false,
+  "exclude_has_collision": true,
+  "model_setting_cols": [
+    "attention_radius_m",
+    "history_sec",
+    "prediction_sec"
+  ],
+  "model_feature_cols": [
+    "std_speed",
+    "mean_acceleration",
+    "min_neighbor_distance",
+    "heading_change_per_sec",
+    "scene_num_VEHICLE",
+    "scene_density_VEHICLE"
+  ],
+  "model_setting_metadata_cols": []
+}

@@ -1,0 +1,9 @@
+feature,global_rank,mean_abs_shap,importance_metric,importance_value,importance_ascending
+prediction_sec,1,0.15965661531410721,mean_abs_shap,0.15965661531410721,False
+std_speed,2,0.09157344125285566,mean_abs_shap,0.09157344125285566,False
+max_speed,3,0.0653369683025507,mean_abs_shap,0.0653369683025507,False
+attention_radius_m,4,0.05573192063451774,mean_abs_shap,0.05573192063451774,False
+heading_change_per_sec,5,0.040309710829102285,mean_abs_shap,0.040309710829102285,False
+min_neighbor_distance,6,0.024035745098642515,mean_abs_shap,0.024035745098642515,False
+history_sec,7,0.014820270846309953,mean_abs_shap,0.014820270846309953,False
+mean_acceleration,8,0.011448700759331173,mean_abs_shap,0.011448700759331173,False

@@ -61,6 +61,17 @@ def test_feature_effect_performance_regimes_notebook_references_export_first_clu
     assert "viz_umap_n_neighbors" in source
     assert "viz_umap_min_dist" in source
     assert "trustworthiness_neighbor_values" in source
+    assert "CLUSTER_SWEEP_MODE" in source
+    assert 'CLUSTER_SWEEP_MODE = "empirical"' in source
+    assert "EMPIRICAL_CLUSTER_SWEEP_PROFILES" in source
+    assert "EMPIRICAL_FOCUSED_CLUSTER_SWEEP_PROFILES" in source
+    assert "empirical_focused" in source
+    assert "effect_representations" in source
+    assert "distance_metrics" in source
+    assert "optics_extraction_methods" in source
+    assert "optics_eps_quantiles" in source
+    assert "n_jobs" in source
+    assert "Quality screen" in source
     assert "min_cluster_size_fractions" in source
     assert "min_cluster_size_floor" in source
     assert "min_samples_values" in source

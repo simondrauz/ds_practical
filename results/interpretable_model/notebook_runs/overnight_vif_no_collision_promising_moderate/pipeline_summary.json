@@ -1,0 +1,18 @@
+{
+  "status": "completed",
+  "updated_at": "2026-05-14T12:30:37",
+  "run_name": "full_trainval_12ep_1seed_vif_only_no_collision",
+  "eval_csv_name": "eval_epoch_12.csv",
+  "target_col_override": null,
+  "models": [
+    "xgboost",
+    "gam"
+  ],
+  "cluster_sweep_mode": "promising_moderate",
+  "inference_mode": "missing",
+  "kernel_name": "python3",
+  "inference_output_root": "results/interpretable_model/notebook_runs/overnight_vif_no_collision_promising_moderate/01_model_inference",
+  "regime_output_root": "results/interpretable_model/notebook_runs/overnight_vif_no_collision_promising_moderate/02_feature_effect_regimes",
+  "inference_summary": "results/interpretable_model/notebook_runs/overnight_vif_no_collision_promising_moderate/01_model_inference/model_inference_summary.json",
+  "regime_summary": "results/interpretable_model/notebook_runs/overnight_vif_no_collision_promising_moderate/02_feature_effect_regimes/overnight_regime_summary.json"
+}
