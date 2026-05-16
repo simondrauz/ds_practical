@@ -109,5 +109,7 @@ results/interpretable_model/**/*
 !results/interpretable_model/**/full_trainval_12ep_1seed_vif_only_no_collision/**/plots/**
 !results/interpretable_model/**/sweep_large_30ep_1seed/**/plots/
 !results/interpretable_model/**/sweep_large_30ep_1seed/**/plots/**
+!results/interpretable_model/**/sweep_large_30ep_1seed_MI_corrected/**/plots/
+!results/interpretable_model/**/sweep_large_30ep_1seed_MI_corrected/**/plots/**
 
 # Data (heavy files tracked separately in data/.gitignore)
