@@ -35,24 +35,24 @@
     "selected_variant_model_kind": "gamma",
     "selected_variant_target_mode": "raw",
     "selected_variant_nested_summary": {
-      "outer_rmse_mean": 0.24301850006982062,
-      "outer_rmse_std": 0.0032949245144801922,
-      "outer_mae_mean": 0.15255107446020819,
-      "outer_mae_std": 0.0009704497948908035,
-      "outer_r2_mean": 0.6583299138284215,
-      "outer_r2_std": 0.0069674120624270966
+      "outer_rmse_mean": 0.24436736449324128,
+      "outer_rmse_std": 0.0031544583274800944,
+      "outer_mae_mean": 0.15343299817962072,
+      "outer_mae_std": 0.0010385947784105956,
+      "outer_r2_mean": 0.6544990428430425,
+      "outer_r2_std": 0.008626263757720066
     },
     "selected_best_params": {
       "n_splines": 49,
-      "spline_order": 3,
-      "lam": 3.154749242854612
+      "spline_order": 4,
+      "lam": 0.08741436832570491
     },
-    "selected_full_data_best_cv_rmse": 0.24370273625170705,
+    "selected_full_data_best_cv_rmse": 0.24576271891095702,
     "exported_model_name": "GammaGAM",
     "exported_model_kind": "gamma",
     "exported_model_target_mode": "raw",
     "exported_model_selection_metric_name": "mean_outer_rmse",
-    "exported_model_selection_metric_value": 0.24301850006982062
+    "exported_model_selection_metric_value": 0.24436736449324128
   },
   "analysis": {
     "poor_well_quantile": 0.2
@@ -64,5 +64,5 @@
   "winning_variant_model_kind": "gamma",
   "winning_variant_target_mode": "raw",
   "selection_metric_name": "mean_outer_rmse",
-  "selection_metric_value": 0.24301850006982062
+  "selection_metric_value": 0.24436736449324128
 }

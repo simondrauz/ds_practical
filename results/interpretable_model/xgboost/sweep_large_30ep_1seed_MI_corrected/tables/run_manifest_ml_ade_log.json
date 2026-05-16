@@ -27,23 +27,22 @@
     "full_data_tuning_trials_path": "../../results/interpretable_model/xgboost/sweep_large_30ep_1seed_MI_corrected/tables/full_data_tuning_optuna_trials_ml_ade_log.csv",
     "full_data_tuning_summary_path": "../../results/interpretable_model/xgboost/sweep_large_30ep_1seed_MI_corrected/tables/full_data_tuning_optuna_summary_ml_ade_log.json",
     "selected_best_params": {
-      "learning_rate": 0.04102051822037473,
-      "max_depth": 12,
-      "min_child_weight": 22,
-      "subsample": 0.8070091419786368,
-      "colsample_bytree": 0.8895164161417118,
-      "gamma": 0.007674141863847128,
-      "reg_alpha": 0.00010510695705466914,
-      "reg_lambda": 3.474456698082926
+      "learning_rate": 0.04860222715760927,
+      "max_depth": 9,
+      "min_child_weight": 17,
+      "subsample": 0.9234651056066276,
+      "colsample_bytree": 0.9886397161046538,
+      "reg_alpha": 0.018970064740230618,
+      "reg_lambda": 0.00035450524489370446
     },
-    "selected_best_iteration": 3997,
-    "best_cv_score": 0.08252570184053763,
+    "selected_best_iteration": 1585,
+    "best_cv_score": 0.07783966892223097,
     "tuning_metric_name": "rmse",
     "exported_model_name": "XGBoost",
     "exported_model_kind": "xgboost",
     "exported_model_target_mode": "log",
     "exported_model_selection_metric_name": "best_cv_score",
-    "exported_model_selection_metric_value": 0.08252570184053763
+    "exported_model_selection_metric_value": 0.07783966892223097
   },
   "analysis": {
     "poor_well_quantile": 0.2

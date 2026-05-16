@@ -34,5 +34,5 @@
   "target_mode": "log",
   "variant_status": "completed",
   "selection_metric_name": "mean_outer_rmse",
-  "selection_metric_value": 0.2478540174096464
+  "selection_metric_value": 0.25086009765569467
 }
