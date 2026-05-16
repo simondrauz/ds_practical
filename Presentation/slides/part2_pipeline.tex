@@ -29,15 +29,25 @@
 
 %--- Slide 6 -------------------------------------------------------------------
 \begin{frame}{Trajectron++ Modification}
-  \begin{itemize}
-    \item Standard training: batch-averaged loss
-    \item Modification: write one row per trajectory
-          \texttt{(data\_idx, scene\_path, agent\_id, scene\_ts, ml\_ade,
-          ml\_fde, min\_ade\_5, nll\_mean, \ldots)}
-    \item \texttt{data\_idx}: stable trajdata identifier used to join
-          evaluation output with computed characteristics
-    \item Identity validation: reconstruction check ensures the join
-          corresponds to the exact same evaluation context (split, temporal
-          window, etc.)
-  \end{itemize}
+  \begin{columns}
+    \begin{column}{0.46\textwidth}
+      \textbf{Standard Trajectron++}
+      \begin{itemize}[<+->]
+        \item Evaluation outputs \emph{batch-averaged} ADE / FDE
+        \item No way to link prediction error back to an
+              individual trajectory
+        \item Cannot study what makes a trajectory hard or easy
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.50\textwidth}
+      \onslide<4->{\textbf{Our Modification}}
+      \begin{itemize}
+        \item<5-> Recover \emph{individual trajectory loss \& characteristics}\\
+              by modifying Trajectron++'s evaluation loop
+        \item<6-> \texttt{data\_idx}: stable trajdata identifier,
+              used to join evaluation output with computed
+              trajectory \& scene characteristics
+      \end{itemize}
+    \end{column}
+  \end{columns}
 \end{frame}

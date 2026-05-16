@@ -2,34 +2,120 @@
 
 \section{Data Preparation}
 
-%--- Slide 7 -------------------------------------------------------------------
-\begin{frame}{Dataset Overview}
-  % TODO: nuScenes dataset stats, split sizes, agent counts, scene counts
-  \begin{itemize}
-    \item \ldots
-  \end{itemize}
+%--- Slide: Feature Engineering -----------------------------------------------
+\begin{frame}{Feature Engineering — Trajectory \& Scene Characteristics}
+  \begin{columns}
+    \begin{column}{0.48\textwidth}
+      \textbf{Agent motion features}
+      \begin{itemize}
+        \item<2-> Speed: mean, max, std
+        \item<2-> Acceleration: mean, max
+        \item<2-> Jerk: mean, max
+        \item<2-> Heading change per second
+        \item<2-> Min.\ neighbour distance
+        \item<2-> Collision indicator
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \onslide<3->{
+      \textbf{Scene context features}
+      \begin{itemize}
+        \item<4-> Number of agents in scene
+        \item<4-> Number of vehicles
+        \item<4-> Scene bounding box area
+        \item<4-> Spatial agent density
+      \end{itemize}
+      }
+      \vspace{0.5em}
+      \onslide<5->{
+      $\Rightarrow$ \textbf{18 candidate features} joined with
+      Trajectron++ evaluation output via \texttt{data\_idx}
+      }
+    \end{column}
+  \end{columns}
 \end{frame}
 
-%--- Slide 8 -------------------------------------------------------------------
-\begin{frame}{Target Distribution \& Transformation}
-  % TODO: histogram of ml_ade; motivation for log transform / Gamma link
-  \begin{itemize}
-    \item \ldots
-  \end{itemize}
+%--- Slide: Target Distribution & Log Transform --------------------------------
+\begin{frame}{Target Distribution \& Log Transformation}
+  \begin{columns}
+    \begin{column}{0.50\textwidth}
+      \begin{itemize}[<+->]
+        \item \texttt{ml\_ade} is strongly \emph{right-skewed}
+              (skewness $= 2.59$)
+        \item Small errors are very frequent; large errors are rare
+              but influential
+        \item Log transformation (\texttt{log1p}) applied to stabilise
+              variance and improve model fit
+        \item Models are trained on log-scale target,
+              evaluated on original scale
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \begin{center}
+        % TODO: before/after histogram of ml_ade vs log(ml_ade)
+        \textit{[figure placeholder: before/after distribution]}
+      \end{center}
+    \end{column}
+  \end{columns}
 \end{frame}
 
-%--- Slide 9 -------------------------------------------------------------------
+%--- Slide: Feature Selection via Mutual Information --------------------------
 \begin{frame}{Feature Selection via Mutual Information}
-  % TODO: MI bar chart; selected vs. dropped features
-  \begin{itemize}
-    \item \ldots
-  \end{itemize}
+  \begin{columns}
+    \begin{column}{0.52\textwidth}
+      \begin{itemize}[<+->]
+        \item Features ranked by Mutual Information (MI) with target
+        \item MI captures \emph{non-linear} dependencies, unlike correlation
+        \item Elbow detection: largest single-step drop in ranked MI curve
+              separates informative features from low-signal tail
+        \item Features below the elbow are dropped
+        \item \textbf{18 $\to$ 10 candidate features}
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \begin{center}
+        % TODO: MI elbow bar chart (mi_elbow.png)
+        \textit{[figure placeholder: MI elbow plot]}
+      \end{center}
+    \end{column}
+  \end{columns}
 \end{frame}
 
-%--- Slide 10 ------------------------------------------------------------------
+%--- Slide: Multicollinearity Filter (VIF) ------------------------------------
 \begin{frame}{Handling Multicollinearity with VIF}
-  % TODO: VIF table before/after; which features were removed/combined
-  \begin{itemize}
-    \item \ldots
-  \end{itemize}
+  \begin{columns}
+    \begin{column}{0.52\textwidth}
+      \begin{itemize}[<+->]
+        \item Collinear features split SHAP attribution arbitrarily and
+              make GAM smooth terms unidentifiable
+        \item Iterative VIF elimination (threshold $= 5$)
+        \item At each step: drop the feature above threshold with the
+              \emph{lowest} $|\rho_\text{Spearman}|$ with target
+        \item Model settings always protected
+      \end{itemize}
+      \vspace{0.4em}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \onslide<3->{
+      \textbf{Dropped (VIF $> 5$):}\\[0.3em]
+      \small
+      \begin{tabular}{lr}
+        \texttt{mean\_speed}      & VIF $= 357$ \\
+        \texttt{max\_jerk}        & VIF $= 20$  \\
+        \texttt{mean\_jerk}       & VIF $= 12$  \\
+        \texttt{max\_acceleration}& VIF $= 10$  \\
+        \texttt{path\_efficiency} & VIF $= 9$   \\
+      \end{tabular}
+      }
+    \end{column}
+  \end{columns}
+        \onslide<4->{
+      \center{\textbf{6 final features:}\\[0.3em]
+      \small
+      \texttt{std\_speed}, \texttt{mean\_acceleration},
+      \texttt{min\_neighbor\_distance},\\
+      \texttt{heading\_change\_per\_sec},
+      \texttt{scene\_num\_VEHICLE},
+      \texttt{scene\_density\_VEHICLE}}
+      }
 \end{frame}

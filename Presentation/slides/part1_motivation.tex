@@ -6,91 +6,110 @@
 \begin{frame}{Trajectory Prediction for Autonomous Driving}
   \begin{columns}
     \begin{column}{0.55\textwidth}
-      \textbf{Task:} forecast the future $(x, y)$ positions of surrounding
-      agents---pedestrians, cyclists, vehicles---from their observed past
-      movements.
-      \vspace{0.5em}
       \begin{itemize}[<+->]
-        \item Essential for \emph{safe path planning} and collision avoidance
+        \item \textbf{Task:} forecast future $(x, y)$ positions of agents
+              (pedestrians, cyclists, vehicles) from observed past movements
+        \item Challenging due to \textbf{complex agent interactions} and influence of \textbf{static context}
+        \item Essential for \textcolor{lmugreen}{\textbf{safe path planning}} and \textcolor{lmugreen}{\textbf{collision avoidance}}
               in autonomous vehicles
-        \item Inherently \emph{multimodal}: many plausible futures exist
-              (a pedestrian may turn left or right)
-        \item Agents \emph{interact} with each other and react to the
-              scene layout
-        \item Scene context matters: open squares behave very differently
-              from narrow corridors
       \end{itemize}
     \end{column}
     \begin{column}{0.42\textwidth}
-      \vspace{0.5em}
       \begin{center}
-        % TODO: replace with a trajectory prediction figure (e.g. nuScenes scene
-        % with predicted trajectories overlaid)
+        % TODO: nuScenes scene figure with trajectory predictions overlaid
         \textit{[figure placeholder]}
       \end{center}
     \end{column}
   \end{columns}
 \end{frame}
 
-%--- Slide: Federated Learning for Trajectory Prediction ----------------------
-\begin{frame}{Federated Learning for Trajectory Prediction}
+%--- Slide: Trajectron++ -------------------------------------------------------
+\begin{frame}{Trajectron++}
   \begin{columns}
-    \begin{column}{0.54\textwidth}
-      \textbf{What is Federated Learning?}\\[0.3em]
-      Train a shared model across many clients (cameras, cities, operators)
-      \emph{without moving raw data}---clients share model updates, not video.
-      \vspace{0.5em}
+    \begin{column}{0.52\textwidth}
       \begin{itemize}[<+->]
-        \item Video data is privacy-sensitive and cannot be centralized
-        \item Trajectory data is naturally distributed across many sites
-        \item Each site has \emph{unique motion patterns} (non-IID):
-              a single global model may not fit all environments
-        \item \textbf{Personalization:} share a common encoder, keep
-              local prediction heads per site
+        \item State-of-the-art probabilistic trajectory prediction model
+              \textnormal{\small[Salzmann et al., 2020]}
+        \item \emph{Spatio-temporal graph encoder}
+        \begin{itemize}
+          \item LSTM per agent 
+          \item edges encode agent--agent interactions
+        \end{itemize}
+        \item \emph{CVAE decoder}
+        \begin{itemize}
+          \item Outputs a distribution over future
+              trajectories
+        \end{itemize}
+        \item Handles \emph{heterogeneous} agent types jointly
+              (pedestrian, bicycle, car) and integrates HD map context
       \end{itemize}
     \end{column}
-    \begin{column}{0.43\textwidth}
+    \begin{column}{0.45\textwidth}
       \onslide<2->{
-      \textbf{Pipeline:}\\[0.4em]
-      \small
-      \begin{tabular}{l}
-        Video stream \\
-        $\downarrow$ Detection \& Tracking \\
-        $\downarrow$ Trajectories $(x, y, t)$ \\
-        $\downarrow$ Local model training \\
-        $\downarrow$ Server aggregation \\
-        $\downarrow$ Personalised prediction
-      \end{tabular}
+        \textbf{trajdata} \textnormal{\small[NVLabs]}\\[0.4em]
+        \begin{itemize}
+          \item Unified interface to many trajectory datasets
+                (nuScenes, ETH/UCY, \ldots)
+          \item[$\Rightarrow$] Our analysis pipeline applies to
+                \emph{any} trajdata-supported dataset
+        \end{itemize}
       }
     \end{column}
   \end{columns}
 \end{frame}
 
+%--- Slide: nuScenes -----------------------------------------------------------
+\begin{frame}{nuScenes Dataset}
+  \begin{columns}
+    \begin{column}{0.50\textwidth}
+      \begin{itemize}[<+->]
+        \item 1\,000 urban driving scenes, Boston \& Singapore
+        \item Agent types: pedestrians, cyclists, vehicles
+        \item Rich sensor suite: camera, LiDAR, radar, GPS, HD map
+        \item Standard split: 700 / 150 / 150 scenes
+              (train / val / test)
+      \end{itemize}
+      \vspace{0.5em}
+      \onslide<5->{
+        \textbf{Prediction metrics:}\\[0.3em]
+        \begin{tabular}{ll}
+          \texttt{ml\_ade}   & most-likely ADE \textcolor{lmugreen}{\textbf{$\leftarrow$ used}}\\
+          \texttt{ml\_fde}   & most-likely FDE \\
+          \texttt{min\_ade\_5} & best-of-5 ADE \\
+          \texttt{nll\_mean} & negative log-likelihood \\
+        \end{tabular}
+      }
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \begin{center}
+        % TODO: nuScenes scene image or trajectory plot
+        \textit{[figure placeholder]}
+      \end{center}
+    \end{column}
+  \end{columns}
+\end{frame}
+
 %--- Slide: Research Questions -------------------------------------------------
-\begin{frame}{The Problem with Aggregate Metrics}
+\begin{frame}{Challenges and Research Questions}
   \begin{columns}
     \begin{column}{0.52\textwidth}
-      Before scaling to FL, we need to understand model behaviour
-      on a single dataset.
-      \vspace{0.4em}
       \begin{itemize}[<+->]
-        \item A single average ADE/FDE hides large variation across trajectories
         \item Some trajectories are inherently hard, others trivially
               easy---but \emph{why?}
+        \item A single average ADE/FDE gives no insight into reasons
+              for failure and success
         \item No understanding of which trajectory or scene characteristics
               drive per-trajectory prediction error
       \end{itemize}
-      \vspace{0.5em}
-      \onslide<4->{$\Rightarrow$ Aggregate metrics cannot guide personalisation
-      decisions in FL.}
+      \vspace{0.4em}
+      \onslide<4->{$\Rightarrow$ \textbf{\textcolor{lmugreen}{Three research questions:}}}
     \end{column}
     \begin{column}{0.45\textwidth}
-      \onslide<5->{\textbf{Three Research Questions:}}
       \begin{enumerate}
         \item<5-> Which trajectory and scene characteristics affect model
               performance?
-        \item<6-> Do distinct \emph{performance regimes} (recurring failure /
-              success patterns) exist?
+        \item<6-> What are the \emph{success and failure modes} that explain
+              model performance?
         \item<7-> How do model settings (history window, prediction horizon,
               attention radius) affect performance?
       \end{enumerate}

@@ -2,24 +2,71 @@
 
 \section{Interpretable Modeling}
 
-%--- Slide 11 ------------------------------------------------------------------
-\begin{frame}{Why GAM + XGBoost?}
-  \begin{columns}
+%--- Slide: Why interpretable models? ------------------------------------------
+\begin{frame}{Why Interpretable Models?}
+  \begin{itemize}[<+->]
+    \item We have per-trajectory \texttt{ml\_ade} — but raw error values
+          alone do not tell us \emph{why} some trajectories are hard
+    \item A black-box model can predict ADE well but gives no insight
+          into which features drive it or in which direction
+    \item \textbf{Interpretable models} let us directly read off feature
+          effects: how does speed, heading change, or scene density
+          affect prediction error?
+    \item This turns ADE into actionable understanding of model
+          behaviour
+  \end{itemize}
+\end{frame}
+
+%--- Slide: GAM and XGBoost ---------------------------------------------------
+\begin{frame}{GAM and XGBoost}
+  We tested two interpretable modeling approaches --- either can be used
+  for the analysis.
+  \vspace{0.5em}
+  \begin{columns}[t]
     \begin{column}{0.48\textwidth}
-      \textbf{GAM (Penalized Splines)}
-      \begin{itemize}
-        \item Directly interpretable smooth effects
-        \item One spline per feature, no interaction terms
+      \textbf{GAM (Generalized Additive Model)}
+      \visible<2->{\begin{itemize}[<+->]
+        \item Models target as a sum of smooth functions: $f(x) = \sum_j s_j(x_j)$
+        \item One spline per feature — no interaction terms
         \item p-values for significance testing
-        % TODO: add further GAM motivation
-      \end{itemize}
+        \item Directly readable smooth effects
+      \end{itemize}}
     \end{column}
     \begin{column}{0.48\textwidth}
       \textbf{XGBoost}
-      \begin{itemize}
-        \item Captures non-linearities and interactions
-        \item SHAP values for local + global interpretation
-        % TODO: add further XGBoost motivation
+      \visible<3->{\begin{itemize}[<+->]
+        \item Gradient-boosted decision trees
+        \item Flexibly captures non-linearities
+              and feature interactions
+        \item Post-hoc interpretation via SHAP values
+      \end{itemize}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Slide: Partial dependence & SHAP -----------------------------------------
+\begin{frame}{Interpreting the Models: Partial Dependence \& SHAP}
+  \begin{columns}[t]
+    \begin{column}{0.48\textwidth}
+      \textbf{GAM — Partial Dependence}
+      \begin{itemize}[<+->]
+        \item The fitted smooth $\hat{s}_j(x_j)$ shows the marginal
+              effect of feature $j$ on \texttt{ml\_ade}
+        \item Holding all other features at their mean
+        \item Confidence bands from the spline fit
+        \item[$\Rightarrow$] How does ADE change as, e.g., speed increases?
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{XGBoost — SHAP Values}
+      \begin{itemize}[<+->]
+        \item Each prediction is decomposed into per-feature
+              contributions
+        \item \emph{Local:} why was this trajectory's ADE high?
+        \item \emph{Global:} average $|$SHAP$|$ gives overall
+              feature importance and direction
+        \item[$\Rightarrow$] Same question answered from a
+              different angle
       \end{itemize}
     \end{column}
   \end{columns}
