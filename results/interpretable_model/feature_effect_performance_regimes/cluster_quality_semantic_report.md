@@ -69,6 +69,36 @@ Values are computed over exported candidates only.
 | GAM / VIF only | hard | optics | 2 | 0.148 | 0.367 | 0.837 | 40 | strongest numeric hard DBCV, but structurally broad-plus-outlier |
 | GAM / VIF only | medium | optics | 2 | 0.300 | 0.114 | 0.695 | 41 | weak; low DBCV and a tiny second cluster |
 
+## Alternative Promising Clusterings
+
+To avoid over-committing to the notebook-selected candidate, I also reviewed the best unique exported candidate families per run/group. Candidates were ranked by raw effect-space DBCV, then de-duplicated by cluster-count/noise/share structure and top-effect pattern so near-identical parameter variants were not counted as separate semantic evidence.
+
+| run | group | alternative-candidate finding | semantic consequence |
+| --- | --- | --- | --- |
+| XGB / MI+VIF | easy | The selected OPTICS candidate is the strongest candidate (DBCV 0.411). The next HDBSCAN families have lower DBCV around 0.27-0.30 and split the same structure into 3-8 clusters. | No missed main narrative. Alternatives only subdivide the easy group into a large mild easy cluster plus lower-speed/very-easy subclusters. |
+| XGB / MI+VIF | medium | The top OPTICS alternatives have almost identical quality and structure (DBCV 0.337-0.396): one large `max_speed`-positive cluster plus a tiny low-speed/high-turning cluster. A HDBSCAN family exposes a tiny high-`std_speed` higher-error cluster, but DBCV is only about 0.038 and the cluster is tiny. | No robust alternative medium segmentation. Whole-group and noise profiles remain more informative than alternative clusters. |
+| XGB / MI+VIF | hard | Selected DBCV is low (0.091). A lower-noise 2-cluster alternative exists (DBCV 0.072, noise 0.200), but it is one dominant 80% cluster plus a 4-row extreme cluster with high `ml_ade`. | This supports the existence of rare extreme hard outliers, but it is not a stable cluster narrative. |
+| GAM / MI+VIF | easy | HDBSCAN alternatives have lower DBCV (about 0.28-0.35) but often lower noise than the selected OPTICS candidate. They reproduce the same slow/stationary easy substructure. | Alternatives reinforce, rather than change, the easy narrative. |
+| GAM / MI+VIF | medium | Only one exported candidate family is available: a dominant 84% cluster plus two tiny low-`max_speed` clusters. | No alternative medium narrative. |
+| GAM / MI+VIF | hard | Several alternatives with DBCV around 0.15-0.19 isolate the same high-`std_speed`/high-turning outlier pattern. One 2-cluster alternative has much lower noise (0.250) but its high-speed outlier cluster is only about 1% of hard rows. | Alternatives strengthen the hard outlier interpretation but do not support several broad hard subgroups. |
+| XGB / VIF only | hard | The best alternatives are near-duplicates of the selected OPTICS family (DBCV 0.245-0.286): a broad lower-error hard cluster plus a tiny extreme high-`std_speed`/high-acceleration cluster. | No missed alternative segmentation. The extreme-hard signal is stable, but tiny. |
+| GAM / VIF only | hard | The selected candidate has the best DBCV (0.367). Alternatives with DBCV 0.185-0.221 are noisier or split the broad lower-error cluster while preserving tiny high-speed outliers. | Selected candidate is the best representative. Alternatives confirm outliers but add little. |
+| GAM / VIF only | medium | The only plausible alternative has lower DBCV (0.080) and the same dominant-cluster structure; its tiny second cluster has higher `ml_ade` but is not stable enough. | No useful alternative medium segmentation. |
+
+Overall, reviewing multiple promising candidates did not uncover a major missed narrative. The recurring alternative pattern is small extreme hard outliers; these are real enough to mention but too small and too parameter-sensitive to present as primary clusters.
+
+## Added Feature Relevance In VIF-Only Runs
+
+I specifically scanned all exported VIF-only candidate clusters for `min_neighbor_distance`, `scene_num_VEHICLE`, and `scene_density_VEHICLE`. None of these added features is the dominant feature effect in any exported non-noise cluster.
+
+| feature | evidence across exported VIF-only candidates | interpretation |
+| --- | --- | --- |
+| `min_neighbor_distance` | In XGB / VIF-only hard candidates, it often appears as the third-largest effect in the broad lower-error hard cluster. In the selected candidate, the effect is +0.047, about 17% of the dominant `std_speed` effect, with almost no raw shift (-0.03 within-group IQR, +0.09 global IQR) and lower `ml_ade` than the hard-group median. In GAM / VIF-only it never forms a non-trivial top-3 cluster feature. | Weak secondary XGB effect only. It does not support a robust neighbor-distance explanation pattern. |
+| `scene_num_VEHICLE` | In GAM / VIF-only hard alternatives it occasionally appears as a third effect in tiny high-error clusters, usually around 1-4% of hard rows and only about 5% of the dominant effect size. Raw vehicle-count shifts are small. | Possible incidental descriptor of some extreme hard outliers, but too weak and too small for a narrative. |
+| `scene_density_VEHICLE` | It appears only in tiny XGB / VIF-only hard clusters of about 0.3% of hard rows, with lower-quality candidates and small relative effect size. GAM excluded it from clustering because it was not significant. | Not semantically relevant in the exported clusterings. |
+
+The larger VIF-only feature set therefore does not reveal a convincing scene-interaction or vehicle-context cluster family. The extra features are at most secondary descriptors; the stable semantic axes remain speed variation, heading change, and acceleration.
+
 ## Performance Within Selected Clusters
 
 Cluster-level `ml_ade` is important for interpreting broad-plus-extreme splits. The original report interpretation used the performance group as the conditioning frame; the additional check below shows whether selected clusters also separate severity within the group.
