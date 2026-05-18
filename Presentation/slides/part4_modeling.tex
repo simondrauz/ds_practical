@@ -66,6 +66,64 @@
     \end{itemize}
     \item OOF evaluation: inspect out-of-fold predictions for instability
           and bias
+  \end{itemize}
+\end{frame}
+
+%--- OOF diagnostics: XGBoost MI+VIF -------------------------------------------
+\begin{frame}{OOF Diagnostics — XGBoost}
+  \framesubtitle{MI\,+\,VIF feature set — main analysis}
+  \centering
+  \vspace{-0.25em}
+
+  \begin{minipage}[t][0.48\textheight][t]{0.95\textwidth}
+    \centering
+    \includegraphics[width=\textwidth,height=0.48\textheight,keepaspectratio]{oof_diagnostics_xgb_mi_vif}
+  \end{minipage}
+
+  \vspace{0.15em}
+  \begin{minipage}{0.88\textwidth}
+    \footnotesize
+    \begin{itemize}
+      \item Strong agreement at low-to-moderate ADE; systematic
+            underprediction at high ADE values
+    \end{itemize}
+  \end{minipage}
+\end{frame}
+
+%--- OOF diagnostics: XGBoost VIF only -----------------------------------------
+\begin{frame}{OOF Diagnostics — XGBoost}
+  \framesubtitle{VIF-only feature set — follow-up comparison}
+  \centering
+  \vspace{-0.25em}
+
+  \begin{minipage}[t][0.48\textheight][t]{0.95\textwidth}
+    \centering
+    \includegraphics[width=\textwidth,height=0.48\textheight,keepaspectratio]{oof_diagnostics_xgb_vif_only}
+  \end{minipage}
+
+  \vspace{0.15em}
+  \begin{minipage}{0.88\textwidth}
+    \footnotesize
+    \begin{itemize}
+      \item Residual pattern nearly unchanged
+      \item MI\,+\,VIF retained for clearer downstream cluster structure;
+            VIF-only used as a complementary check
+    \end{itemize}
+  \end{minipage}
+\end{frame}
+
+%--- Return to validation slide with conclusion --------------------------------
+\begin{frame}{Validating the Tuning Procedure — Nested Resampling}
+  \begin{itemize}
+    \item \textbf{Problem:} hyperparameter tuning risks overfitting to a
+          particular data split
+    \item \textbf{Solution:} nested cross-validation
+    \begin{itemize}
+      \item Outer folds: evaluate generalization of the full tuning procedure
+      \item Inner folds: tune hyperparameters on each outer-fold training set via cross-validation
+    \end{itemize}
+    \item OOF evaluation: inspect out-of-fold predictions for instability
+          and bias
     \item \textbf{Conclusion:} tuning generalises stably $\to$ proceed to
           full-data tuning + refit
   \end{itemize}
@@ -75,35 +133,13 @@
   not out-of-fold performance.
 \end{frame}
 
-%--- OOF diagnostics: XGBoost MI+VIF -------------------------------------------
-\begin{frame}{OOF Diagnostics — XGBoost (MI\,+\,VIF, 4 features)}
-  \begin{center}
-    \includegraphics[width=0.88\textwidth]{oof_diagnostics_xgb_mi_vif}
-  \end{center}
-  \vspace{-0.3em}
-  \footnotesize
-  Model fits well for low-to-moderate ADE but \textbf{underpredicts} at
-  high error values — a known consequence of the right-skewed target.
-\end{frame}
-
-%--- OOF diagnostics: XGBoost VIF only -----------------------------------------
-\begin{frame}{OOF Diagnostics — XGBoost (VIF only, 6 features)}
-  \begin{center}
-    \includegraphics[width=0.88\textwidth]{oof_diagnostics_xgb_vif_only}
-  \end{center}
-  \vspace{-0.3em}
-  \footnotesize
-  Similar underprediction pattern; the larger feature set does not
-  substantially change residual behaviour.
-\end{frame}
-
 %--- Slide: GAM Variant Selection ----------------------------------------------
 \begin{frame}{GAM Variant Selection}
   \begin{columns}[t]
     \begin{column}{0.44\textwidth}
       \textbf{Three candidates:}
       \begin{itemize}
-        \item \textbf{LinearGAM} — fitted on raw \texttt{ml\_ade}
+        \item \textbf{LinearGAM (no log)} — fitted on raw \texttt{ml\_ade}
         \item \textbf{LinearGAM (log)} — fitted on
               $\log(1+\texttt{ml\_ade})$, evaluated on original scale
         \item \textbf{GammaGAM} — Gamma distribution with log link,
@@ -118,13 +154,13 @@
         \toprule
         \textbf{Variant} & \textbf{RMSE} & \textbf{R$^2$} & \textbf{MAE} \\
         \midrule
-        \textcolor{lmugreen}{\textbf{LinearGAM}} & \textcolor{lmugreen}{\textbf{0.440}} & \textcolor{lmugreen}{\textbf{0.515}} & \textcolor{lmugreen}{0.268} \\
-        LinearGAM (log)  & 0.444          & 0.506          & \textbf{0.255} \\
-        GammaGAM         & 0.475          & 0.434          & 0.277 \\
+        LinearGAM & 0.448 & 0.491 & 0.263 \\
+        \textcolor{lmugreen}{\textbf{LinearGAM (log)}} & \textcolor{lmugreen}{\textbf{0.445}} & \textcolor{lmugreen}{\textbf{0.498}} & \textcolor{lmugreen}{0.250} \\
+        GammaGAM         & 0.445          & 0.498          & 0.253 \\
         \bottomrule
       \end{tabular}\\[0.4em]
       \footnotesize Outer-fold means, 3-fold nested CV\@.\\
-      \textcolor{lmugreen}{\textbf{LinearGAM selected.}}
+      \textcolor{lmugreen}{\textbf{LinearGAM (log) selected.}}
     \end{column}
   \end{columns}
 \end{frame}
@@ -133,9 +169,9 @@
 \begin{frame}{Final Model Performance (OOF)}
   \begin{columns}[t]
     \begin{column}{0.48\textwidth}
-      \textbf{GAM (LinearGAM)}
+      \textbf{GAM (LinearGAM, log)}
       \begin{itemize}
-        \item Fitted on raw \texttt{ml\_ade}
+        \item Fitted on \texttt{log1p(ml\_ade)}
         \item Additive smooth terms, one per feature
       \end{itemize}
       \vspace{0.5em}
@@ -144,9 +180,9 @@
         \toprule
         \textbf{Metric} & \textbf{OOF value} \\
         \midrule
-        RMSE & 0.440 \\
-        R$^2$ & 0.515 \\
-        MAE  & 0.268 \\
+        RMSE & 0.445 \\
+        R$^2$ & 0.498 \\
+        MAE  & 0.250 \\
         \bottomrule
       \end{tabular}
     \end{column}
@@ -163,9 +199,9 @@
         \toprule
         \textbf{Metric} & \textbf{OOF value} \\
         \midrule
-        RMSE & \textbf{0.387} \\
-        R$^2$ & \textbf{0.624} \\
-        MAE  & \textbf{0.213} \\
+        RMSE & \textbf{0.388} \\
+        R$^2$ & \textbf{0.619} \\
+        MAE  & \textbf{0.214} \\
         \bottomrule
       \end{tabular}
     \end{column}

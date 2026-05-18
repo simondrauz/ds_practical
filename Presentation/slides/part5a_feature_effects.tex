@@ -12,6 +12,52 @@
 
 %--- Slide 15 ------------------------------------------------------------------
 \begin{frame}{Global Feature Importance}
+  \small
+  \textbf{Feature Selection:} MI elbow + VIF
+  \vspace{0.5em}
+  \begin{columns}[t]
+    \begin{column}{0.50\textwidth}
+      \textbf{XGBoost} — mean $|\mathrm{SHAP}|$
+      \vspace{0.3em}
+      \renewcommand{\arraystretch}{1.2}
+      \begin{tabular}{lc}
+        \toprule
+        \textbf{Feature} & \textbf{Mean $|\mathrm{SHAP}|$} \\
+        \midrule
+        \texttt{std\_speed}                & \textbf{0.109} \\
+        \texttt{max\_speed}                & 0.103 \\
+        \texttt{heading\_change\_per\_sec} & 0.090 \\
+        \texttt{mean\_acceleration}        & 0.026 \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \textbf{GAM} — smooth-term significance
+      \vspace{0.3em}
+      \renewcommand{\arraystretch}{1.2}
+      \begin{tabular}{lc}
+        \toprule
+        \textbf{Feature} & \textbf{$p < 0.05$?} \\
+        \midrule
+        \texttt{heading\_change\_per\_sec} & \textcolor{lmugreen}{\checkmark} \\
+        \texttt{max\_speed}                & \textcolor{lmugreen}{\checkmark} \\
+        \texttt{mean\_acceleration}        & \textcolor{lmugreen}{\checkmark} \\
+        \texttt{std\_speed}                & \textcolor{lmugreen}{\checkmark} \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+  \end{columns}
+  \vspace{0.4em}
+  \footnotesize
+  \textbf{Both models agree:} speed variation, maximum speed, turning, and
+  acceleration explain the global error pattern; all retained GAM smooth terms
+  are significant.
+\end{frame}
+
+\begin{frame}{Global Feature Importance}
+  \small
+  \textbf{Feature Selection:} VIF only
+  \vspace{0.5em}
   \begin{columns}[t]
     \begin{column}{0.50\textwidth}
       \textbf{XGBoost} — mean $|\mathrm{SHAP}|$
@@ -55,67 +101,101 @@
   error. Scene density is consistently least important.
 \end{frame}
 
-%--- Slide 16 ------------------------------------------------------------------
-\begin{frame}{Feature Effects — What Drives Prediction Error?}
-  \begin{columns}[t]
-    \begin{column}{0.48\textwidth}
-      \textbf{Motion features}
-      \begin{itemize}[<+->]
-        \item \texttt{std\_speed}: strong positive effect —
-              erratic speed changes make trajectories harder to forecast
-        \item \texttt{heading\_change\_per\_sec}: positive effect —
-              more turning $\to$ higher ADE
-        \item \texttt{mean\_acceleration}: positive effect —
-              higher acceleration raises predicted error
+%--- Feature Effects: std_speed & heading_change_per_sec -----------------------
+\begin{frame}{Feature Effects — \texttt{std\_speed} \& \texttt{heading\_change\_per\_sec}}
+  \begin{columns}[T]
+    \begin{column}{0.4\textwidth}
+      \scriptsize
+      \textbf{\texttt{std\_speed}} — strong, monotone positive
+      \begin{itemize}\setlength\itemsep{0.1em}
+        \item dominant predictor
+        \item speed variability rises monotonically with predicted ADE
+        \item GAM confirms behaviour within the PDP range
+        \item \textit{Erratic speed changes are fundamentally harder to forecast.}
       \end{itemize}
+      \vspace{0.5em}
+      \textbf{\texttt{heading\_change\_per\_sec}} — positive, non-linear
+      \begin{itemize}\setlength\itemsep{0.1em}
+        \item turning raises ADE; plateaus at extreme values
+        \item GAM diverges: high effect near zero, \emph{decreasing} with more turning
+        \item \textit{Near-stationary agents inflate the low-turning tail; PDP trend is more robust.}
+      \end{itemize}
+      \vspace*{\fill}
+      \scriptsize\textit{PDP: 5--95\% percentile range. GAM smooth: full feature range with 95\% CI.}
     \end{column}
-    \begin{column}{0.48\textwidth}
-      \onslide<3->{\textbf{Scene \& proximity features}}
-      \begin{itemize}
-        \item<3-> \texttt{min\_neighbor\_distance}: mild positive effect
-                  — isolated agents are marginally harder to predict
-        \item<3-> \texttt{scene\_num\_VEHICLE}: small positive effect;
-                  crowded vehicle context increases error slightly
-        \item<3-> \texttt{scene\_density\_VEHICLE}: not significant in GAM;
-                  weakest SHAP contribution in XGBoost
-      \end{itemize}
-      \onslide<4->{
-      \vspace{0.4em}
-      \footnotesize
-      $\Rightarrow$ Trajectron++ struggles most with
-      \textbf{fast, erratic, turning pedestrians}; scene context
-      is a secondary factor.
-      }
+    \begin{column}{0.57\textwidth}
+      \centering
+      {\setlength\tabcolsep{2pt}%
+      \begin{tabular}{@{}cc@{}}
+        \scriptsize\textbf{PDP} & \scriptsize\textbf{GAM smooth} \\[0.15em]
+        \includegraphics[width=0.43\columnwidth,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_std_speed.png} &
+        \includegraphics[width=0.43\columnwidth,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_std_speed.png} \\[0.3em]
+        \includegraphics[width=0.43\columnwidth,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_heading_change_per_sec.png} &
+        \includegraphics[width=0.43\columnwidth,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_heading_change_per_sec.png}
+      \end{tabular}}
     \end{column}
   \end{columns}
 \end{frame}
 
-%--- Slide 17 ------------------------------------------------------------------
-\begin{frame}{Feature Effects — Partial Dependence}
-  \begin{columns}[t]
-    \begin{column}{0.48\textwidth}
-      \textbf{GAM — smooth effects}
-      \begin{itemize}[<+->]
-        \item Marginal effect of each feature on
-              predicted \texttt{ml\_ade}, holding others fixed
-        \item \texttt{std\_speed}: monotonically increasing — more
-              speed variation $\to$ higher error
-        \item \texttt{heading\_change\_per\_sec}: positive, non-linear
-              — effect levels off at high turning rates
-        \item Confidence bands narrow in high-density regions
+%--- Feature Effects: max_speed & mean_acceleration ----------------------------
+\begin{frame}{Feature Effects — \texttt{max\_speed} \& \texttt{mean\_acceleration}}
+  \begin{columns}[T]
+    \begin{column}{0.4\textwidth}
+      \scriptsize
+      \textbf{\texttt{max\_speed}} — positive, broadly increasing
+      \begin{itemize}\setlength\itemsep{0.1em}
+        \item higher peak speeds raise predicted ADE
+        \item second-strongest driver after \texttt{std\_speed}
+        \item GAM confirms; confidence bands widen at tail (data sparsity)
+        \item \textit{Faster peak speeds widen the trajectory envelope.}
       \end{itemize}
+      \vspace{0.5em}
+      \textbf{\texttt{mean\_acceleration}} — near-zero, mixed
+      \begin{itemize}\setlength\itemsep{0.1em}
+        \item oscillates around zero across its full range
+        \item GAM: not significant; consistent with XGBoost
+        \item \textit{Acceleration alone does not drive prediction error.}
+      \end{itemize}
+      \vspace*{\fill}
+      \scriptsize\textit{PDP: 5--95\% percentile range. GAM smooth: full feature range with 95\% CI.}
     \end{column}
-    \begin{column}{0.48\textwidth}
-      \onslide<2->{\textbf{XGBoost — SHAP dependence}}
-      \begin{itemize}
-        \item<2-> Global picture consistent with GAM:
-                  \texttt{std\_speed} contributes most strongly
-        \item<2-> \texttt{min\_neighbor\_distance} shows a
-                  non-monotonic pattern — very close \emph{and}
-                  very distant neighbors raise error
-        \item<3-> Both models: scene features show flat or
-                  near-zero marginal effects compared to motion features
+    \begin{column}{0.57\textwidth}
+      \centering
+      {\setlength\tabcolsep{2pt}%
+      \begin{tabular}{@{}cc@{}}
+        \scriptsize\textbf{PDP} & \scriptsize\textbf{GAM smooth} \\[0.15em]
+        \includegraphics[width=0.43\columnwidth,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_max_speed.png} &
+        \includegraphics[width=0.43\columnwidth,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_max_speed.png} \\[0.3em]
+        \includegraphics[width=0.43\columnwidth,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_mean_acceleration.png} &
+        \includegraphics[width=0.43\columnwidth,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_mean_acceleration.png}
+      \end{tabular}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Feature Effects: scene_density_VEHICLE ------------------------------------
+\begin{frame}{Feature Effects — \texttt{scene\_density\_VEHICLE}}
+  \begin{columns}[T]
+    \begin{column}{0.4\textwidth}
+      \scriptsize
+      \textbf{\texttt{scene\_density\_VEHICLE}} — negligible, noisy
+      \begin{itemize}\setlength\itemsep{0.1em}
+        \item noisy oscillation throughout the feature range
+        \item effect scale negligible relative to motion features
+        \item GAM: not significant — confidence bands span zero
+        \item \textit{Scene density does not robustly explain individual trajectory prediction error.}
       \end{itemize}
+      \vspace*{\fill}
+      \scriptsize\textit{PDP: 5--95\% percentile range. GAM smooth: full feature range with 95\% CI.}
+    \end{column}
+    \begin{column}{0.57\textwidth}
+      \centering
+      {\setlength\tabcolsep{2pt}%
+      \begin{tabular}{@{}cc@{}}
+        \scriptsize\textbf{PDP} & \scriptsize\textbf{GAM smooth} \\[0.15em]
+        \includegraphics[width=0.48\columnwidth,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_vif_only_no_collision_target_ml_ade_log_pdp_scene_density_VEHICLE.png} &
+        \includegraphics[width=0.48\columnwidth,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_vif_only_no_collision_target_ml_ade_raw_smooth_additive_effect_scene_density_VEHICLE.png}
+      \end{tabular}}
     \end{column}
   \end{columns}
 \end{frame}
