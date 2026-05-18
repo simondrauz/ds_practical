@@ -4,18 +4,56 @@
 
 %--- Slide 23 ------------------------------------------------------------------
 \begin{frame}{Summary of Findings}
-  % TODO: fill in once results are finalised
-  \begin{itemize}
-    \item RQ1 — Characteristics driving performance: \ldots
-    \item RQ2 — Performance regimes: \ldots
-    \item RQ3 — Model settings: \ldots
-  \end{itemize}
+  \begin{enumerate}
+    \item<1-> \textbf{RQ1 — Which characteristics drive prediction error?}
+    \begin{itemize}
+      \item \texttt{std\_speed} (speed variation) and
+            \texttt{heading\_change\_per\_sec} (turning) are the
+            dominant drivers in both GAM and XGBoost
+      \item Scene-level features (\texttt{scene\_density\_VEHICLE}) are
+            consistently least important; Trajectron++ handles scene
+            context better than individual motion dynamics
+    \end{itemize}
+    \item<2-> \textbf{RQ2 — What are the success and failure modes?}
+    \begin{itemize}
+      \item Easy: slow or near-stationary pedestrians with low speed
+            variation — Trajectron++ excels here
+      \item Hard: continuous high-variation regime driven by erratic,
+            fast-turning pedestrians; no sharp sub-clusters
+    \end{itemize}
+    \item<3-> \textbf{RQ3 — How do model settings affect performance?}
+    \begin{itemize}
+      \item Prediction horizon (\texttt{prediction\_sec}) has the
+            largest effect — longer horizon raises error strongly
+      \item Attention radius (\texttt{attention\_radius\_m}) is
+            second; history window (\texttt{history\_sec}) has
+            minimal impact
+    \end{itemize}
+  \end{enumerate}
 \end{frame}
 
 %--- Slide 24 ------------------------------------------------------------------
 \begin{frame}{Limitations \& Future Work}
-  % TODO: limitations of the approach; directions for future work
-  \begin{itemize}
-    \item \ldots
+  \textbf{Limitations}
+  \begin{itemize}[<+->]
+    \item Analysis restricted to \emph{pedestrian} trajectories on
+          nuScenes — generalisability to other agent types or datasets
+          is not guaranteed
+    \item Meta-models explain Trajectron++ predictions, not ground-truth
+          difficulty — effects are model-specific
+    \item Hard-regime clustering is weak (75\% noise); discrete
+          failure-mode identification remains an open challenge
+    \item Settings sweep uses nuScenes \emph{mini} —
+          results may not transfer to full-scale training
   \end{itemize}
+  \vspace{0.4em}
+  \onslide<3->{%
+  \textbf{Future Work}
+  \begin{itemize}[<4->]
+    \item Extend pipeline to vehicle and cyclist trajectories
+    \item Apply to other trajectory prediction models and datasets
+          via the trajdata interface
+    \item Explore higher-capacity meta-models to better isolate
+          failure modes in the hard regime
+  \end{itemize}}
 \end{frame}

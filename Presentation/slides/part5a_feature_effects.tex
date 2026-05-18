@@ -2,36 +2,116 @@
 
 \section{Feature Effects \& Importance}
 
+\begin{frame}{Analysis Pipeline}
+  \vfill\pipelinehighlight{3}\vfill
+\end{frame}
+
 %--- Slide 15 ------------------------------------------------------------------
 \begin{frame}{Global Feature Importance}
-  \begin{columns}
-    \begin{column}{0.48\textwidth}
-      \textbf{XGBoost} (global SHAP)\\
-      % TODO: SHAP beeswarm or bar chart
-      \vspace{2cm}
+  \begin{columns}[t]
+    \begin{column}{0.50\textwidth}
+      \textbf{XGBoost} — mean $|\mathrm{SHAP}|$
+      \vspace{0.3em}
+      \renewcommand{\arraystretch}{1.2}
+      \begin{tabular}{lc}
+        \toprule
+        \textbf{Feature} & \textbf{Mean $|\mathrm{SHAP}|$} \\
+        \midrule
+        \texttt{std\_speed}               & \textbf{0.129} \\
+        \texttt{heading\_change\_per\_sec} & 0.070 \\
+        \texttt{min\_neighbor\_distance}   & 0.027 \\
+        \texttt{mean\_acceleration}        & 0.027 \\
+        \texttt{scene\_density\_VEHICLE}   & 0.020 \\
+        \texttt{scene\_num\_VEHICLE}       & 0.016 \\
+        \bottomrule
+      \end{tabular}
     \end{column}
-    \begin{column}{0.48\textwidth}
-      \textbf{GAM} (p-values of smooth effects)\\
-      % TODO: significance table or bar chart
-      \vspace{2cm}
+    \begin{column}{0.47\textwidth}
+      \textbf{GAM} — smooth-term significance
+      \vspace{0.3em}
+      \renewcommand{\arraystretch}{1.2}
+      \begin{tabular}{lc}
+        \toprule
+        \textbf{Feature} & \textbf{$p < 0.05$?} \\
+        \midrule
+        \texttt{heading\_change\_per\_sec} & \textcolor{lmugreen}{\checkmark} \\
+        \texttt{mean\_acceleration}        & \textcolor{lmugreen}{\checkmark} \\
+        \texttt{min\_neighbor\_distance}   & \textcolor{lmugreen}{\checkmark} \\
+        \texttt{std\_speed}               & \textcolor{lmugreen}{\checkmark} \\
+        \texttt{scene\_num\_VEHICLE}       & \textcolor{lmugreen}{\checkmark} \\
+        \texttt{scene\_density\_VEHICLE}   & $\times$ \\
+        \bottomrule
+      \end{tabular}
     \end{column}
   \end{columns}
-  % TODO: highlight agreement and disagreement between models
+  \vspace{0.4em}
+  \footnotesize
+  \textbf{Both models agree:} speed variation (\texttt{std\_speed}) and turning
+  (\texttt{heading\_change\_per\_sec}) are the dominant drivers of prediction
+  error. Scene density is consistently least important.
 \end{frame}
 
 %--- Slide 16 ------------------------------------------------------------------
-\begin{frame}{Feature Effects — Model Settings}
-  % TODO: smooth effect plots (GAM) / ALE plots (XGBoost) for
-  %       history_sec, prediction_sec, attention_radius_m
-  \begin{itemize}
-    \item \ldots
-  \end{itemize}
+\begin{frame}{Feature Effects — What Drives Prediction Error?}
+  \begin{columns}[t]
+    \begin{column}{0.48\textwidth}
+      \textbf{Motion features}
+      \begin{itemize}[<+->]
+        \item \texttt{std\_speed}: strong positive effect —
+              erratic speed changes make trajectories harder to forecast
+        \item \texttt{heading\_change\_per\_sec}: positive effect —
+              more turning $\to$ higher ADE
+        \item \texttt{mean\_acceleration}: positive effect —
+              higher acceleration raises predicted error
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \onslide<3->{\textbf{Scene \& proximity features}}
+      \begin{itemize}
+        \item<3-> \texttt{min\_neighbor\_distance}: mild positive effect
+                  — isolated agents are marginally harder to predict
+        \item<3-> \texttt{scene\_num\_VEHICLE}: small positive effect;
+                  crowded vehicle context increases error slightly
+        \item<3-> \texttt{scene\_density\_VEHICLE}: not significant in GAM;
+                  weakest SHAP contribution in XGBoost
+      \end{itemize}
+      \onslide<4->{
+      \vspace{0.4em}
+      \footnotesize
+      $\Rightarrow$ Trajectron++ struggles most with
+      \textbf{fast, erratic, turning pedestrians}; scene context
+      is a secondary factor.
+      }
+    \end{column}
+  \end{columns}
 \end{frame}
 
 %--- Slide 17 ------------------------------------------------------------------
-\begin{frame}{Feature Effects — Trajectory Characteristics}
-  % TODO: smooth effect plots / ALE plots for key trajectory + scene features
-  \begin{itemize}
-    \item \ldots
-  \end{itemize}
+\begin{frame}{Feature Effects — Partial Dependence}
+  \begin{columns}[t]
+    \begin{column}{0.48\textwidth}
+      \textbf{GAM — smooth effects}
+      \begin{itemize}[<+->]
+        \item Marginal effect of each feature on
+              predicted \texttt{ml\_ade}, holding others fixed
+        \item \texttt{std\_speed}: monotonically increasing — more
+              speed variation $\to$ higher error
+        \item \texttt{heading\_change\_per\_sec}: positive, non-linear
+              — effect levels off at high turning rates
+        \item Confidence bands narrow in high-density regions
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \onslide<2->{\textbf{XGBoost — SHAP dependence}}
+      \begin{itemize}
+        \item<2-> Global picture consistent with GAM:
+                  \texttt{std\_speed} contributes most strongly
+        \item<2-> \texttt{min\_neighbor\_distance} shows a
+                  non-monotonic pattern — very close \emph{and}
+                  very distant neighbors raise error
+        \item<3-> Both models: scene features show flat or
+                  near-zero marginal effects compared to motion features
+      \end{itemize}
+    \end{column}
+  \end{columns}
 \end{frame}

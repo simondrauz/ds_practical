@@ -2,29 +2,11 @@
 
 \section{Analysis Pipeline}
 
-%--- Slide 5 -------------------------------------------------------------------
-\begin{frame}{Two Analysis Paths}
-  % TODO: pipeline diagram (TikZ or figure)
-  \begin{columns}
-    \begin{column}{0.48\textwidth}
-      \textbf{Track 1 — Full Dataset}\\[0.4em]
-      Train Trajectron++ $\to$ per-trajectory ADE\\
-      $\to$ join trajectory + scene characteristics\\
-      $\to$ interpretable models $\to$ feature effects\\
-      $\to$ performance regime clustering\\
-      $\to$ cluster inspection
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \textbf{Track 2 — Mini Dataset (Settings Sweep)}\\[0.4em]
-      Cartesian sweep over model settings\\
-      $\to$ combine runs\\
-      $\to$ interpretable models\\
-      $\to$ feature effects with settings as predictors\\
-      \hspace{1em}(trajectory/scene chars as controls)
-    \end{column}
-  \end{columns}
-  \vspace{0.5em}
-  \footnotesize Clustering + cluster inspection run only on the full-dataset path.
+%--- Slide: Pipeline Overview --------------------------------------------------
+\begin{frame}{Analysis Pipeline}
+  \vfill
+  \pipelineoverview
+  \vfill
 \end{frame}
 
 %--- Slide 6 -------------------------------------------------------------------

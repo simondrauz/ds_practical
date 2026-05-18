@@ -23,9 +23,39 @@
 
 %--- Slide 22 ------------------------------------------------------------------
 \begin{frame}{Effect of Model Settings}
-  % TODO: feature effect plots for history_sec, prediction_sec,
-  %       attention_radius_m (GAM smooth / ALE)
-  \begin{itemize}
-    \item \ldots
-  \end{itemize}
+  \begin{columns}[t]
+    \begin{column}{0.50\textwidth}
+      \textbf{XGBoost — mean $|\mathrm{SHAP}|$ (pooled model)}
+      \vspace{0.3em}
+      \renewcommand{\arraystretch}{1.2}
+      \begin{tabular}{lc}
+        \toprule
+        \textbf{Feature} & \textbf{Mean $|\mathrm{SHAP}|$} \\
+        \midrule
+        \texttt{prediction\_sec}    & \textbf{0.178} \\
+        \texttt{attention\_radius\_m} & 0.098 \\
+        \texttt{std\_speed}         & 0.093 \\
+        \texttt{max\_speed}         & 0.070 \\
+        \texttt{history\_sec}       & 0.022 \\
+        \bottomrule
+      \end{tabular}
+      \vspace{0.4em}
+      \footnotesize All 8 features significant in GAM ($p \ll 0.01$).
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \textbf{Key findings}
+      \begin{itemize}[<+->]
+        \item \texttt{prediction\_sec}: largest effect — longer horizon
+              means harder forecasting (ADE grows with time)
+        \item \texttt{attention\_radius\_m}: second — larger radius
+              provides more context but also adds noise;
+              non-linear optimal range
+        \item \texttt{history\_sec}: smallest setting effect — model
+              is robust to history window length in this range
+        \item Trajectory features (\texttt{std\_speed},
+              \texttt{max\_speed}) retain strong explanatory power
+              even after controlling for settings
+      \end{itemize}
+    \end{column}
+  \end{columns}
 \end{frame}

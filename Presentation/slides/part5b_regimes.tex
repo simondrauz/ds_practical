@@ -2,6 +2,10 @@
 
 \section{Performance Regimes}
 
+\begin{frame}{Analysis Pipeline}
+  \vfill\pipelinehighlight{4}\vfill
+\end{frame}
+
 %--- Slide 18 ------------------------------------------------------------------
 \begin{frame}{Performance Regime Methodology}
   \begin{enumerate}
@@ -20,17 +24,80 @@
 
 %--- Slide 19 ------------------------------------------------------------------
 \begin{frame}{Clustering Results}
-  % TODO: UMAP scatter coloured by cluster, DBCV scores per difficulty group
-  \begin{itemize}
-    \item \ldots
-  \end{itemize}
+  \begin{columns}[t]
+    \begin{column}{0.50\textwidth}
+      \textbf{Performance group sizes} (VIF-only run)\\[0.3em]
+      \renewcommand{\arraystretch}{1.2}
+      \begin{tabular}{lccc}
+        \toprule
+        \textbf{Group} & \textbf{Boundary} & \textbf{N} & \textbf{\%} \\
+        \midrule
+        Easy   & $<0.39$ & 15\,348 & 59\% \\
+        Medium & $0.39$–$1.20$ & 8\,094 & 31\% \\
+        Hard   & $>1.20$ & 2\,680 & 10\% \\
+        \bottomrule
+      \end{tabular}
+      \vspace{0.5em}
+      \begin{itemize}[<2->]
+        \item<2-> Clustering algorithm: \textbf{OPTICS} on raw
+              feature-effect space (no UMAP needed for 6-dimensional space)
+        \item<2-> Quality assessed via \textbf{DBCV} score
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \onslide<3->{\textbf{Cluster quality by group}}
+      \onslide<3->{
+      \vspace{0.3em}
+      \renewcommand{\arraystretch}{1.2}
+      \begin{tabular}{lcc}
+        \toprule
+        \textbf{Group} & \textbf{DBCV} & \textbf{Noise \%} \\
+        \midrule
+        Easy   & \textcolor{lmugreen}{\textbf{0.411}} & 30\% \\
+        Medium & 0.397 & 40\% \\
+        Hard   & 0.091 & 75\% \\
+        \bottomrule
+      \end{tabular}
+      \vspace{0.4em}
+      \footnotesize
+      Easy group has the clearest substructure.\\
+      Hard is mostly a continuous high-error regime.
+      }
+    \end{column}
+  \end{columns}
 \end{frame}
 
 %--- Slide 20 ------------------------------------------------------------------
 \begin{frame}{Regime Inspection — What Drives Error in Each Regime?}
-  % TODO: per-cluster SHAP / additive contribution summary;
-  %       feature value distributions per cluster
-  \begin{itemize}
-    \item \ldots
-  \end{itemize}
+  \begin{columns}[t]
+    \begin{column}{0.48\textwidth}
+      \textbf{Easy regime}
+      \begin{itemize}[<+->]
+        \item Low \texttt{std\_speed} ($-2.0\sigma$ global) and
+              low heading change $\to$ slow, predictable trajectories
+        \item Two sub-clusters:
+              \emph{slow/stationary} (median ADE 0.02)
+              vs.\ \emph{mild motion} (median ADE 0.22)
+        \item Both drive negative total feature effects
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \onslide<2->{\textbf{Hard regime}}
+      \begin{itemize}
+        \item<2-> 99.5\% of hard trajectories have \emph{positive}
+                  total feature effect
+        \item<2-> Dominated by high \texttt{std\_speed}
+                  ($+2.0\sigma$ global), turning, and acceleration
+        \item<3-> No sharp sub-clusters — hard is a
+                  \textbf{continuous high-variation regime};
+                  a small extreme outlier group has
+                  $\texttt{std\_speed} \approx +4.8\sigma$
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \vspace{0.4em}
+  \onslide<3->{%
+  \footnotesize
+  \textbf{Takeaway:} Trajectron++ struggles with erratic, fast-turning pedestrians.
+  Slow or near-stationary pedestrians are easy regardless of scene complexity.}
 \end{frame}

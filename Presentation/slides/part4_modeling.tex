@@ -2,6 +2,10 @@
 
 \section{Interpretable Modeling}
 
+\begin{frame}{Analysis Pipeline}
+  \vfill\pipelinehighlight{2}\vfill
+\end{frame}
+
 %--- Slide: Why interpretable models? ------------------------------------------
 \begin{frame}{Why Interpretable Models?}
   \begin{itemize}[<+->]
@@ -44,32 +48,31 @@
   \end{columns}
 \end{frame}
 
-%--- Slide: Partial dependence & SHAP -----------------------------------------
-\begin{frame}{Interpreting the Models: Partial Dependence \& SHAP}
+%--- Slide: Additive effects & SHAP -------------------------------------------
+\begin{frame}{Interpreting the Models: Additive Effects \& SHAP Values}
   \begin{columns}[t]
     \begin{column}{0.48\textwidth}
-      \textbf{GAM — Partial Dependence}
+      \textbf{GAM — Additive Effects}
       \begin{itemize}[<+->]
-        \item The fitted smooth $\hat{s}_j(x_j)$ shows the marginal
-              effect of feature $j$ on \texttt{ml\_ade}
-        \item Holding all other features at their mean
+        \item The model is a sum of smooth terms:
+              $\hat{y} = \sum_j \hat{s}_j(x_j)$
+        \item Each $\hat{s}_j$ directly shows how feature $j$
+              affects \texttt{ml\_ade} — no post-hoc step needed
         \item Confidence bands from the spline fit
-        \item[$\Rightarrow$] How does ADE change as, e.g., speed increases?
       \end{itemize}
     \end{column}
     \begin{column}{0.48\textwidth}
       \textbf{XGBoost — SHAP Values}
       \begin{itemize}[<+->]
         \item Each prediction is decomposed into per-feature
-              contributions
+              contributions post-hoc
         \item \emph{Local:} why was this trajectory's ADE high?
-        \item \emph{Global:} average $|$SHAP$|$ gives overall
-              feature importance and direction
-        \item[$\Rightarrow$] Same question answered from a
-              different angle
+        \item \emph{Global:} mean $|$SHAP$|$ gives feature
+              importance and direction
       \end{itemize}
     \end{column}
   \end{columns}
+  \vspace{0.5em}
 \end{frame}
 
 %--- Slide 12 ------------------------------------------------------------------
@@ -80,7 +83,7 @@
     \item \textbf{Solution:} nested cross-validation
     \begin{itemize}
       \item Outer folds: evaluate generalization of the full tuning procedure
-      \item Inner folds: tune hyperparameters on each outer-fold training set
+      \item Inner folds: tune hyperparameters on each outer-fold training set via cross-validation
     \end{itemize}
     \item OOF evaluation: inspect out-of-fold predictions for instability,
           outlier folds, bias
@@ -93,21 +96,83 @@
   not unbiased prediction.
 \end{frame}
 
-%--- Slide 13 ------------------------------------------------------------------
+%--- Slide: GAM Variant Selection ----------------------------------------------
 \begin{frame}{GAM Variant Selection}
-  % TODO: table comparing Linear / Linear-log / Gamma GAM by RMSE
-  \begin{itemize}
-    \item Candidates: linear GAM, linear GAM on log-transformed target,
-          Gamma GAM
-    \item Selection criterion: lowest RMSE
-    \item \ldots
-  \end{itemize}
+  \begin{columns}[t]
+    \begin{column}{0.44\textwidth}
+      \textbf{Three candidates:}
+      \begin{itemize}[<+->]
+        \item \textbf{LinearGAM} — fitted on raw \texttt{ml\_ade}
+        \item \textbf{LinearGAM (log)} — fitted on
+              $\log(\texttt{ml\_ade})$, evaluated on original scale
+        \item \textbf{GammaGAM} — Gamma distribution with log link,
+              suited for positive right-skewed targets
+      \end{itemize}
+      \vspace{0.5em}
+      \onslide<2->{Selection criterion: lowest mean outer-fold RMSE
+      (original scale).}
+    \end{column}
+    \begin{column}{0.53\textwidth}
+      \onslide<2->{
+      \renewcommand{\arraystretch}{1.3}
+      \begin{tabular}{lccc}
+        \toprule
+        \textbf{Variant} & \textbf{RMSE} & \textbf{R$^2$} & \textbf{MAE} \\
+        \midrule
+        \textcolor{lmugreen}{\textbf{LinearGAM}} & \textcolor{lmugreen}{\textbf{0.440}} & \textcolor{lmugreen}{\textbf{0.515}} & \textcolor{lmugreen}{0.268} \\
+        LinearGAM (log)  & 0.444          & 0.506          & \textbf{0.255} \\
+        GammaGAM         & 0.475          & 0.434          & 0.277 \\
+        \bottomrule
+      \end{tabular}\\[0.4em]
+      \footnotesize Outer-fold means, 3-fold nested CV\@.\\
+      \textcolor{lmugreen}{\textbf{LinearGAM selected.}}
+      }
+    \end{column}
+  \end{columns}
 \end{frame}
 
 %--- Slide 14 ------------------------------------------------------------------
 \begin{frame}{Final Model Performance (OOF)}
-  % TODO: OOF RMSE / R² table or bar chart for GAM and XGBoost
-  \begin{itemize}
-    \item \ldots
-  \end{itemize}
+  \begin{columns}[t]
+    \begin{column}{0.48\textwidth}
+      \textbf{GAM (LinearGAM)}
+      \begin{itemize}
+        \item Fitted on raw \texttt{ml\_ade}
+        \item Additive smooth terms, one per feature
+      \end{itemize}
+      \vspace{0.5em}
+      \renewcommand{\arraystretch}{1.3}
+      \begin{tabular}{lc}
+        \toprule
+        \textbf{Metric} & \textbf{OOF value} \\
+        \midrule
+        RMSE & 0.440 \\
+        R$^2$ & 0.515 \\
+        MAE  & 0.268 \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{XGBoost}
+      \begin{itemize}
+        \item Gradient-boosted trees
+        \item Post-hoc interpretation via SHAP
+      \end{itemize}
+      \vspace{0.5em}
+      \renewcommand{\arraystretch}{1.3}
+      \begin{tabular}{lc}
+        \toprule
+        \textbf{Metric} & \textbf{OOF value} \\
+        \midrule
+        RMSE & \textbf{0.387} \\
+        R$^2$ & \textbf{0.624} \\
+        MAE  & \textbf{0.213} \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+  \end{columns}
+  \vspace{0.5em}
+  \footnotesize
+  XGBoost outperforms GAM on all metrics. Both models are used as a
+  cross-check: the feature-effect narratives should agree across approaches.
 \end{frame}

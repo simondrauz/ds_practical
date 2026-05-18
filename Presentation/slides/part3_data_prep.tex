@@ -2,6 +2,10 @@
 
 \section{Data Preparation}
 
+\begin{frame}{Analysis Pipeline}
+  \vfill\pipelinehighlight{1}\vfill
+\end{frame}
+
 %--- Slide: Feature Engineering -----------------------------------------------
 \begin{frame}{Feature Engineering — Trajectory \& Scene Characteristics}
   \begin{columns}
@@ -59,63 +63,46 @@
   \end{columns}
 \end{frame}
 
-%--- Slide: Feature Selection via Mutual Information --------------------------
-\begin{frame}{Feature Selection via Mutual Information}
-  \begin{columns}
-    \begin{column}{0.52\textwidth}
+%--- Slide: Feature Selection — two approaches --------------------------------
+\begin{frame}{Feature Selection — Two Approaches}
+  \begin{columns}[t]
+    \begin{column}{0.48\textwidth}
+      \textbf{Approach 1: MI elbow + VIF}
       \begin{itemize}[<+->]
-        \item Features ranked by Mutual Information (MI) with target
-        \item MI captures \emph{non-linear} dependencies, unlike correlation
-        \item Elbow detection: largest single-step drop in ranked MI curve
-              separates informative features from low-signal tail
-        \item Features below the elbow are dropped
-        \item \textbf{18 $\to$ 10 candidate features}
+        \item Rank features by Mutual Information with target
+        \item Drop low-signal tail below the elbow: 18 $\to$ 10
+        \item Apply VIF filter (threshold $= 5$): 10 $\to$ \textbf{4 features}
       \end{itemize}
-    \end{column}
-    \begin{column}{0.45\textwidth}
-      \begin{center}
-        % TODO: MI elbow bar chart (mi_elbow.png)
-        \textit{[figure placeholder: MI elbow plot]}
-      \end{center}
-    \end{column}
-  \end{columns}
-\end{frame}
-
-%--- Slide: Multicollinearity Filter (VIF) ------------------------------------
-\begin{frame}{Handling Multicollinearity with VIF}
-  \begin{columns}
-    \begin{column}{0.52\textwidth}
-      \begin{itemize}[<+->]
-        \item Collinear features split SHAP attribution arbitrarily and
-              make GAM smooth terms unidentifiable
-        \item Iterative VIF elimination (threshold $= 5$)
-        \item At each step: drop the feature above threshold with the
-              \emph{lowest} $|\rho_\text{Spearman}|$ with target
-        \item Model settings always protected
-      \end{itemize}
+      \onslide<2->{
       \vspace{0.4em}
-    \end{column}
-    \begin{column}{0.45\textwidth}
-      \onslide<3->{
-      \textbf{Dropped (VIF $> 5$):}\\[0.3em]
       \small
-      \begin{tabular}{lr}
-        \texttt{mean\_speed}      & VIF $= 357$ \\
-        \texttt{max\_jerk}        & VIF $= 20$  \\
-        \texttt{mean\_jerk}       & VIF $= 12$  \\
-        \texttt{max\_acceleration}& VIF $= 10$  \\
-        \texttt{path\_efficiency} & VIF $= 9$   \\
-      \end{tabular}
+      \texttt{std\_speed}, \texttt{mean\_acceleration},\\
+      \texttt{max\_speed}, \texttt{heading\_change\_per\_sec}\\[0.3em]
+      \footnotesize Motion features only; all highly significant
+      ($p \ll 0.01$).
+      }
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \onslide<3->{\textbf{Approach 2: VIF only}}
+      \begin{itemize}
+        \item<3-> Skip MI; apply VIF directly to all 18 candidates
+        \item<3-> VIF filter (threshold $= 5$): 18 $\to$ \textbf{6 features}
+      \end{itemize}
+      \onslide<3->{
+      \vspace{0.4em}
+      \small
+      \texttt{std\_speed}, \texttt{mean\_acceleration},\\
+      \texttt{min\_neighbor\_distance},
+      \texttt{heading\_change\_per\_sec},\\
+      \texttt{scene\_num\_VEHICLE},
+      \texttt{scene\_density\_VEHICLE}\\[0.3em]
+      \footnotesize Retains scene-level features alongside motion features.
       }
     \end{column}
   \end{columns}
-        \onslide<4->{
-      \center{\textbf{6 final features:}\\[0.3em]
-      \small
-      \texttt{std\_speed}, \texttt{mean\_acceleration},
-      \texttt{min\_neighbor\_distance},\\
-      \texttt{heading\_change\_per\_sec},
-      \texttt{scene\_num\_VEHICLE},
-      \texttt{scene\_density\_VEHICLE}}
-      }
+  \vspace{0.5em}
+  \onslide<4->{%
+    \footnotesize
+    \textbf{VIF only} was used for the main analysis — it retains richer
+    context without discarding potentially informative scene features.}
 \end{frame}
