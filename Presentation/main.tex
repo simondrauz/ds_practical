@@ -9,85 +9,11 @@
 \definecolor{lmugreen}{RGB}{0, 136, 58}
 \usecolortheme[named=lmugreen]{structure}
 \usepackage{graphicx}
-\graphicspath{{./}{figures/}}
+\graphicspath{{./}{figures/}{figures/pipeline/}}
 \usepackage{booktabs}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning}
 
-%--- Pipeline colors (one per step, used consistently everywhere) --------------
-\definecolor{pipecolorA}{RGB}{52,  110, 175}   % steel blue  — Data Preparation
-\definecolor{pipecolorB}{RGB}{120,  65, 155}   % purple      — Interpretable Modeling
-\definecolor{pipecolorC}{RGB}{205,  95,  10}   % amber       — Feature Effects
-% step D reuses lmugreen                        % green       — Failure/Success Modes
-
-%--- Pipeline TikZ styles ------------------------------------------------------
-\tikzset{
-  pipebox base/.style={rounded corners=5pt, line width=1.2pt,
-                        text width=2.3cm, align=center,
-                        minimum height=1.15cm, font=\small\bfseries},
-  pipeboxA/.style={pipebox base, draw=pipecolorA, fill=pipecolorA!12},
-  pipeboxB/.style={pipebox base, draw=pipecolorB, fill=pipecolorB!12},
-  pipeboxC/.style={pipebox base, draw=pipecolorC, fill=pipecolorC!12},
-  pipeboxD/.style={pipebox base, draw=lmugreen,   fill=lmugreen!12},
-  pipearrow/.style={-{Stealth[length=5pt,width=4pt]}, gray!55, line width=1.2pt},
-  pipelabel/.style={font=\scriptsize\itshape, text=gray!70, align=right},
-}
-
-% \pipelinehighlight{N}: Track 1 only; box N full opacity, others faded to 0.2
-\newcommand{\pipelinehighlight}[1]{%
-  \pgfmathsetmacro{\opA}{(#1==1)?1.0:0.2}%
-  \pgfmathsetmacro{\opB}{(#1==2)?1.0:0.2}%
-  \pgfmathsetmacro{\opC}{(#1==3)?1.0:0.2}%
-  \pgfmathsetmacro{\opD}{(#1==4)?1.0:0.2}%
-  \pgfmathsetmacro{\arAB}{min(\opA,\opB)}%
-  \pgfmathsetmacro{\arBC}{min(\opB,\opC)}%
-  \pgfmathsetmacro{\arCD}{min(\opC,\opD)}%
-  \centering
-  \begin{tikzpicture}[node distance=0cm]
-    \begin{scope}[opacity=\opA]
-      \node[pipeboxA] (dp) {Data\\Preparation};
-    \end{scope}
-    \begin{scope}[opacity=\opB]
-      \node[pipeboxB, right=0.7cm of dp] (im) {Interpretable\\Modeling};
-    \end{scope}
-    \begin{scope}[opacity=\opC]
-      \node[pipeboxC, right=0.7cm of im] (fe) {Feature Effects\\[-1pt]\& Importance};
-    \end{scope}
-    \begin{scope}[opacity=\opD]
-      \node[pipeboxD, right=0.7cm of fe] (fs) {Failure/Success\\Mode Analysis};
-    \end{scope}
-    \draw[pipearrow, opacity=\arAB] (dp.east)  -- (im.west);
-    \draw[pipearrow, opacity=\arBC] (im.east)  -- (fe.west);
-    \draw[pipearrow, opacity=\arCD] (fe.east)  -- (fs.west);
-  \end{tikzpicture}%
-}
-
-% \pipelineoverview: both tracks, all boxes at full opacity
-\newcommand{\pipelineoverview}{%
-  \centering
-  \begin{tikzpicture}[node distance=0cm]
-    % ---- Track 1 (full data) ----
-    \node[pipeboxA] (dp1) {Data\\Preparation};
-    \node[pipeboxB, right=0.7cm of dp1] (im1) {Interpretable\\Modeling};
-    \node[pipeboxC, right=0.7cm of im1] (fe1) {Feature Effects\\[-1pt]\& Importance};
-    \node[pipeboxD, right=0.7cm of fe1] (fs1) {Failure/Success\\Mode Analysis};
-    \draw[pipearrow] (dp1.east) -- (im1.west);
-    \draw[pipearrow] (im1.east) -- (fe1.west);
-    \draw[pipearrow] (fe1.east) -- (fs1.west);
-    \node[pipelabel, left=0.35cm of dp1] {Track~1\\(full data)};
-    % ---- Track 2 (mini data, settings sweep) ----
-    \begin{scope}[opacity=0.6]
-      \node[pipeboxA, below=1.5cm of dp1] (dp2) {Data\\Preparation};
-      \node[pipeboxB, right=0.7cm of dp2]  (im2) {Interpretable\\Modeling};
-      \node[pipeboxC, right=0.7cm of im2]  (fe2) {Feature Effects\\[-1pt]\& Importance};
-      \draw[pipearrow] (dp2.east) -- (im2.west);
-      \draw[pipearrow] (im2.east) -- (fe2.west);
-    \end{scope}
-    \node[pipelabel, left=0.35cm of dp2] {Track~2\\(mini data,\\settings\\sweep)};
-    \node[font=\scriptsize\itshape, text=gray!70, right=0.25cm of fe2, align=left]
-      {no clustering};
-  \end{tikzpicture}%
-}
 \usepackage[english]{babel}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath,amssymb}
@@ -141,10 +67,16 @@ belowskip = -1.2 \baselineskip,
 %	TITLE PAGE
 %----------------------------------------------------------------------------------------
 
+% Pipeline corner image — set per section; empty = no corner image
+\newcommand{\cornerpipeline}{}
 \addtobeamertemplate{frametitle}{}{%
-	\begin{textblock*}{100mm}(0.88\textwidth,-0.5cm)
-		\includegraphics[height=1cm,width=2cm]{lmu_logo}
-\end{textblock*}}
+  \ifx\cornerpipeline\empty\else
+  \begin{tikzpicture}[remember picture, overlay]
+    \node[anchor=north east, inner sep=0pt] at
+      ([xshift=-0.2cm, yshift=-0.2cm]current page.north east)
+      {\includegraphics[width=4.2cm]{\cornerpipeline}};
+  \end{tikzpicture}%
+  \fi}
 
 \title[Trajectron++ Analysis]{Understanding Trajectron++: \\
 A Interpretable Performance Analysis Pipeline}
@@ -186,27 +118,35 @@ A Per-Trajectory Performance Analysis \\}}
 \input{slides/part0_outline}
 
 %--- Part 1: Motivation ---------------------------------------------------------
+\renewcommand{\cornerpipeline}{}
 \input{slides/part1_motivation}
 
 %--- Part 2: Analysis Pipeline --------------------------------------------------
+\renewcommand{\cornerpipeline}{}
 \input{slides/part2_pipeline}
 
 %--- Part 3: Data Preparation ---------------------------------------------------
+\renewcommand{\cornerpipeline}{}
 \input{slides/part3_data_prep}
 
 %--- Part 4: Interpretable Modeling ---------------------------------------------
+\renewcommand{\cornerpipeline}{}
 \input{slides/part4_modeling}
 
 %--- Part 5a: Feature Effects & Importance -------------------------------------
+\renewcommand{\cornerpipeline}{}
 \input{slides/part5a_feature_effects}
 
 %--- Part 5b: Performance Regimes ----------------------------------------------
+\renewcommand{\cornerpipeline}{}
 \input{slides/part5b_regimes}
 
 %--- Part 5c: Model Settings Analysis ------------------------------------------
+\renewcommand{\cornerpipeline}{}
 \input{slides/part5c_settings}
 
 %--- Part 6: Conclusions --------------------------------------------------------
+\renewcommand{\cornerpipeline}{}
 \input{slides/part6_conclusions}
 
 %--- References -----------------------------------------------------------------

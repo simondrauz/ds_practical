@@ -8,7 +8,7 @@
     \begin{column}{0.55\textwidth}
       \begin{itemize}[<+->]
         \item \textbf{Task:} forecast future $(x, y)$ positions of agents
-              (pedestrians, cyclists, vehicles) from observed past movements
+              (pedestrians, cyclists, motorcyclists, vehicles) from observed past movements
         \item Challenging due to \textbf{complex agent interactions} and influence of \textbf{static context}
         \item Essential for \textcolor{lmugreen}{\textbf{safe path planning}} and \textcolor{lmugreen}{\textbf{collision avoidance}}
               in autonomous vehicles
@@ -16,8 +16,9 @@
     \end{column}
     \begin{column}{0.42\textwidth}
       \begin{center}
-        % TODO: nuScenes scene figure with trajectory predictions overlaid
-        \textit{[figure placeholder]}
+        \includegraphics[width=\textwidth]{trajectory_prediction}\\
+        \vspace{0.2em}
+        {\tiny Source: Salzmann et al.\ (2020)}
       \end{center}
     \end{column}
   \end{columns}
@@ -41,11 +42,15 @@
               trajectories
         \end{itemize}
         \item Handles \emph{heterogeneous} agent types jointly
-              (pedestrian, bicycle, car) and integrates HD map context
+              (pedestrian, bicycle, motorcycle, car) and integrates HD map context
       \end{itemize}
     \end{column}
     \begin{column}{0.45\textwidth}
-      \onslide<2->{
+      \begin{center}
+        \includegraphics[width=\textwidth]{trajectronpp}\\
+        {\tiny Source: Salzmann et al.\ (2020)}
+      \end{center}
+      \onslide<8->{
         \textbf{trajdata} \textnormal{\small[NVLabs]}\\[0.4em]
         \begin{itemize}
           \item Unified interface to many trajectory datasets
@@ -64,27 +69,33 @@
     \begin{column}{0.50\textwidth}
       \begin{itemize}[<+->]
         \item 1\,000 urban driving scenes, Boston \& Singapore
-        \item Agent types: pedestrians, cyclists, vehicles
+        \item Agent types: pedestrians, cyclists, motorcyclists, vehicles
         \item Rich sensor suite: camera, LiDAR, radar, GPS, HD map
         \item Standard split: 700 / 150 / 150 (train / val / test)
+        \item Target Features:
+        \begin{itemize}
+        \item \small \textbf{ADE:} avg.\ L2 distance over all predicted timesteps\\
+        \item \small \textbf{FDE:} L2 distance at the final predicted timestep
+        \end{itemize}
         \item \textbf{Scope:} we predict \emph{pedestrian} trajectories
-              only; all agent types serve as scene context
+              only, all agent types serve as scene context
       \end{itemize}
     \end{column}
     \begin{column}{0.47\textwidth}
-      \begin{center}
-        % TODO: nuScenes scene image or trajectory plot
-        \textit{[figure placeholder]}
-      \end{center}
-      \onslide<6->{
-        \vspace{0.4em}
+      \centering
+      \includegraphics[width=0.55\textwidth]{nuscenes_example3}\\[0.15em]
+      \includegraphics[width=0.75\textwidth]{nuscenes_maps}\\[0.1em]
+      {\tiny Source: Caesar et al.\ (2020)}
+
+      \only<7->{%
+        \vspace{0.3em}
+        \footnotesize
         \textbf{Prediction metrics:}\\[0.2em]
-        \small
         \begin{tabular}{ll}
           \texttt{ml\_ade}     & most-likely ADE \textcolor{lmugreen}{\textbf{$\leftarrow$ used}}\\
           \texttt{ml\_fde}     & most-likely FDE \\
           \texttt{min\_ade\_5} & best-of-5 ADE \\
-          \texttt{nll\_mean}   & negative log-likelihood \\
+          \texttt{nll\_mean}   & neg.\ log-likelihood \\
         \end{tabular}
       }
     \end{column}

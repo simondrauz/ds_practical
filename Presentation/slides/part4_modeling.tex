@@ -3,8 +3,12 @@
 \section{Interpretable Modeling}
 
 \begin{frame}{Analysis Pipeline}
-  \vfill\pipelinehighlight{2}\vfill
+  \begin{center}
+    \includegraphics[width=\textwidth]{pipeline-modelling}
+  \end{center}
 \end{frame}
+
+\renewcommand{\cornerpipeline}{cornerpipeline/pipeline-modelling}
 
 %--- Slide: Why interpretable models? ------------------------------------------
 \begin{frame}{Why Interpretable Models?}
@@ -51,7 +55,7 @@
 
 %--- Slide: Additive effects & SHAP -------------------------------------------
 %--- Slide 12 ------------------------------------------------------------------
-\begin{frame}{Validating the Tuning Procedure — Nested Resampling}
+\begin{frame}{Validating the Tuning Procedure — Nested \\ Resampling}
   \begin{itemize}
     \item \textbf{Problem:} hyperparameter tuning risks overfitting to a
           particular data split

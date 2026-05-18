@@ -3,8 +3,12 @@
 \section{Performance Regimes}
 
 \begin{frame}{Analysis Pipeline}
-  \vfill\pipelinehighlight{4}\vfill
+  \begin{center}
+    \includegraphics[width=\textwidth]{pipeline-clustering}
+  \end{center}
 \end{frame}
+
+\renewcommand{\cornerpipeline}{cornerpipeline/pipeline-clustering}
 
 %--- Slide 18 ------------------------------------------------------------------
 \begin{frame}{Performance Regime Methodology}
@@ -45,9 +49,8 @@
       \end{itemize}
     \end{column}
     \begin{column}{0.47\textwidth}
-      \onslide<3->{\textbf{Cluster quality by group}}
-      \onslide<3->{
-      \vspace{0.3em}
+      \onslide<3->{%
+      \textbf{Cluster quality by group}\\[0.3em]
       \renewcommand{\arraystretch}{1.2}
       \begin{tabular}{lcc}
         \toprule
@@ -68,7 +71,7 @@
 \end{frame}
 
 %--- Slide 20 ------------------------------------------------------------------
-\begin{frame}{Regime Inspection — What Drives Error in Each Regime?}
+\begin{frame}{Regime Inspection — What Drives Error in Each \\ Regime?}
   \begin{columns}[t]
     \begin{column}{0.48\textwidth}
       \textbf{Easy regime}
