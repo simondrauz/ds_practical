@@ -68,7 +68,7 @@ belowskip = -1.2 \baselineskip,
 %----------------------------------------------------------------------------------------
 
 % Pipeline corner image — set per section; empty = no corner image
-\newcommand{\cornerpipeline}{}
+\def\cornerpipeline{}
 \addtobeamertemplate{frametitle}{}{%
   \ifx\cornerpipeline\empty\else
   \begin{tikzpicture}[remember picture, overlay]
@@ -126,35 +126,35 @@ A Per-Trajectory Performance Analysis \\}}
 \input{slides/part0_outline}
 
 %--- Part 1: Motivation ---------------------------------------------------------
-\renewcommand{\cornerpipeline}{}
+\def\cornerpipeline{}
 \input{slides/part1_motivation}
 
 %--- Part 2: Analysis Pipeline --------------------------------------------------
-\renewcommand{\cornerpipeline}{}
+\def\cornerpipeline{}
 \input{slides/part2_pipeline}
 
 %--- Part 3: Data Preparation ---------------------------------------------------
-\renewcommand{\cornerpipeline}{}
+\def\cornerpipeline{}
 \input{slides/part3_data_prep}
 
 %--- Part 4: Interpretable Modeling ---------------------------------------------
-\renewcommand{\cornerpipeline}{}
+\def\cornerpipeline{}
 \input{slides/part4_modeling}
 
 %--- Part 5a: Feature Effects & Importance -------------------------------------
-\renewcommand{\cornerpipeline}{}
+\def\cornerpipeline{}
 \input{slides/part5a_feature_effects}
 
 %--- Part 5b: Performance Regimes ----------------------------------------------
-\renewcommand{\cornerpipeline}{}
+\def\cornerpipeline{}
 \input{slides/part5b_regimes}
 
 %--- Part 5c: Model Settings Analysis ------------------------------------------
-\renewcommand{\cornerpipeline}{}
+\def\cornerpipeline{}
 \input{slides/part5c_settings}
 
 %--- Part 6: Conclusions --------------------------------------------------------
-\renewcommand{\cornerpipeline}{}
+\def\cornerpipeline{}
 \input{slides/part6_conclusions}
 
 %--- References -----------------------------------------------------------------
