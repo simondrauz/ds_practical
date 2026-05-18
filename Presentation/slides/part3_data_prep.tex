@@ -73,22 +73,22 @@
         \item Drop low-signal tail below the elbow: 18 $\to$ 10
         \item Apply VIF filter (threshold $= 5$): 10 $\to$ \textbf{4 features}
       \end{itemize}
-      \onslide<2->{
+      \onslide<4->{
       \vspace{0.4em}
       \small
       \texttt{std\_speed}, \texttt{mean\_acceleration},\\
       \texttt{max\_speed}, \texttt{heading\_change\_per\_sec}\\[0.3em]
-      \footnotesize Motion features only; all highly significant
+      \footnotesize Motion features only
       ($p \ll 0.01$).
       }
     \end{column}
     \begin{column}{0.48\textwidth}
-      \onslide<3->{\textbf{Approach 2: VIF only}}
+      \onslide<5->{\textbf{Approach 2: VIF only}}
       \begin{itemize}
-        \item<3-> Skip MI; apply VIF directly to all 18 candidates
-        \item<3-> VIF filter (threshold $= 5$): 18 $\to$ \textbf{6 features}
+        \item<5-> Skip MI; apply VIF directly to all 18 candidates
+        \item<5-> VIF filter (threshold $= 5$): 18 $\to$ \textbf{6 features}
       \end{itemize}
-      \onslide<3->{
+      \onslide<6->{
       \vspace{0.4em}
       \small
       \texttt{std\_speed}, \texttt{mean\_acceleration},\\
@@ -101,8 +101,4 @@
     \end{column}
   \end{columns}
   \vspace{0.5em}
-  \onslide<4->{%
-    \footnotesize
-    \textbf{VIF only} was used for the main analysis — it retains richer
-    context without discarding potentially informative scene features.}
 \end{frame}

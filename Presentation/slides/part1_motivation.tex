@@ -66,27 +66,27 @@
         \item 1\,000 urban driving scenes, Boston \& Singapore
         \item Agent types: pedestrians, cyclists, vehicles
         \item Rich sensor suite: camera, LiDAR, radar, GPS, HD map
-        \item Standard split: 700 / 150 / 150 scenes
-              (train / val / test)
+        \item Standard split: 700 / 150 / 150 (train / val / test)
         \item \textbf{Scope:} we predict \emph{pedestrian} trajectories
-              only, while all agent types serve as scene context
+              only; all agent types serve as scene context
       \end{itemize}
-      \vspace{0.5em}
-      \onslide<6->{
-        \textbf{Prediction metrics:}\\[0.3em]
-        \begin{tabular}{ll}
-          \texttt{ml\_ade}   & most-likely ADE \textcolor{lmugreen}{\textbf{$\leftarrow$ used}}\\
-          \texttt{ml\_fde}   & most-likely FDE \\
-          \texttt{min\_ade\_5} & best-of-5 ADE \\
-          \texttt{nll\_mean} & negative log-likelihood \\
-        \end{tabular}
-      }
     \end{column}
     \begin{column}{0.47\textwidth}
       \begin{center}
         % TODO: nuScenes scene image or trajectory plot
         \textit{[figure placeholder]}
       \end{center}
+      \onslide<6->{
+        \vspace{0.4em}
+        \textbf{Prediction metrics:}\\[0.2em]
+        \small
+        \begin{tabular}{ll}
+          \texttt{ml\_ade}     & most-likely ADE \textcolor{lmugreen}{\textbf{$\leftarrow$ used}}\\
+          \texttt{ml\_fde}     & most-likely FDE \\
+          \texttt{min\_ade\_5} & best-of-5 ADE \\
+          \texttt{nll\_mean}   & negative log-likelihood \\
+        \end{tabular}
+      }
     \end{column}
   \end{columns}
 \end{frame}
