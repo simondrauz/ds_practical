@@ -453,6 +453,14 @@ INPUT ./figures/nuscenes_example2.png
 INPUT ./figures/nuscenes_example2.png
 INPUT ./figures/nuscenes_example2.png
 INPUT ./figures/nuscenes_example2.png
+INPUT ./figures/nuscenes_maps.png
+INPUT ./figures/nuscenes_maps.png
+INPUT ./figures/nuscenes_maps.png
+INPUT ./figures/nuscenes_maps.png
+INPUT ./figures/clustering-cover.png
+INPUT ./figures/clustering-cover.png
+INPUT ./figures/clustering-cover.png
+INPUT ./figures/clustering-cover.png
 INPUT ./lmu-background.pdf
 INPUT ./lmu-background.pdf
 INPUT ./lmu-background.pdf
@@ -543,7 +551,6 @@ INPUT ./figures/nuscenes_example3.png
 INPUT ./figures/nuscenes_example3.png
 INPUT ./figures/nuscenes_example3.png
 INPUT ./figures/nuscenes_example3.png
-INPUT ./figures/nuscenes_maps.png
 INPUT ./figures/nuscenes_maps.png
 INPUT ./figures/nuscenes_maps.png
 INPUT ./figures/nuscenes_maps.png

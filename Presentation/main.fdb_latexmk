@@ -1,6 +1,6 @@
 # Fdb version 4
-["pdflatex"] 1779121596.18701 "/Users/zoe/Desktop/ds_practical/Presentation/main.tex" "main.pdf" "main" 1779121608.639 0
-  "/Users/zoe/Desktop/ds_practical/Presentation/main.tex" 1779121595.5057 4805 7a88ef9c0e78fb9b6ef2ae8e536478f6 ""
+["pdflatex"] 1779122474.14322 "/Users/zoe/Desktop/ds_practical/Presentation/main.tex" "main.pdf" "main" 1779122486.04962 0
+  "/Users/zoe/Desktop/ds_practical/Presentation/main.tex" 1779122473.80835 5075 5790f6e3e8f55359b917f7deeb81fc3b ""
   "/Users/zoe/Library/TinyTeX/texmf-dist/fonts/enc/dvips/cm-super/cm-super-t1.enc" 1136849721 2971 def0b6c1f0b107b3b936def894055589 ""
   "/Users/zoe/Library/TinyTeX/texmf-dist/fonts/enc/dvips/sourcesanspro/a_emkxm5.enc" 1587936753 3021 665788e9679767ade2a71155215d25e0 ""
   "/Users/zoe/Library/TinyTeX/texmf-dist/fonts/tfm/adobe/sourcesanspro/SourceSansPro-Bold-tlf-t1--base.tfm" 1587936753 1648 77a748afe0a406be1ac3f29e1cd365cb ""
@@ -265,6 +265,7 @@
   "/Users/zoe/Library/TinyTeX/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1764195324 369859 e902efec7e5273fdd84fb725cb5791d0 ""
   "/Users/zoe/Library/TinyTeX/texmf-var/web2c/pdftex/pdflatex.fmt" 1764181951 2285669 3a4af6816ce0eb35b15677253fe28130 ""
   "/Users/zoe/Library/TinyTeX/texmf.cnf" 1741950226.35361 708 85fd07691b6294ba94c59dbc62380410 ""
+  "figures/clustering-cover.png" 1779122298.72774 107844 5f359af838d22bcad2e4ab85f62750b4 ""
   "figures/cornerpipeline/pipeline-clustering.png" 1779119938.13393 323651 0ee2468a4d96fd1e4746e161a7c5bd1c ""
   "figures/cornerpipeline/pipeline-dataprep.png" 1779119937.88849 322547 38cee2f988aa1bd8abf8246d5c366767 ""
   "figures/cornerpipeline/pipeline-featureeffect.png" 1779119938.05664 322015 cd52afc5759607542bbf6958d4906a2d ""
@@ -286,11 +287,11 @@
   "figures/trajectory_prediction.png" 1779107272.05837 291624 c15bdd9633aba4e6951d38e4b8b1df6b ""
   "figures/trajectronpp.png" 1779107627.89476 489174 73d1b66e0c5a3311d5ff358bdc15ad11 ""
   "lmu-background.pdf" 1778663556 66051 db0b87484d5e254e6f8288c8895b57e1 ""
-  "main.aux" 1779121608.36143 10896 8df9ed3603caeef1615e2a33f2fd184f "pdflatex"
-  "main.nav" 1779121608.36436 5478 9a83eae0922c2cee82fd3aeea0a95f72 "pdflatex"
-  "main.out" 1779121608.36403 93 9b43054cd6aed50502c6d6a5e9840f14 "pdflatex"
-  "main.tex" 1779121595.5057 4805 7a88ef9c0e78fb9b6ef2ae8e536478f6 ""
-  "main.toc" 1779121608.36443 473 571f36b21306a231408a35a597927aa9 "pdflatex"
+  "main.aux" 1779122485.78066 10896 8df9ed3603caeef1615e2a33f2fd184f "pdflatex"
+  "main.nav" 1779122485.78354 5478 9a83eae0922c2cee82fd3aeea0a95f72 "pdflatex"
+  "main.out" 1779122485.78321 93 9b43054cd6aed50502c6d6a5e9840f14 "pdflatex"
+  "main.tex" 1779122473.80835 5075 5790f6e3e8f55359b917f7deeb81fc3b ""
+  "main.toc" 1779122485.78363 473 571f36b21306a231408a35a597927aa9 "pdflatex"
   "slides/part0_outline.tex" 1778684694.76011 137 a768aff313c0be8f06d6cf73182669d1 ""
   "slides/part1_motivation.tex" 1779110174.25097 5257 e485ba60132fb8de84f4deb3925be401 ""
   "slides/part2_pipeline.tex" 1779120236.81782 1587 9d9fa9e62addad158348b4d93d530f6b ""
