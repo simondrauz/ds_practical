@@ -8,6 +8,11 @@
 
 %--- Slide: Feature Engineering -----------------------------------------------
 \begin{frame}{Feature Engineering — Trajectory \& Scene Characteristics}
+  \onslide<1->{%
+  \footnotesize\textit{Trajectron++ outputs only $(x,y)$ position sequences —
+  all features below are computed by us from those trajectories.}
+  \vspace{0.4em}
+  }
   \begin{columns}
     \begin{column}{0.48\textwidth}
       \textbf{Agent motion features}
@@ -17,7 +22,6 @@
         \item<2-> Jerk: mean, max
         \item<2-> Heading change per second
         \item<2-> Min.\ neighbour distance
-        \item<2-> Collision indicator
       \end{itemize}
     \end{column}
     \begin{column}{0.48\textwidth}
@@ -46,12 +50,8 @@
       \begin{itemize}[<+->]
         \item \texttt{ml\_ade} is strongly \emph{right-skewed}
               (skewness $= 2.59$)
-        \item Small errors are very frequent; large errors are rare
-              but influential
-        \item Log transformation (\texttt{log1p}) applied to stabilise
-              variance and improve model fit
-        \item Models are trained on log-scale target,
-              evaluated on original scale
+        \item Log transformation (\texttt{log1p}) considered to stabilise
+              variance — tested as a modeling choice in the next step
       \end{itemize}
     \end{column}
     \begin{column}{0.47\textwidth}
