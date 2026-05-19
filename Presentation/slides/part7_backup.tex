@@ -1,0 +1,82 @@
+%==============================================================================
+%  BACKUP SLIDES
+%==============================================================================
+
+\appendix
+
+\begin{frame}[noframenumbering, plain]
+  \begin{center}
+    {\Huge \textbf{Backup Slides}}
+  \end{center}
+\end{frame}
+
+%--- Algorithm comparison with noise: OPTICS vs HDBSCAN ----------------------
+\begin{frame}{Algorithm Choice — OPTICS vs.\ HDBSCAN (with noise)}
+  \footnotesize
+  Same XGBoost effect space; algorithm differs. Noise points shown.
+  \vspace{0.2em}
+  \begin{center}
+  \renewcommand{\arraystretch}{1.05}
+  \begin{tabular}{@{}c@{\hspace{0.3em}}c@{\hspace{0.4em}}c@{\hspace{0.4em}}c@{}}
+    & \textbf{Easy} & \textbf{Medium} & \textbf{Hard} \\
+    \rotatebox{90}{\quad\textbf{OPTICS}} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_easy_rank1_optics_raw-euclidean_eps0p0181_mcs24_ms40_K2_N30pct_DBCV0p41.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_medium_rank1_optics_raw-euclidean_eps0p0243_mcs13_ms15_K2_N40pct_DBCV0p40.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_hard_rank1_optics_raw-euclidean_eps0p0413_mcs10_ms15_K4_N75pct_DBCV0p09.png} \\
+    &
+      \tiny K\,$=$\,2 \textbar\ noise 30\% \textbar\ \textbf{DBCV 0.41} &
+      \tiny K\,$=$\,2 \textbar\ noise 40\% \textbar\ \textbf{DBCV 0.40} &
+      \tiny K\,$=$\,4 \textbar\ noise 75\% \textbar\ \textbf{DBCV 0.09} \\[0.3em]
+    \rotatebox{90}{\,\textbf{HDBSCAN}} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_easy_rank1_hdbscan_raw-euclidean_mcs475_ms30_K3_N30pct_DBCV0p30.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_medium_rank1_hdbscan_raw-euclidean_mcs13_ms20_K3_N24pct_DBCV0p04.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_hard_rank1_hdbscan_raw-euclidean_mcs14_ms8_K4_N73pct_DBCV0p05.png} \\
+    &
+      \tiny K\,$=$\,3 \textbar\ noise 30\% \textbar\ DBCV 0.30 &
+      \tiny K\,$=$\,3 \textbar\ noise 24\% \textbar\ DBCV 0.04 &
+      \tiny K\,$=$\,4 \textbar\ noise 73\% \textbar\ DBCV 0.05 \\
+  \end{tabular}
+  \end{center}
+  \vspace{-0.2em}
+  \scriptsize
+  \begin{itemize}\setlength\itemsep{0.1em}
+    \item OPTICS: higher DBCV everywhere, cleaner cores
+    \item HDBSCAN: collapses medium / hard into one dominant blob
+  \end{itemize}
+\end{frame}
+
+%--- Model comparison with noise: XGBoost vs GAM -----------------------------
+\begin{frame}{Effect Source — XGBoost vs.\ GAM (with noise)}
+  \footnotesize
+  Same OPTICS algorithm; feature-effect source differs. Noise points shown.
+  \vspace{0.2em}
+  \begin{center}
+  \renewcommand{\arraystretch}{1.05}
+  \begin{tabular}{@{}c@{\hspace{0.3em}}c@{\hspace{0.4em}}c@{\hspace{0.4em}}c@{}}
+    & \textbf{Easy} & \textbf{Medium} & \textbf{Hard} \\
+    \rotatebox{90}{\quad\textbf{XGBoost}} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/xgboost_with-noise_easy_rank1_optics_raw-euclidean_eps0p0181_mcs24_ms40_K2_N30pct_DBCV0p41.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/xgboost_with-noise_medium_rank1_optics_raw-euclidean_eps0p0243_mcs13_ms15_K2_N40pct_DBCV0p40.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/xgboost_with-noise_hard_rank1_optics_raw-euclidean_eps0p0413_mcs10_ms15_K4_N75pct_DBCV0p09.png} \\
+    &
+      \tiny K\,$=$\,2 \textbar\ noise 30\% \textbar\ \textbf{DBCV 0.41} &
+      \tiny K\,$=$\,2 \textbar\ noise 40\% \textbar\ \textbf{DBCV 0.40} &
+      \tiny K\,$=$\,4 \textbar\ noise 75\% \textbar\ DBCV 0.09 \\[0.3em]
+    \rotatebox{90}{\qquad\textbf{GAM}} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/gam_with-noise_easy_rank1_optics_raw-euclidean_xi0p01_mcs633_ms5_K4_N32pct_DBCV0p40.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/gam_with-noise_medium_rank1_optics_raw-euclidean_eps0p0338_mcs25_ms40_K3_N15pct_DBCV0p14.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/gam_with-noise_hard_rank1_optics_raw-euclidean_xi0p015_mcs110_ms5_K4_N70pct_DBCV0p19.png} \\
+    &
+      \tiny K\,$=$\,4 \textbar\ noise 32\% \textbar\ DBCV 0.40 &
+      \tiny K\,$=$\,3 \textbar\ noise 15\% \textbar\ DBCV 0.14 &
+      \tiny K\,$=$\,4 \textbar\ noise 70\% \textbar\ \textbf{DBCV 0.19} \\
+  \end{tabular}
+  \end{center}
+  \vspace{-0.2em}
+  \scriptsize
+  \begin{itemize}\setlength\itemsep{0.1em}
+    \item Comparable easy structure across sources
+    \item XGBoost: cleaner medium separation
+    \item GAM: corroborates hard speed-variation / turning pattern
+  \end{itemize}
+\end{frame}
