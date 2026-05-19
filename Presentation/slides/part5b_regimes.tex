@@ -71,7 +71,7 @@
                   $0$ = ambiguous structure, clusters no denser than
                   surrounding noise
           \end{itemize}
-    \item<2-> Interpret clusters (explanation patterns) by grounding them in raw trajectory characteristics
+    \item<3-> Interpret clusters (explanation patterns) by grounding them in raw trajectory characteristics
           $\to$ \textbf{success / failure modes}
   \end{enumerate}
 \end{frame}
@@ -149,21 +149,20 @@
 
 %--- Easy ---------------------------------------------------------------------
 \begin{frame}{Easy Regime — Success Modes}
-  \footnotesize
+  \small
   DBCV \textbf{0.41} \hspace{0.4em}\textbar\hspace{0.4em} 2 clusters
   \hspace{0.4em}\textbar\hspace{0.4em} group median \texttt{ml\_ade}
   \textbf{0.17\,m}
-  \vspace{0.4em}
   \begin{itemize}\setlength\itemsep{0.1em}
     \item Two well-separated modes cover 70\% of easy
     \item Different motion profiles $\to$ same low-error outcome
   \end{itemize}
-  \vspace{0.5em}
+  \vspace{0.25em}
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
       \onslide<2->{%
         \textbf{Slow turners} \\
-        \scriptsize 34\% of easy \textbar\ median \textbf{0.08\,m}
+        \small 34\% of easy \textbar\ median \textbf{0.08\,m}
         \begin{itemize}\setlength\itemsep{0.15em}
           \item Very low max speed, very low speed variation, High turning rate
           \item Turning increases error, but slow steady motion dominates
@@ -174,7 +173,7 @@
     \begin{column}{0.48\textwidth}
       \onslide<3->{%
         \textbf{Straight walkers}\\
-        \scriptsize 36\% of easy \textbar\ median \textbf{0.20\,m}
+        \small 36\% of easy \textbar\ median \textbf{0.20\,m}
         \begin{itemize}\setlength\itemsep{0.15em}
           \item Stable heading, normal max speed, Low speed variation
           \item Heading stability drives low predicted error
@@ -190,21 +189,20 @@
 
 %--- Medium -------------------------------------------------------------------
 \begin{frame}{Medium Regime — Transition Zone}
-  \footnotesize
+  \small
   DBCV \textbf{0.40} \hspace{0.4em}\textbar\hspace{0.4em} 2 clusters
   \hspace{0.4em}\textbar\hspace{0.4em} group median \texttt{ml\_ade}
   \textbf{0.60\,m}
-  \vspace{0.4em}
   \begin{itemize}\setlength\itemsep{0.1em}
     \item Transition zone between easy and hard
     \item One discrete mode (60\%) + continuous gradient toward hard
   \end{itemize}
-  \vspace{0.5em}
+  \vspace{0.25em}
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
       \onslide<2->{%
         \textbf{Ordinary medium}\\
-        \scriptsize 60\% of medium \textbar\ median \textbf{0.55\,m}
+        \small 60\% of medium \textbar\ median \textbf{0.55\,m}
         \begin{itemize}\setlength\itemsep{0.15em}
           \item Slightly elevated max speed, Modest speed variation, Heading near global median
           \item \texttt{max\_speed} = only consistent error driver
@@ -215,7 +213,7 @@
     \begin{column}{0.48\textwidth}
       \onslide<3->{%
         \textbf{Toward the hard boundary}\\
-        \scriptsize No second discrete mode
+        \small No second discrete mode
         \begin{itemize}\setlength\itemsep{0.15em}
           \item Higher error $\to$ speed variation $\uparrow$, turning $\uparrow$,
                 acceleration / jerk $\uparrow$
@@ -232,23 +230,22 @@
 
 %--- Hard ---------------------------------------------------------------------
 \begin{frame}{Hard Regime — Failure Modes}
-  \footnotesize
+  \small
   DBCV \textbf{0.09} \hspace{0.4em}\textbar\hspace{0.4em} 4 clusters
   \hspace{0.4em}\textbar\hspace{0.4em} group median \texttt{ml\_ade}
   \textbf{1.78\,m}
-  \vspace{0.4em}
   \begin{itemize}\setlength\itemsep{0.1em}
     \item 99.5\% of hard rows: positive total feature effect
     \item Dominant axes: high speed variation + elevated turning
     \item Two distinct failure modes (25\% combined); rest spreads
           continuously along the same axes
   \end{itemize}
-  \vspace{0.4em}
+  \vspace{0.25em}
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
       \onslide<2->{%
         \textbf{Erratic motion at low pace}\\
-        \scriptsize 8\% of hard \textbar\ median \textbf{1.6–1.9\,m}
+        \small 8\% of hard \textbar\ median \textbf{1.6–1.9\,m}
         \begin{itemize}\setlength\itemsep{0.15em}
           \item Below-median max speed, Very high speed variation, Elevated turning
           \item Different magnitudes of
@@ -260,7 +257,7 @@
     \begin{column}{0.48\textwidth}
       \onslide<3->{%
         \textbf{Fast motion with mild turning}\\
-        \scriptsize 17\% of hard \textbar\ median \textbf{1.50\,m}
+        \small 17\% of hard \textbar\ median \textbf{1.50\,m}
         \begin{itemize}\setlength\itemsep{0.15em}
           \item Only hard mode with above-median max speed
           \item Loss split between \texttt{max\_speed} and
@@ -272,8 +269,8 @@
   \end{columns}
   \vfill
   \onslide<4->{\textcolor{lmugreen}{\textbf{Takeaway:}}
-  failure is driven by \emph{erratic} motion, not raw speed —
-  fast only matters when paired with turning.}
+  failure driven by \emph{erratic} motion, not raw speed —
+  fast matters when paired with turning.}
 \end{frame}
 
 %--- Summary: Success / Failure Modes ----------------------------------------
