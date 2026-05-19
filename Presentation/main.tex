@@ -30,14 +30,6 @@
 \DeclareCaptionFont{tiny}{\tiny}
 \captionsetup{font=scriptsize,labelfont=scriptsize,justification=centering}
 
-% Automatic section outline slide
-\AtBeginSection[]{
-	\begin{frame}[noframenumbering, plain]
-	\frametitle{Outline}
-	\setcounter{tocdepth}{1}
-	\tableofcontents[currentsection]
-\end{frame}
-}
 
 % Remove navigation symbols
 \beamertemplatenavigationsymbolsempty
@@ -122,8 +114,6 @@ A Per-Trajectory Performance Analysis \\}}
 \end{frame}
 }
 
-%--- Slide 2: Outline -----------------------------------------------------------
-\input{slides/part0_outline}
 
 %--- Part 1: Motivation ---------------------------------------------------------
 \def\cornerpipeline{}

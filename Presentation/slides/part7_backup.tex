@@ -6,10 +6,129 @@
 
 \begin{frame}[noframenumbering, plain]
   \begin{center}
-    {\Huge \textbf{Backup Slides}}
+    {\Huge \textcolor{lmugreen}{\textbf{Appendix}}}
   \end{center}
 \end{frame}
 
+
+%--- SHAP explanation ---------------------------------------------------------
+\begin{frame}{SHAP Values - SHapley Additive exPlanations}
+  \footnotesize
+  For each trajectory $i$, SHAP decomposes the XGBoost prediction into
+  per-feature contributions — quantifying how much each feature
+  shifts $\log(1+\widehat{\texttt{ml\_ade}}_i)$ away from the global mean:
+  \vspace{0.2em}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \textbf{Additive decomposition}
+      \[
+        f(\mathbf{x}_i) \;=\;
+        \underbrace{E\bigl[f(\mathbf{x})\bigr]}_{\text{baseline}}
+        \;+\; \sum_{j=1}^{p} \phi_{i,j}
+      \]
+      \vspace{0.1em}
+      \textbf{Shapley value for feature $j$}
+      \[
+        \phi_j(\mathbf{x}) =
+        \!\!\!\sum_{S\,\subseteq\, F\setminus\{j\}}
+        \frac{|S|\,!\;(|F|-|S|-1)!}{|F|!}
+        \bigl[
+          f_{S\cup\{j\}}(\mathbf{x}_{S\cup\{j\}}) - f_S(\mathbf{x}_S)
+        \bigr]
+      \]
+      \vspace{-0.3em}
+      \scriptsize Averages the marginal contribution of $j$ over all
+      possible feature subsets.
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \textbf{Notation}
+      \begin{itemize}\setlength\itemsep{0.18em}
+        \item $\phi_{i,j}$: contribution of feature $j$ to trajectory $i$
+        \item $F$: full feature set (trajectory \& scene features)
+        \item $S \subseteq F\setminus\{j\}$: subset excluding $j$
+        \item $f_S(\mathbf{x}_S)$: prediction using only features in $S$
+        \item $E[f(\mathbf{x})]$: mean prediction across all trajectories
+      \end{itemize}
+      \vspace{0.4em}
+      \textbf{Interpretation}\\[0.2em]
+      $\phi_{i,j}>0$: feature $j$ pushes predicted ADE \textbf{up}\\
+      $\phi_{i,j}<0$: feature $j$ pushes predicted ADE \textbf{down}\\[0.3em]
+      Mean $|\phi_j|$ over all $i$ $\;\rightarrow\;$
+      \textcolor{lmugreen}{\textbf{global feature importance}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Trajectron++ configuration -----------------------------------------------
+\begin{frame}{Trajectron++ — Model Configuration}
+  \scriptsize
+  \renewcommand{\arraystretch}{1.0}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Data \& Training}\\[0.15em]
+      \begin{tabular}{@{}ll@{}}
+        \toprule
+        Parameter & Value \\
+        \midrule
+        \texttt{history\_sec}         & 2.0\,s \\
+        \texttt{prediction\_sec}      & 6.0\,s \\
+        \texttt{train\_epochs}        & 12 \\
+        \texttt{batch\_size}          & 256 \\
+        \texttt{learning\_rate}       & 0.003 \\
+        \texttt{learning\_rate\_style}& exponential \\
+        \texttt{learning\_decay\_rate}& 0.9999 \\
+        \texttt{min\_learning\_rate}  & $10^{-5}$ \\
+        \texttt{grad\_clip}           & 1.0 \\
+        \bottomrule
+      \end{tabular}
+
+      \vspace{0.3em}
+      \textbf{Map Encoder} (all agent types)\\[0.15em]
+      \begin{tabular}{@{}ll@{}}
+        \toprule
+        Parameter & Value \\
+        \midrule
+        \texttt{patch\_size}      & 100 \\
+        \texttt{map\_channels}    & 3 \\
+        \texttt{hidden\_channels} & [10, 20, 10, 1] \\
+        \texttt{output\_size}     & 32 \\
+        \texttt{dropout}          & 0.5 \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Architecture}\\[0.15em]
+      \begin{tabular}{@{}ll@{}}
+        \toprule
+        Parameter & Value \\
+        \midrule
+        \texttt{enc\_rnn\_dim\_history}        & 32 \\
+        \texttt{enc\_rnn\_dim\_future}         & 32 \\
+        \texttt{enc\_rnn\_dim\_edge}           & 32 \\
+        \texttt{enc\_rnn\_dim\_edge\_influence}& 32 \\
+        \texttt{dec\_rnn\_dim}                 & 128 \\
+        \texttt{p\_z\_x\_MLP\_dims}            & 32 \\
+        \texttt{rnn dropout keep prob}         & 0.75 \\
+        \texttt{MLP dropout keep prob}         & 0.90 \\
+        \bottomrule
+      \end{tabular}
+
+      \vspace{0.3em}
+      \textbf{CVAE / Latent}\\[0.15em]
+      \begin{tabular}{@{}ll@{}}
+        \toprule
+        Parameter & Value \\
+        \midrule
+        \texttt{K} (prediction samples) & 25 \\
+        \texttt{GMM\_components}         & 1 \\
+        \texttt{kl\_weight}              & 100.0 \\
+        \texttt{kl\_min}                 & 0.07 \\
+        $\tau$ (Gumbel init / final)     & 2.0 / 0.05 \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+  \end{columns}
+\end{frame}
 
 %--- Hyperparameter tuning search space --------------------------------------
 \begin{frame}{Hyperparameter Tuning — Search Space}
