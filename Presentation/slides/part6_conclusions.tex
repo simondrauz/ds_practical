@@ -2,58 +2,97 @@
 
 \section{Conclusions}
 
-%--- Slide 23 ------------------------------------------------------------------
+%--- Summary of Findings ------------------------------------------------------
 \begin{frame}{Summary of Findings}
   \begin{enumerate}
     \item<1-> \textbf{RQ1 — Which characteristics drive prediction error?}
     \begin{itemize}
       \item \texttt{std\_speed} (speed variation) and
-            \texttt{heading\_change\_per\_sec} (turning) are the
-            dominant drivers in both GAM and XGBoost
-      \item Scene-level features (\texttt{scene\_density\_VEHICLE}) are
-            consistently least important; Trajectron++ handles scene
-            context better than individual motion dynamics
+            \texttt{heading\_change\_per\_sec} (turning) dominate in
+            both GAM and XGBoost
+      \item \texttt{max\_speed} contributes; \texttt{mean\_acceleration}
+            is near-zero
+      \item Scene-context features (density, vehicle count) carry little
+            explanatory power for per-trajectory error — motion features
+            dominate the meta-model
     \end{itemize}
     \item<2-> \textbf{RQ2 — What are the success and failure modes?}
     \begin{itemize}
-      \item Easy: slow or near-stationary pedestrians with low speed
-            variation — Trajectron++ excels here
-      \item Hard: continuous high-variation regime driven by erratic,
-            fast-turning pedestrians; no sharp sub-clusters
+      \item \emph{Success:} slow turners (low speed absorbs turning) or
+            straight walkers (stable heading) — 70\% of easy
+      \item \emph{Failure:} erratic motion — speed variation + turning;
+            two distinct hard modes over a continuous high-variation regime
+      \item Raw speed alone is not a failure driver — only when paired
+            with turning
     \end{itemize}
     \item<3-> \textbf{RQ3 — How do model settings affect performance?}
     \begin{itemize}
-      \item Prediction horizon (\texttt{prediction\_sec}) has the
-            largest effect — longer horizon raises error strongly
-      \item Attention radius (\texttt{attention\_radius\_m}) is
-            second; history window (\texttt{history\_sec}) has
-            minimal impact
+      \item \texttt{prediction\_sec} has the largest effect — longer
+            horizon raises error strongly
+      \item \texttt{attention\_radius\_m} second — short radius is
+            beneficial; the PDP shows a non-linear optimal at low values
+      \item \texttt{history\_sec} has minimal impact in the swept range
     \end{itemize}
   \end{enumerate}
 \end{frame}
 
-%--- Slide 24 ------------------------------------------------------------------
-\begin{frame}{Limitations \& Future Work}
-  \textbf{Limitations}
+%--- Limitations --------------------------------------------------------------
+\begin{frame}{Limitations}
   \begin{itemize}[<+->]
-    \item Analysis restricted to \emph{pedestrian} trajectories on
-          nuScenes — generalisability to other agent types or datasets
-          is not guaranteed
-    \item Meta-models explain Trajectron++ predictions, not ground-truth
-          difficulty — effects are model-specific
-    \item Hard-regime clustering is weak (75\% noise); discrete
-          failure-mode identification remains an open challenge
-    \item Settings sweep uses nuScenes \emph{mini} —
-          results may not transfer to full-scale training
+    \item \textbf{Meta-models explain Trajectron++, not ground truth}
+      \begin{itemize}
+        \item Targets are Trajectron++ \texttt{ml\_ade} values
+              $\to$ effects are model-specific
+        \item Drivers are inferred via meta-models as proxies —
+              Trajectron++ does not expose them directly
+      \end{itemize}
+    \item \textbf{Meta-model under-prediction at high ADE}
+      \begin{itemize}
+        \item OOF diagnostics: strong agreement at low/moderate ADE,
+              systematic under-prediction in the high-error tail
+        \item Implication: trajectory + scene features do not cover
+              what makes the worst cases worst
+        \item Plausibly missing: map / lane geometry, location, finer
+              social context beyond simple neighbor / density features
+        \item Likely cause of weak hard-regime clustering
+              (DBCV 0.09, 75\% noise): feature effects don't
+              differentiate within the high-error tail
+      \end{itemize}
+    \item \textbf{Scope}
+      \begin{itemize}
+        \item Pedestrian trajectories on nuScenes only — no transfer
+              guarantee to other agent types or datasets
+        \item Settings sweep uses nuScenes \emph{mini} — results may
+              not transfer to full-scale training
+      \end{itemize}
   \end{itemize}
-  \vspace{0.4em}
-  \onslide<3->{%
-  \textbf{Future Work}
-  \begin{itemize}[<4->]
-    \item Extend pipeline to vehicle and cyclist trajectories
-    \item Apply to other trajectory prediction models and datasets
-          via the trajdata interface
-    \item Explore higher-capacity meta-models to better isolate
-          failure modes in the hard regime
-  \end{itemize}}
+\end{frame}
+
+%--- Future Work --------------------------------------------------------------
+\begin{frame}{Future Work}
+  \begin{itemize}[<+->]
+    \item \textbf{Pipeline as a tool — model- and dataset-agnostic by design}
+      \begin{itemize}
+        \item Meta-model + feature-effect clustering is decoupled from
+              the prediction model and the dataset
+        \item Via the \texttt{trajdata} interface, the same pipeline
+              ports to other trajectory prediction models and datasets
+              with minimal effort
+      \end{itemize}
+    \item \textbf{Richer input space}
+      \begin{itemize}
+        \item Add map / lane geometry, location, finer social context
+        \item Targets the under-prediction ceiling and may unlock
+              cleaner hard-regime sub-structure
+      \end{itemize}
+    \item \textbf{Other agents}
+      \begin{itemize}
+        \item Extend to vehicle, cyclist, and motorcyclist trajectories
+      \end{itemize}
+    \item \textbf{Higher-capacity meta-models}
+      \begin{itemize}
+        \item Explore architectures that can isolate failure modes
+              even in noisy high-ADE regions
+      \end{itemize}
+  \end{itemize}
 \end{frame}

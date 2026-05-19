@@ -2,6 +2,14 @@
 
 \section{Model Settings Analysis}
 
+\begin{frame}{Analysis Pipeline}
+  \begin{center}
+    \includegraphics[width=\textwidth]{pipeline-modelsetting}
+  \end{center}
+\end{frame}
+
+\renewcommand{\cornerpipeline}{cornerpipeline/pipeline-modelsetting}
+
 %--- Slide 21 ------------------------------------------------------------------
 \begin{frame}{Settings Sweep Setup}
   \begin{itemize}
@@ -21,10 +29,13 @@
   \end{itemize}
 \end{frame}
 
-%--- Slide 22 ------------------------------------------------------------------
-\begin{frame}{Effect of Model Settings}
+%--- Slide 22: overview (table only) -------------------------------------------
+\begin{frame}[t]{Effect of Model Settings}
+  \small
+  \vspace{0.1em}
   \begin{columns}[t]
-    \begin{column}{0.50\textwidth}
+    \begin{column}{0.56\textwidth}
+      \centering
       \textbf{XGBoost — mean $|\mathrm{SHAP}|$ (pooled model)}
       \vspace{0.3em}
       \renewcommand{\arraystretch}{1.2}
@@ -32,30 +43,164 @@
         \toprule
         \textbf{Feature} & \textbf{Mean $|\mathrm{SHAP}|$} \\
         \midrule
-        \texttt{prediction\_sec}    & \textbf{0.178} \\
-        \texttt{attention\_radius\_m} & 0.098 \\
-        \texttt{std\_speed}         & 0.093 \\
-        \texttt{max\_speed}         & 0.070 \\
-        \texttt{history\_sec}       & 0.022 \\
+        \texttt{prediction\_sec}            & \textbf{0.178} \\
+        \texttt{attention\_radius\_m}       & 0.098 \\
+        \texttt{std\_speed}                 & 0.093 \\
+        \texttt{max\_speed}                 & 0.070 \\
+        \texttt{heading\_change\_per\_sec}  & 0.039 \\
+        \texttt{min\_neighbor\_distance}    & 0.029 \\
+        \texttt{history\_sec}               & 0.022 \\
+        \texttt{mean\_acceleration}         & 0.013 \\
         \bottomrule
       \end{tabular}
-      \vspace{0.4em}
-      \footnotesize All 8 features significant in GAM ($p \ll 0.01$).
+      \vspace{0.3em}
+
+      \footnotesize All 8 features also significant in GAM ($p \ll 0.01$);
+      XGBoost has the better fit
+      (R$^2$ 0.90 / RMSE 0.13 vs GAM R$^2$ 0.65 / RMSE 0.24).
     \end{column}
-    \begin{column}{0.47\textwidth}
-      \textbf{Key findings}
-      \begin{itemize}[<+->]
-        \item \texttt{prediction\_sec}: largest effect — longer horizon
-              means harder forecasting (ADE grows with time)
-        \item \texttt{attention\_radius\_m}: second — larger radius
-              provides more context but also adds noise;
-              non-linear optimal range
-        \item \texttt{history\_sec}: smallest setting effect — model
-              is robust to history window length in this range
-        \item Trajectory features (\texttt{std\_speed},
-              \texttt{max\_speed}) retain strong explanatory power
-              even after controlling for settings
-      \end{itemize}
+    \begin{column}{0.40\textwidth}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Slide 23 ------------------------------------------------------------------
+\begin{frame}[t]{Effect of Model Settings — Prediction Horizon}
+  \small
+  \vspace{0.1em}
+  \begin{columns}[t]
+    \begin{column}{0.56\textwidth}
+      \centering
+      \textbf{XGBoost — mean $|\mathrm{SHAP}|$ (pooled model)}
+      \vspace{0.3em}
+      \renewcommand{\arraystretch}{1.2}
+      \begin{tabular}{lc}
+        \toprule
+        \textbf{Feature} & \textbf{Mean $|\mathrm{SHAP}|$} \\
+        \midrule
+        \textcolor{lmugreen}{\texttt{prediction\_sec}}   & \textcolor{lmugreen}{\textbf{0.178}} \\
+        \texttt{attention\_radius\_m}                    & 0.098 \\
+        \texttt{std\_speed}                              & 0.093 \\
+        \texttt{max\_speed}                              & 0.070 \\
+        \texttt{heading\_change\_per\_sec}               & 0.039 \\
+        \texttt{min\_neighbor\_distance}                 & 0.029 \\
+        \texttt{history\_sec}                            & 0.022 \\
+        \texttt{mean\_acceleration}                      & 0.013 \\
+        \bottomrule
+      \end{tabular}
+      \vspace{0.3em}
+
+      \footnotesize All 8 features also significant in GAM ($p \ll 0.01$);
+      XGBoost has the better fit
+      (R$^2$ 0.90 / RMSE 0.13 vs GAM R$^2$ 0.65 / RMSE 0.24).
+    \end{column}
+    \begin{column}{0.40\textwidth}
+      \textbf{Key Insights}
+
+      \vspace{0.5em}
+      \textbf{\texttt{prediction\_sec}}
+
+      \vspace{0.3em}
+      largest effect — longer horizon means harder
+      forecasting (ADE grows with time)
+
+      \vspace{0.5em}
+      \centering
+      \includegraphics[width=\linewidth,height=0.28\textheight,keepaspectratio]{settings_pdp/prediction_sec_pdp.png}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Slide 24 ------------------------------------------------------------------
+\begin{frame}[t]{Effect of Model Settings — Attention Radius}
+  \small
+  \vspace{0.1em}
+  \begin{columns}[t]
+    \begin{column}{0.56\textwidth}
+      \centering
+      \textbf{XGBoost — mean $|\mathrm{SHAP}|$ (pooled model)}
+      \vspace{0.3em}
+      \renewcommand{\arraystretch}{1.2}
+      \begin{tabular}{lc}
+        \toprule
+        \textbf{Feature} & \textbf{Mean $|\mathrm{SHAP}|$} \\
+        \midrule
+        \texttt{prediction\_sec}                                  & \textbf{0.178} \\
+        \textcolor{lmugreen}{\texttt{attention\_radius\_m}}       & \textcolor{lmugreen}{0.098} \\
+        \texttt{std\_speed}                                       & 0.093 \\
+        \texttt{max\_speed}                                       & 0.070 \\
+        \texttt{heading\_change\_per\_sec}                        & 0.039 \\
+        \texttt{min\_neighbor\_distance}                          & 0.029 \\
+        \texttt{history\_sec}                                     & 0.022 \\
+        \texttt{mean\_acceleration}                               & 0.013 \\
+        \bottomrule
+      \end{tabular}
+      \vspace{0.3em}
+
+      \footnotesize All 8 features also significant in GAM ($p \ll 0.01$);
+      XGBoost has the better fit
+      (R$^2$ 0.90 / RMSE 0.13 vs GAM R$^2$ 0.65 / RMSE 0.24).
+    \end{column}
+    \begin{column}{0.40\textwidth}
+      \textbf{Key Insights}
+
+      \vspace{0.5em}
+      \textbf{\texttt{attention\_radius\_m}}
+
+      \vspace{0.3em}
+      second — larger radius provides more context
+      but also adds noise; non-linear optimal range
+
+      \vspace{0.5em}
+      \centering
+      \includegraphics[width=\linewidth,height=0.28\textheight,keepaspectratio]{settings_pdp/attention_radius_m_pdp.png}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Slide 25 ------------------------------------------------------------------
+\begin{frame}[t]{Effect of Model Settings — History Window}
+  \small
+  \vspace{0.1em}
+  \begin{columns}[t]
+    \begin{column}{0.56\textwidth}
+      \centering
+      \textbf{XGBoost — mean $|\mathrm{SHAP}|$ (pooled model)}
+      \vspace{0.3em}
+      \renewcommand{\arraystretch}{1.2}
+      \begin{tabular}{lc}
+        \toprule
+        \textbf{Feature} & \textbf{Mean $|\mathrm{SHAP}|$} \\
+        \midrule
+        \texttt{prediction\_sec}                        & \textbf{0.178} \\
+        \texttt{attention\_radius\_m}                   & 0.098 \\
+        \texttt{std\_speed}                             & 0.093 \\
+        \texttt{max\_speed}                             & 0.070 \\
+        \texttt{heading\_change\_per\_sec}              & 0.039 \\
+        \texttt{min\_neighbor\_distance}                & 0.029 \\
+        \textcolor{lmugreen}{\texttt{history\_sec}}     & \textcolor{lmugreen}{0.022} \\
+        \texttt{mean\_acceleration}                     & 0.013 \\
+        \bottomrule
+      \end{tabular}
+      \vspace{0.3em}
+
+      \footnotesize All 8 features also significant in GAM ($p \ll 0.01$);
+      XGBoost has the better fit
+      (R$^2$ 0.90 / RMSE 0.13 vs GAM R$^2$ 0.65 / RMSE 0.24).
+    \end{column}
+    \begin{column}{0.40\textwidth}
+      \textbf{Key Insights}
+
+      \vspace{0.5em}
+      \textbf{\texttt{history\_sec}}
+
+      \vspace{0.3em}
+      smallest setting effect — model is robust
+      to history window length in this range
+
+      \vspace{0.5em}
+      \centering
+      \includegraphics[width=\linewidth,height=0.28\textheight,keepaspectratio]{settings_pdp/history_sec_pdp.png}
     \end{column}
   \end{columns}
 \end{frame}

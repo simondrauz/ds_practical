@@ -1,103 +1,335 @@
 %--- Part 5b: Performance Regimes (6 min) --------------------------------------
 
-\section{Performance Regimes}
+\section{Failure and Success Modes}
 
 \begin{frame}{Analysis Pipeline}
-  \vfill\pipelinehighlight{4}\vfill
+  \begin{center}
+    \includegraphics[width=\textwidth]{pipeline-clustering}
+  \end{center}
 \end{frame}
 
-%--- Slide 18 ------------------------------------------------------------------
-\begin{frame}{Performance Regime Methodology}
+\renewcommand{\cornerpipeline}{cornerpipeline/pipeline-clustering}
+
+%--- Methodology --------------------------------------------------------------
+\begin{frame}{Performance Group Methodology}
   \begin{enumerate}
-    \item Divide trajectories into difficulty groups based on \texttt{ml\_ade}
-          (easy / medium / hard)
-    \item Run clustering on trajectory + scene characteristics per group
-    \begin{itemize}
-      \item Option A: original feature space
-      \item Option B: UMAP-reduced space
-            (dimensions chosen via trustworthiness score + elbow rule)
-    \end{itemize}
-    \item Assess clustering quality with DBCV score
-    \item Export identified clusters (performance regimes)
+    \item Performance groups via k-means on $\log(1+\texttt{ml\_ade})$
+          $\to$ easy / medium / hard
+    \item Per group: cluster the signed feature-effect vector
+          \begin{itemize}
+            \item Features: \texttt{std\_speed}, \texttt{max\_speed},
+                  \texttt{heading\_change\_per\_sec}, \texttt{mean\_acceleration}
+            \item Effect sources: \textbf{XGBoost SHAP} \textbar\
+                  \textbf{GAM additive effects}
+            \item Algorithms: \textbf{OPTICS} \textbar\ \textbf{HDBSCAN}
+          \end{itemize}
+    \item Select per group via \textbf{DBCV} + noise share +
+          semantic quality
+          $\Rightarrow$ OPTICS / XGBoost preferred everywhere
+    \item Map clusters $\to$ raw trajectory characteristics
+          $\to$ \textbf{success / failure modes}
   \end{enumerate}
+  \vfill
+  \footnotesize
+  Positive effect $\to$ pushes \texttt{ml\_ade} \emph{up}; negative $\to$ down.
 \end{frame}
 
-%--- Slide 19 ------------------------------------------------------------------
-\begin{frame}{Clustering Results}
-  \begin{columns}[t]
-    \begin{column}{0.50\textwidth}
-      \textbf{Performance group sizes} (VIF-only run)\\[0.3em]
-      \renewcommand{\arraystretch}{1.2}
-      \begin{tabular}{lccc}
-        \toprule
-        \textbf{Group} & \textbf{Boundary} & \textbf{N} & \textbf{\%} \\
-        \midrule
-        Easy   & $<0.39$ & 15\,348 & 59\% \\
-        Medium & $0.39$–$1.20$ & 8\,094 & 31\% \\
-        Hard   & $>1.20$ & 2\,680 & 10\% \\
-        \bottomrule
-      \end{tabular}
-      \vspace{0.5em}
-      \begin{itemize}[<2->]
-        \item<2-> Clustering algorithm: \textbf{OPTICS} on raw
-              feature-effect space (no UMAP needed for 6-dimensional space)
-        \item<2-> Quality assessed via \textbf{DBCV} score
-      \end{itemize}
+%--- Performance Groups -------------------------------------------------------
+\begin{frame}{Performance Groups}
+  \begin{columns}[T]
+    \begin{column}{0.70\textwidth}
+      \includegraphics[width=\textwidth]{performance_groups.png}
     \end{column}
-    \begin{column}{0.47\textwidth}
-      \onslide<3->{\textbf{Cluster quality by group}}
-      \onslide<3->{
-      \vspace{0.3em}
+    \begin{column}{0.29\textwidth}
+      \scriptsize
+      K-means on $\log(1+\texttt{ml\_ade})$\\[0.4em]
       \renewcommand{\arraystretch}{1.2}
       \begin{tabular}{lcc}
         \toprule
-        \textbf{Group} & \textbf{DBCV} & \textbf{Noise \%} \\
+        \textbf{Group} & \textbf{Range (m)} & \textbf{N} \\
         \midrule
-        Easy   & \textcolor{lmugreen}{\textbf{0.411}} & 30\% \\
-        Medium & 0.397 & 40\% \\
-        Hard   & 0.091 & 75\% \\
+        Easy   & $<0.39$        & 15\,823 \\
+        Medium & $0.39$–$1.20$  & 8\,320  \\
+        Hard   & $>1.20$        & 2\,743  \\
+        \midrule
+        Total  &                & 26\,886 \\
         \bottomrule
       \end{tabular}
-      \vspace{0.4em}
-      \footnotesize
-      Easy group has the clearest substructure.\\
-      Hard is mostly a continuous high-error regime.
-      }
+      \vspace{0.5em}
+      \begin{itemize}\setlength\itemsep{0.1em}
+        \item Split 59 / 31 / 10\%
+        \item Long heavy tail (max 9.33\,m)
+      \end{itemize}
     \end{column}
   \end{columns}
 \end{frame}
 
-%--- Slide 20 ------------------------------------------------------------------
-\begin{frame}{Regime Inspection — What Drives Error in Each Regime?}
-  \begin{columns}[t]
+%--- Algorithm comparison: OPTICS vs HDBSCAN ---------------------------------
+\begin{frame}{Algorithm Choice — OPTICS vs.\ HDBSCAN}
+  \footnotesize
+  Same XGBoost effect space; algorithm differs.
+  \vspace{0.2em}
+  \begin{center}
+  \renewcommand{\arraystretch}{1.05}
+  \begin{tabular}{@{}c@{\hspace{0.3em}}c@{\hspace{0.4em}}c@{\hspace{0.4em}}c@{}}
+    & \textbf{Easy} & \textbf{Medium} & \textbf{Hard} \\
+    \rotatebox{90}{\quad\textbf{OPTICS}} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps/xgboost_easy_rank1_optics_raw-euclidean_eps0p0181_mcs24_ms40_K2_N30pct_DBCV0p41.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps/xgboost_medium_rank1_optics_raw-euclidean_eps0p0243_mcs13_ms15_K2_N40pct_DBCV0p40.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps/xgboost_hard_rank1_optics_raw-euclidean_eps0p0413_mcs10_ms15_K4_N75pct_DBCV0p09.png} \\
+    &
+      \tiny K\,$=$\,2 \textbar\ noise 30\% \textbar\ \textbf{DBCV 0.41} &
+      \tiny K\,$=$\,2 \textbar\ noise 40\% \textbar\ \textbf{DBCV 0.40} &
+      \tiny K\,$=$\,4 \textbar\ noise 75\% \textbar\ DBCV 0.09 \\[0.3em]
+    \rotatebox{90}{\,\textbf{HDBSCAN}} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps/xgboost_easy_rank1_hdbscan_raw-euclidean_mcs475_ms30_K3_N30pct_DBCV0p30.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps/xgboost_medium_rank1_hdbscan_raw-euclidean_mcs13_ms20_K3_N24pct_DBCV0p04.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps/xgboost_hard_rank1_hdbscan_raw-euclidean_mcs14_ms8_K4_N73pct_DBCV0p05.png} \\
+    &
+      \tiny K\,$=$\,3 \textbar\ noise 30\% \textbar\ DBCV 0.30 &
+      \tiny K\,$=$\,3 \textbar\ noise 24\% \textbar\ DBCV 0.04 &
+      \tiny K\,$=$\,4 \textbar\ noise 73\% \textbar\ DBCV 0.05 \\
+  \end{tabular}
+  \end{center}
+  \vspace{-0.2em}
+  \scriptsize
+  \begin{itemize}\setlength\itemsep{0.1em}
+    \item OPTICS: higher DBCV everywhere, cleaner cores
+    \item HDBSCAN: collapses medium / hard into one dominant blob
+  \end{itemize}
+\end{frame}
+
+%--- Model comparison: XGBoost vs GAM ----------------------------------------
+\begin{frame}{Effect Source — XGBoost vs.\ GAM}
+  \footnotesize
+  Same OPTICS algorithm; feature-effect source differs.
+  \vspace{0.2em}
+  \begin{center}
+  \renewcommand{\arraystretch}{1.05}
+  \begin{tabular}{@{}c@{\hspace{0.3em}}c@{\hspace{0.4em}}c@{\hspace{0.4em}}c@{}}
+    & \textbf{Easy} & \textbf{Medium} & \textbf{Hard} \\
+    \rotatebox{90}{\quad\textbf{XGBoost}} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps/xgboost_easy_rank1_optics_raw-euclidean_eps0p0181_mcs24_ms40_K2_N30pct_DBCV0p41.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps/xgboost_medium_rank1_optics_raw-euclidean_eps0p0243_mcs13_ms15_K2_N40pct_DBCV0p40.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps/xgboost_hard_rank1_optics_raw-euclidean_eps0p0413_mcs10_ms15_K4_N75pct_DBCV0p09.png} \\
+    &
+      \tiny K\,$=$\,2 \textbar\ noise 30\% \textbar\ \textbf{DBCV 0.41} &
+      \tiny K\,$=$\,2 \textbar\ noise 40\% \textbar\ \textbf{DBCV 0.40} &
+      \tiny K\,$=$\,4 \textbar\ noise 75\% \textbar\ \textbf{DBCV 0.09} \\[0.3em]
+    \rotatebox{90}{\qquad\textbf{GAM}} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps/gam_easy_rank1_optics_raw-euclidean_xi0p01_mcs633_ms5_K4_N32pct_DBCV0p40.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps/gam_medium_rank1_optics_raw-euclidean_eps0p0338_mcs25_ms40_K3_N15pct_DBCV0p14.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps/gam_hard_rank1_optics_raw-euclidean_xi0p015_mcs110_ms5_K4_N70pct_DBCV0p19.png} \\
+    &
+      \tiny K\,$=$\,4 \textbar\ noise 32\% \textbar\ DBCV 0.40 &
+      \tiny K\,$=$\,3 \textbar\ noise 15\% \textbar\ DBCV 0.14 &
+      \tiny K\,$=$\,4 \textbar\ noise 70\% \textbar\ \textbf{DBCV 0.19} \\
+  \end{tabular}
+  \end{center}
+  \vspace{-0.2em}
+  \scriptsize
+  \begin{itemize}\setlength\itemsep{0.1em}
+    \item Comparable easy structure across sources
+    \item XGBoost: cleaner medium separation
+    \item GAM: corroborates hard speed-variation / turning pattern
+  \end{itemize}
+\end{frame}
+
+%--- Easy ---------------------------------------------------------------------
+\begin{frame}{Easy Regime — Success Modes}
+  \footnotesize
+  DBCV \textbf{0.41} \hspace{0.4em}\textbar\hspace{0.4em} 2 clusters
+  \hspace{0.4em}\textbar\hspace{0.4em} group median \texttt{ml\_ade}
+  \textbf{0.17\,m}
+  \vspace{0.4em}
+  \begin{itemize}\setlength\itemsep{0.1em}
+    \item Two well-separated modes cover 70\% of easy
+    \item Different motion profiles $\to$ same low-error outcome
+  \end{itemize}
+  \vspace{0.5em}
+  \begin{columns}[T]
     \begin{column}{0.48\textwidth}
-      \textbf{Easy regime}
-      \begin{itemize}[<+->]
-        \item Low \texttt{std\_speed} ($-2.0\sigma$ global) and
-              low heading change $\to$ slow, predictable trajectories
-        \item Two sub-clusters:
-              \emph{slow/stationary} (median ADE 0.02)
-              vs.\ \emph{mild motion} (median ADE 0.22)
-        \item Both drive negative total feature effects
+      \textbf{Slow turners} \\
+      \scriptsize 34\% of easy \textbar\ median \textbf{0.08\,m}
+      \begin{itemize}\setlength\itemsep{0.15em}
+        \item Very low max speed, very low speed variation
+        \item High turning rate
+        \item Turning $\uparrow$ error, but slow steady motion dominates
+        \item \emph{Slow despite turning} $\Rightarrow$ easiest
       \end{itemize}
     \end{column}
     \begin{column}{0.48\textwidth}
-      \onslide<2->{\textbf{Hard regime}}
-      \begin{itemize}
-        \item<2-> 99.5\% of hard trajectories have \emph{positive}
-                  total feature effect
-        \item<2-> Dominated by high \texttt{std\_speed}
-                  ($+2.0\sigma$ global), turning, and acceleration
-        \item<3-> No sharp sub-clusters — hard is a
-                  \textbf{continuous high-variation regime};
-                  a small extreme outlier group has
-                  $\texttt{std\_speed} \approx +4.8\sigma$
+      \onslide<2->{\textbf{Straight walkers}}\\
+      \onslide<2->{\scriptsize 36\% of easy \textbar\ median \textbf{0.20\,m}}
+      \begin{itemize}[<2->]\setlength\itemsep{0.15em}
+        \item Stable heading, normal max speed
+        \item Low speed variation
+        \item Heading stability drives low predicted error
+        \item \emph{Straight and steady} $\Rightarrow$ easy
       \end{itemize}
     \end{column}
   \end{columns}
-  \vspace{0.4em}
-  \onslide<3->{%
+  \vfill
+  \onslide<3->{\textcolor{lmugreen}{\textbf{Takeaway:}}
+  low speed \emph{or} stable heading $\to$ Trajectron++ stays on track.}
+\end{frame}
+
+%--- Medium -------------------------------------------------------------------
+\begin{frame}{Medium Regime — Transition Zone}
   \footnotesize
-  \textbf{Takeaway:} Trajectron++ struggles with erratic, fast-turning pedestrians.
-  Slow or near-stationary pedestrians are easy regardless of scene complexity.}
+  DBCV \textbf{0.40} \hspace{0.4em}\textbar\hspace{0.4em} 2 clusters
+  \hspace{0.4em}\textbar\hspace{0.4em} group median \texttt{ml\_ade}
+  \textbf{0.60\,m}
+  \vspace{0.4em}
+  \begin{itemize}\setlength\itemsep{0.1em}
+    \item Transition zone between easy and hard
+    \item One discrete mode (60\%) + continuous gradient toward hard
+  \end{itemize}
+  \vspace{0.5em}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Ordinary medium}\\
+      \scriptsize 60\% of medium \textbar\ median \textbf{0.55\,m}
+      \begin{itemize}\setlength\itemsep{0.15em}
+        \item Slightly elevated max speed
+        \item Modest speed variation
+        \item Heading near global median
+        \item \texttt{max\_speed} = only consistent error driver
+        \item Stable heading prevents slide into hard
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \onslide<2->{\textbf{Toward the hard boundary}}\\
+      \onslide<2->{\scriptsize No second discrete mode}
+      \begin{itemize}[<2->]\setlength\itemsep{0.15em}
+        \item Higher error $\to$ speed variation $\uparrow$, turning $\uparrow$,
+              acceleration / jerk $\uparrow$
+        \item Same axes as hard, lower magnitudes
+        \item Continuous gradient, not a stable second cluster
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \vfill
+  \onslide<3->{\textcolor{lmugreen}{\textbf{Takeaway:}}
+  speed pushes error up; stable heading keeps it bounded.}
+\end{frame}
+
+%--- Hard ---------------------------------------------------------------------
+\begin{frame}{Hard Regime — Failure Modes}
+  \footnotesize
+  DBCV \textbf{0.09} \hspace{0.4em}\textbar\hspace{0.4em} 4 clusters
+  \hspace{0.4em}\textbar\hspace{0.4em} group median \texttt{ml\_ade}
+  \textbf{1.78\,m}
+  \vspace{0.4em}
+  \begin{itemize}\setlength\itemsep{0.1em}
+    \item 99.5\% of hard rows: positive total feature effect
+    \item Dominant axes: high speed variation + elevated turning
+    \item Two distinct failure modes (25\% combined); rest spreads
+          continuously along the same axes
+  \end{itemize}
+  \vspace{0.4em}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Erratic motion at low pace}\\
+      \scriptsize 8\% of hard \textbar\ median \textbf{1.6–1.9\,m}
+      \begin{itemize}\setlength\itemsep{0.15em}
+        \item Below-median pace
+        \item Very high speed variation + elevated turning
+        \item Both drivers raise error (different magnitudes of
+              variation $\times$ turning)
+        \item Mean acceleration well below average
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \onslide<2->{\textbf{Fast motion with mild turning}}\\
+      \onslide<2->{\scriptsize 17\% of hard \textbar\ median \textbf{1.50\,m}}
+      \begin{itemize}[<2->]\setlength\itemsep{0.15em}
+        \item Only hard mode with above-median max speed
+        \item Loss split between \texttt{max\_speed} and
+              \texttt{heading\_change}
+        \item Speed variation only mildly elevated
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \vfill
+  \onslide<3->{\textcolor{lmugreen}{\textbf{Takeaway:}}
+  failure is driven by \emph{erratic} motion, not raw speed —
+  fast only matters when paired with turning.}
+\end{frame}
+
+%--- Summary: Success / Failure Modes ----------------------------------------
+\begin{frame}{Success \& Failure Modes — At a Glance}
+  \centering
+  \scriptsize
+  \begin{tikzpicture}[
+      every node/.style={font=\scriptsize},
+      box/.style={draw=lmugreen!40, rounded corners=2pt,
+                  inner sep=4pt, minimum width=2.55cm, minimum height=2.0cm,
+                  align=center, fill=lmugreen!5},
+      hardbox/.style={draw=red!40, rounded corners=2pt,
+                  inner sep=4pt, minimum width=2.55cm, minimum height=2.0cm,
+                  align=center, fill=red!5},
+      medbox/.style={draw=orange!50, rounded corners=2pt,
+                  inner sep=4pt, minimum width=2.55cm, minimum height=2.0cm,
+                  align=center, fill=orange!5},
+      traj/.style={->, >=Stealth, thick, lmugreen!70!black},
+      trajm/.style={->, >=Stealth, thick, orange!80!black},
+      trajh/.style={->, >=Stealth, thick, red!70!black},
+  ]
+    \node[box] (easy1) at (0,0) {};
+    \node[box] (easy2) at (3.0,0) {};
+    \node[medbox] (med) at (6.0,0) {};
+    \node[hardbox] (hard1) at (9.0,0) {};
+    \node[hardbox] (hard2) at (12.0,0) {};
+
+    % Slow turner: small loopy path
+    \draw[traj] (-0.9,-0.4) .. controls (-0.6,0.4) and (-0.2,-0.4) ..
+                (0.1,0.3) .. controls (0.4,-0.2) and (0.7,0.4) .. (0.9,-0.1);
+    \node at (0,0.7) {\textbf{Slow turner}};
+
+    % Straight walker: straight arrow
+    \draw[traj] (2.1,0) -- (3.9,0);
+    \node at (3.0,0.7) {\textbf{Straight walker}};
+
+    % Ordinary mover: gentle wave
+    \draw[trajm] (5.1,-0.2) .. controls (5.5,0.3) and (5.9,-0.3) ..
+                 (6.3,0.2) .. controls (6.6,0.4) .. (6.9,0.0);
+    \node at (6.0,0.7) {\textbf{Ordinary mover}};
+
+    % Erratic turner: zigzag
+    \draw[trajh] (8.05,-0.2) -- (8.35,0.35) -- (8.6,-0.3) --
+                 (8.9,0.4) -- (9.2,-0.2) -- (9.5,0.3) -- (9.85,-0.1);
+    \node at (9.0,0.7) {\textbf{Erratic turner}};
+
+    % Fast & turning: long swooping curve
+    \draw[trajh, line width=1.2pt] (11.0,-0.3) .. controls
+          (11.5,0.1) and (12.3,-0.1) .. (12.95,0.3);
+    \node at (12.0,0.7) {\textbf{Fast \& turning}};
+
+    \node[lmugreen!70!black] at (0,-1.25) {\textbf{EASY}};
+    \node[lmugreen!70!black] at (3.0,-1.25) {\textbf{EASY}};
+    \node[orange!80!black]   at (6.0,-1.25) {\textbf{MEDIUM}};
+    \node[red!70!black]      at (9.0,-1.25) {\textbf{HARD}};
+    \node[red!70!black]      at (12.0,-1.25){\textbf{HARD}};
+
+    \node[text width=2.5cm, align=center] at (0,-2.0)
+      {Slow,\\high turning\\\emph{0.08\,m}};
+    \node[text width=2.5cm, align=center] at (3.0,-2.0)
+      {Normal speed,\\stable heading\\\emph{0.20\,m}};
+    \node[text width=2.5cm, align=center] at (6.0,-2.0)
+      {Elevated speed,\\stable heading\\\emph{0.55\,m}};
+    \node[text width=2.5cm, align=center] at (9.0,-2.0)
+      {Erratic speed\\+ turning, slow\\\emph{1.6–1.9\,m}};
+    \node[text width=2.5cm, align=center] at (12.0,-2.0)
+      {Above-median speed\\+ mild turning\\\emph{1.5\,m}};
+
+    %--- Group-level success / failure summary lines ---------------------
+    \node[lmugreen!70!black, text width=6.5cm, align=center]
+         at (1.5,-3.4)
+      {\textbf{Success:} low speed \emph{or} stable heading};
+    \node[red!70!black, text width=6.5cm, align=center]
+         at (10.5,-3.4)
+      {\textbf{Failure:} erratic motion — fast only matters
+        when paired with turning};
+  \end{tikzpicture}
 \end{frame}
