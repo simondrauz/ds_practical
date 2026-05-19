@@ -64,12 +64,9 @@
     \item<2-> Select per group via \textbf{DBCV} + noise share +
           semantic quality
           $\Rightarrow$ OPTICS / XGBoost preferred everywhere
-    \item<2-> Map clusters $\to$ raw trajectory characteristics
+    \item<2-> Interpret clusters (explanation patterns) by grounding them in raw trajectory characteristics
           $\to$ \textbf{success / failure modes}
   \end{enumerate}
-  \vfill
-  \footnotesize
-  Positive effect $\to$ pushes \texttt{ml\_ade} \emph{up}; negative $\to$ down.
 \end{frame}
 
 %--- Algorithm comparison: OPTICS vs HDBSCAN ---------------------------------
@@ -88,7 +85,7 @@
     &
       \tiny K\,$=$\,2 \textbar\ noise 30\% \textbar\ \textbf{DBCV 0.41} &
       \tiny K\,$=$\,2 \textbar\ noise 40\% \textbar\ \textbf{DBCV 0.40} &
-      \tiny K\,$=$\,4 \textbar\ noise 75\% \textbar\ DBCV 0.09 \\[0.3em]
+      \tiny K\,$=$\,4 \textbar\ noise 75\% \textbar\ \textbf{DBCV 0.09} \\[0.3em]
     \rotatebox{90}{\,\textbf{HDBSCAN}} &
       \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps/xgboost_easy_rank1_hdbscan_raw-euclidean_mcs475_ms30_K3_N30pct_DBCV0p30.png} &
       \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps/xgboost_medium_rank1_hdbscan_raw-euclidean_mcs13_ms20_K3_N24pct_DBCV0p04.png} &
