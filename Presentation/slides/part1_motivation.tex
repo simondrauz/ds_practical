@@ -29,11 +29,12 @@
   \begin{columns}
     \begin{column}{0.52\textwidth}
       \begin{itemize}
-        \item<1-> State-of-the-art probabilistic trajectory prediction model
+        \item<1-> Probabilistic trajectory prediction model, state-of-the-art
+              at publication
               \textnormal{\small[Salzmann et al., 2020]}
         \item<2-> \emph{Spatio-temporal graph encoder}
         \begin{itemize}
-          \item LSTM per agent
+          \item LSTM encodes each agent's history
           \item edges encode agent--agent interactions
         \end{itemize}
         \item<3-> \emph{CVAE decoder}
@@ -42,7 +43,7 @@
               trajectories
         \end{itemize}
         \item<4-> Handles \emph{heterogeneous} agent types jointly
-              (pedestrian, bicycle, motorcycle, car) and integrates HD map context
+              (pedestrian, bicycle, motorcycle, vehicle) and integrates HD map context
         \item<6-> \small \textbf{ADE:} avg.\ L2 distance over all predicted timesteps
         \item<7-> \small \textbf{FDE:} L2 distance at the final predicted timestep
       \end{itemize}
