@@ -64,6 +64,13 @@
     \item<2-> Select per group via \textbf{DBCV} + noise share +
           semantic quality
           $\Rightarrow$ OPTICS / XGBoost preferred everywhere
+          \begin{itemize}
+            \item DBCV evaluates density-reachability and connectivity
+                  within the data, $\in [-1, 1]$:
+                  $+1$ = robust separation of dense, distinct groups;
+                  $0$ = ambiguous structure, clusters no denser than
+                  surrounding noise
+          \end{itemize}
     \item<2-> Interpret clusters (explanation patterns) by grounding them in raw trajectory characteristics
           $\to$ \textbf{success / failure modes}
   \end{enumerate}

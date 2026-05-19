@@ -48,7 +48,9 @@
               and feature interactions
         \item Interpreted via \textbf{SHAP values} and
               \textbf{partial dependence plots}
-      \end{itemize}}
+        \item SHAP: per-row, signed contribution of each feature,
+              additive on top of a baseline (mean model prediction)
+              : $$f(x) = \phi_0 + \sum_j \phi_j(x)$$      \end{itemize}}
     \end{column}
   \end{columns}
 \end{frame}
