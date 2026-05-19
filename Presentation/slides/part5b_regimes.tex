@@ -123,7 +123,7 @@
     &
       \tiny K\,$=$\,2 \textbar\ noise 30\% \textbar\ \textbf{DBCV 0.41} &
       \tiny K\,$=$\,2 \textbar\ noise 40\% \textbar\ \textbf{DBCV 0.40} &
-      \tiny K\,$=$\,4 \textbar\ noise 75\% \textbar\ \textbf{DBCV 0.09} \\[0.3em]
+      \tiny K\,$=$\,4 \textbar\ noise 75\% \textbar\ DBCV 0.09 \\[0.3em]
     \rotatebox{90}{\qquad\textbf{GAM}} &
       \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps/gam_easy_rank1_optics_raw-euclidean_xi0p01_mcs633_ms5_K4_N32pct_DBCV0p40.png} &
       \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps/gam_medium_rank1_optics_raw-euclidean_eps0p0338_mcs25_ms40_K3_N15pct_DBCV0p14.png} &
@@ -161,9 +161,8 @@
         \textbf{Slow turners} \\
         \scriptsize 34\% of easy \textbar\ median \textbf{0.08\,m}
         \begin{itemize}\setlength\itemsep{0.15em}
-          \item Very low max speed, very low speed variation
-          \item High turning rate
-          \item Turning $\uparrow$ error, but slow steady motion dominates
+          \item Very low max speed, very low speed variation, High turning rate
+          \item Turning increases error, but slow steady motion dominates
           \item \emph{Slow despite turning} $\Rightarrow$ easiest
         \end{itemize}
       }
@@ -173,8 +172,7 @@
         \textbf{Straight walkers}\\
         \scriptsize 36\% of easy \textbar\ median \textbf{0.20\,m}
         \begin{itemize}\setlength\itemsep{0.15em}
-          \item Stable heading, normal max speed
-          \item Low speed variation
+          \item Stable heading, normal max speed, Low speed variation
           \item Heading stability drives low predicted error
           \item \emph{Straight and steady} $\Rightarrow$ easy
         \end{itemize}
@@ -204,9 +202,7 @@
         \textbf{Ordinary medium}\\
         \scriptsize 60\% of medium \textbar\ median \textbf{0.55\,m}
         \begin{itemize}\setlength\itemsep{0.15em}
-          \item Slightly elevated max speed
-          \item Modest speed variation
-          \item Heading near global median
+          \item Slightly elevated max speed, Modest speed variation, Heading near global median
           \item \texttt{max\_speed} = only consistent error driver
           \item Stable heading prevents slide into hard
         \end{itemize}
@@ -250,10 +246,9 @@
         \textbf{Erratic motion at low pace}\\
         \scriptsize 8\% of hard \textbar\ median \textbf{1.6–1.9\,m}
         \begin{itemize}\setlength\itemsep{0.15em}
-          \item Below-median pace
-          \item Very high speed variation + elevated turning
-          \item Both drivers raise error (different magnitudes of
-                variation $\times$ turning)
+          \item Below-median max speed, Very high speed variation, Elevated turning
+          \item Different magnitudes of
+                variation $\times$ turning drive error
           \item Mean acceleration well below average
         \end{itemize}
       }

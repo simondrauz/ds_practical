@@ -62,7 +62,6 @@
       \onslide<1->{%
         \textbf{\texttt{std\_speed}} — strong, monotone positive
         \begin{itemize}\setlength\itemsep{0.05em}
-          \item Top driver of predicted ADE
           \item More variation $\Rightarrow$ higher ADE, monotonically
           \item GAM confirms the trend within the PDP range
           \item \textit{Erratic speed is harder to forecast}
@@ -72,9 +71,8 @@
       \onslide<2->{%
         \textbf{\texttt{heading\_change\_per\_sec}} — positive, non-linear
         \begin{itemize}\setlength\itemsep{0.05em}
-          \item Turning raises ADE; plateaus at high values
-          \item GAM diverges near zero — slow pedestrians register
-                large heading rates from small position jitter
+          \item Turning generally raises ADE; drop-off at high values
+          \item GAM confirms the trend within the PDP range
           \item \textit{Turns hurt accuracy — but only up to a point}
         \end{itemize}
       }
@@ -102,8 +100,7 @@
         \textbf{\texttt{max\_speed}} — positive, broadly increasing
         \begin{itemize}\setlength\itemsep{0.05em}
           \item Higher peak speeds raise predicted ADE
-          \item Second-strongest driver after \texttt{std\_speed}
-          \item GAM agrees; CI widens at the tail (data sparsity)
+          \item GAM agrees; CI widens at the tail
           \item \textit{At the upper tail, both the data and the
                 model's confidence run thin}
         \end{itemize}
@@ -112,11 +109,11 @@
       \onslide<2->{%
         \textbf{\texttt{mean\_acceleration}} — near-zero, mixed
         \begin{itemize}\setlength\itemsep{0.05em}
-          \item Oscillates around zero; GAM not significant
+          \item Oscillates around zero
           \item Population-level effect $\approx 0$, but signed
                 per-trajectory effects still vary
           \item \textit{What matters more is that pedestrians are
-                changing speed (\texttt{std\_speed}), not how quickly}
+                changing speed, not how quickly}
         \end{itemize}
       }
     \end{column}
@@ -141,14 +138,13 @@
       \footnotesize
       \textbf{\texttt{scene\_density\_VEHICLE}} — negligible, noisy
       \begin{itemize}\setlength\itemsep{0.05em}
-        \item Noisy oscillation across the full range
-        \item Effect scale negligible vs.\ motion features
+        \item lower density seems to increase predicted ADE, but PDP is noisy
         \item GAM smooth not significant — CI spans zero
         \item Other scene / social features
               (\texttt{scene\_num\_VEHICLE},
                \texttt{min\_neighbor\_distance})
               show similar near-flat PDPs
-        \item \textit{Scene density does not robustly explain
+        \item \textit{Scene features do not robustly explain
                       individual trajectory error}
       \end{itemize}
     \end{column}
