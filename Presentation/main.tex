@@ -78,8 +78,8 @@ belowskip = -1.2 \baselineskip,
   \end{tikzpicture}%
   \fi}
 
-\title[Trajectron++ Analysis]{Understanding Trajectron++: \\
-A Interpretable Performance Analysis Pipeline}
+\title[Trajectron++ Analysis]{Why Are Some Trajectories Harder Than Others?}
+\subtitle{Interpreting Trajectron++ Prediction Errors}
 
 \author[Drauz \& Matrullo]{Simon Drauz and Zoe Matrullo}
 \institute[LMU]{LMU Munich}
@@ -94,28 +94,30 @@ A Interpretable Performance Analysis Pipeline}
 {
 \usebackgroundtemplate{\includegraphics[width=\paperwidth]{lmu-background.pdf}}
 \begin{frame}
-\begin{columns}
-	\begin{column}{0.4\textwidth}
-		\vspace*{3cm}
-		\textbf{\textcolor{white}{\Large 
-		\\ Understanding Trajectron++:\\
-A Per-Trajectory Performance Analysis \\}}
-		\vspace{1cm}
+\begin{columns}[T,onlytextwidth]
+	\begin{column}{0.48\textwidth}
+		\vspace*{2.3cm}
+		\begin{minipage}{0.85\linewidth}
+		\raggedright
+		\LARGE
+		\textbf{\textcolor{white}{Why Are Some Trajectories Harder Than Others?}}
+		\vspace{0.24cm}
+
+		\Large
+		\textcolor{white}{
+		Interpreting Trajectron++ Prediction Errors}
+		\end{minipage}\par
+		\vspace{0.85cm}
 		\textcolor{white}{\footnotesize Simon Drauz and Zoe Matrullo \\
 			\today}
 	\end{column}
-	\begin{column}{0.49\textwidth}
-		\vspace*{1.5cm}
+	\begin{column}{0.46\textwidth}
+		\vspace*{1.75cm}
 		\begin{center}
-			\includegraphics[width=0.85\textwidth]{nuscenes_example2}\\[0.3em]
-			\begin{columns}[c]
-				\begin{column}{0.43\textwidth}
-					\includegraphics[width=\textwidth]{nuscenes_maps}
-				\end{column}
-				\begin{column}{0.43\textwidth}
-					\includegraphics[width=\textwidth]{clustering-cover}
-				\end{column}
-			\end{columns}
+			\hspace*{-0.75cm}%
+			\includegraphics[width=\textwidth,height=2.55cm,keepaspectratio]{trajectory_prediction}\\[0.55cm]
+			\hspace*{-0.75cm}%
+			\includegraphics[width=\textwidth,height=2.75cm,keepaspectratio]{performance_groups}
 		\end{center}
 	\end{column}
 \end{columns}
