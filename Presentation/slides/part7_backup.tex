@@ -1,0 +1,265 @@
+%==============================================================================
+%  BACKUP SLIDES
+%==============================================================================
+
+\appendix
+
+\begin{frame}[noframenumbering, plain]
+  \begin{center}
+    {\Huge \textbf{Backup Slides}}
+  \end{center}
+\end{frame}
+
+
+%--- Hyperparameter tuning search space --------------------------------------
+\begin{frame}{Hyperparameter Tuning — Search Space}
+  \footnotesize
+  Bayesian optimization with Optuna (TPE sampler) on a $3$-fold inner CV;
+  $15$ trials per study.
+  \vspace{0.3em}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \textbf{XGBoost} \\
+      \scriptsize
+      \renewcommand{\arraystretch}{1.1}
+      \begin{center}
+      \begin{tabular}{@{}ll@{}}
+        \toprule
+        Parameter & Search range \\
+        \midrule
+        \texttt{learning\_rate}    & $[0.01,\,0.2]$ (log) \\
+        \texttt{max\_depth}        & $\{3,\dots,10\}$ \\
+        \texttt{min\_child\_weight}& $\{1,\dots,20\}$ \\
+        \texttt{subsample}         & $[0.5,\,1.0]$ \\
+        \texttt{colsample\_bytree} & $[0.5,\,1.0]$ \\
+        \texttt{reg\_alpha}        & $[10^{-8},\,10]$ (log) \\
+        \texttt{reg\_lambda}       & $[10^{-6},\,20]$ (log) \\
+        \texttt{num\_boost\_round} & up to $2000$, early-stop $50$ \\
+        \bottomrule
+      \end{tabular}
+      \end{center}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \textbf{GAM} \\
+      \scriptsize
+      \renewcommand{\arraystretch}{1.1}
+      \begin{center}
+      \begin{tabular}{@{}ll@{}}
+        \toprule
+        Parameter & Search range \\
+        \midrule
+        \texttt{n\_splines}    & $\{10,\dots,50\}$ \\
+        \texttt{spline\_order} & $\{3,\,4\}$ \\
+        \texttt{lam}           & $[10^{-3},\,10^{3}]$ (log) \\
+        \bottomrule
+      \end{tabular}
+      \end{center}
+      \vspace{0.5em}
+
+      \textbf{Variants compared:}
+      \begin{itemize}\setlength\itemsep{0.05em}
+        \item LinearGAM on log target
+        \item LinearGAM on raw target
+        \item GammaGAM on raw target
+      \end{itemize}
+      Winner selected by lowest mean outer-fold RMSE on original scale.
+    \end{column}
+  \end{columns}
+  \vspace{0.4em}
+  \scriptsize
+  \begin{itemize}\setlength\itemsep{0.08em}
+    \item XGBoost tuning minimizes RMSE on \texttt{ml\_ade\_log}; GAM tuning
+      converts predictions back to original \texttt{ml\_ade} scale.
+    \item Nested resampling: $3$ outer folds $\times$ $3$ inner folds; tuning
+      rerun on all rows for the final refit.
+  \end{itemize}
+\end{frame}
+
+%--- Best XGBoost configurations across runs ---------------------------------
+\begin{frame}{Hyperparameter Tuning — XGBoost Configurations}
+  \footnotesize
+  Full-data retuned configurations of the exported XGBoost models.
+  \vspace{0.3em}
+
+  \scriptsize
+  \renewcommand{\arraystretch}{1.05}
+  \begin{center}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+     & \textbf{MI\,+\,VIF} & \textbf{VIF only} & \textbf{Settings sweep (MI\,+\,VIF)} \\
+    \midrule
+    \texttt{learning\_rate}    & $0.0174$ & $0.0219$ & $0.0486$ \\
+    \texttt{max\_depth}        & $10$     & $9$      & $9$ \\
+    \texttt{min\_child\_weight}& $16$     & $6$      & $17$ \\
+    \texttt{subsample}         & $0.97$   & $0.88$   & $0.92$ \\
+    \texttt{colsample\_bytree} & $0.95$   & $0.80$   & $0.99$ \\
+    \texttt{reg\_alpha}        & $2.4\!\times\!10^{-3}$ & $1.6\!\times\!10^{-4}$ & $1.9\!\times\!10^{-2}$ \\
+    \texttt{reg\_lambda}       & $5.38$                 & $0.45$                 & $3.5\!\times\!10^{-4}$ \\
+    best iteration             & $1475$   & $1998$   & $1585$ \\
+    full-data CV RMSE (log target) & $0.176$  & $0.177$  & $\mathbf{0.078}$ \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+
+  \vspace{0.3em}
+  \scriptsize
+  \begin{itemize}\setlength\itemsep{0.08em}
+    \item CV scores are on \texttt{ml\_ade\_log}.
+    \item Original-scale RMSE is reported by the nested/OOF evaluation, not by
+      the XGBoost tuning objective.
+  \end{itemize}
+\end{frame}
+
+%--- Best GAM configurations across runs -------------------------------------
+\begin{frame}{Hyperparameter Tuning — GAM Configurations}
+  \footnotesize
+  Full-data retuned configurations of the exported GAM winners.
+  \vspace{0.3em}
+
+  \scriptsize
+  \renewcommand{\arraystretch}{1.05}
+  \begin{center}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+     & \textbf{MI\,+\,VIF} & \textbf{VIF only} & \textbf{Settings sweep (MI\,+\,VIF)} \\
+    \midrule
+    variant            & LinearGAM (log) & LinearGAM (raw) & GammaGAM (raw) \\
+    \texttt{n\_splines}& $50$    & $50$    & $49$ \\
+    \texttt{spline\_order} & $4$ & $4$     & $4$ \\
+    \texttt{lam}       & $39.11$ & $39.11$ & $0.087$ \\
+    full-data CV RMSE  & $0.431$ & $0.439$ & $\mathbf{0.246}$ \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+
+  \vspace{0.3em}
+  \scriptsize
+  \begin{itemize}\setlength\itemsep{0.08em}
+    \item Settings-sweep results use nuScenes \emph{mini}, 30 epochs,
+      model-setting features, and a different row filter.
+    \item The lower RMSE is useful descriptively but is not a direct
+      full-trainval comparison.
+  \end{itemize}
+\end{frame}
+
+%--- Interaction PDPs: XGBoost MI+VIF -----------------------------------------
+\begin{frame}{Interaction PDPs — XGBoost}
+  \framesubtitle{MI\,+\,VIF feature set; log1p transformed target}
+  \centering
+  \includegraphics[
+    width=\textwidth,
+    height=0.82\textheight,
+    keepaspectratio
+  ]{interaction_plots/xgboost_mi_and_vif_pdp_interactions_ml_ade_log_cropped.png}
+\end{frame}
+
+%--- Algorithm comparison with noise: OPTICS vs HDBSCAN ----------------------
+\begin{frame}{Algorithm Choice — OPTICS vs.\ HDBSCAN (with noise)}
+  \footnotesize
+  Same XGBoost effect space; algorithm differs. Noise points shown.
+  \vspace{0.2em}
+  \begin{center}
+  \renewcommand{\arraystretch}{1.05}
+  \begin{tabular}{@{}c@{\hspace{0.3em}}c@{\hspace{0.4em}}c@{\hspace{0.4em}}c@{}}
+    & \textbf{Easy} & \textbf{Medium} & \textbf{Hard} \\
+    \rotatebox{90}{\quad\textbf{OPTICS}} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_easy_rank1_optics_raw-euclidean_eps0p0181_mcs24_ms40_K2_N30pct_DBCV0p41.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_medium_rank1_optics_raw-euclidean_eps0p0243_mcs13_ms15_K2_N40pct_DBCV0p40.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_hard_rank1_optics_raw-euclidean_eps0p0413_mcs10_ms15_K4_N75pct_DBCV0p09.png} \\
+    &
+      \tiny K\,$=$\,2 \textbar\ noise 30\% \textbar\ \textbf{DBCV 0.41} &
+      \tiny K\,$=$\,2 \textbar\ noise 40\% \textbar\ \textbf{DBCV 0.40} &
+      \tiny K\,$=$\,4 \textbar\ noise 75\% \textbar\ \textbf{DBCV 0.09} \\[0.3em]
+    \rotatebox{90}{\,\textbf{HDBSCAN}} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_easy_rank1_hdbscan_raw-euclidean_mcs475_ms30_K3_N30pct_DBCV0p30.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_medium_rank1_hdbscan_raw-euclidean_mcs13_ms20_K3_N24pct_DBCV0p04.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_hard_rank1_hdbscan_raw-euclidean_mcs14_ms8_K4_N73pct_DBCV0p05.png} \\
+    &
+      \tiny K\,$=$\,3 \textbar\ noise 30\% \textbar\ DBCV 0.30 &
+      \tiny K\,$=$\,3 \textbar\ noise 24\% \textbar\ DBCV 0.04 &
+      \tiny K\,$=$\,4 \textbar\ noise 73\% \textbar\ DBCV 0.05 \\
+  \end{tabular}
+  \end{center}
+\end{frame}
+
+%--- Model comparison with noise: XGBoost vs GAM -----------------------------
+\begin{frame}{Effect Source — XGBoost vs.\ GAM (with noise)}
+  \footnotesize
+  Same OPTICS algorithm; feature-effect source differs. Noise points shown.
+  \vspace{0.2em}
+  \begin{center}
+  \renewcommand{\arraystretch}{1.05}
+  \begin{tabular}{@{}c@{\hspace{0.3em}}c@{\hspace{0.4em}}c@{\hspace{0.4em}}c@{}}
+    & \textbf{Easy} & \textbf{Medium} & \textbf{Hard} \\
+    \rotatebox{90}{\quad\textbf{XGBoost}} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/xgboost_with-noise_easy_rank1_optics_raw-euclidean_eps0p0181_mcs24_ms40_K2_N30pct_DBCV0p41.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/xgboost_with-noise_medium_rank1_optics_raw-euclidean_eps0p0243_mcs13_ms15_K2_N40pct_DBCV0p40.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/xgboost_with-noise_hard_rank1_optics_raw-euclidean_eps0p0413_mcs10_ms15_K4_N75pct_DBCV0p09.png} \\
+    &
+      \tiny K\,$=$\,2 \textbar\ noise 30\% \textbar\ \textbf{DBCV 0.41} &
+      \tiny K\,$=$\,2 \textbar\ noise 40\% \textbar\ \textbf{DBCV 0.40} &
+      \tiny K\,$=$\,4 \textbar\ noise 75\% \textbar\ DBCV 0.09 \\[0.3em]
+    \rotatebox{90}{\qquad\textbf{GAM}} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/gam_with-noise_easy_rank1_optics_raw-euclidean_xi0p01_mcs633_ms5_K4_N32pct_DBCV0p40.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/gam_with-noise_medium_rank1_optics_raw-euclidean_eps0p0338_mcs25_ms40_K3_N15pct_DBCV0p14.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/gam_with-noise_hard_rank1_optics_raw-euclidean_xi0p015_mcs110_ms5_K4_N70pct_DBCV0p19.png} \\
+    &
+      \tiny K\,$=$\,4 \textbar\ noise 32\% \textbar\ DBCV 0.40 &
+      \tiny K\,$=$\,3 \textbar\ noise 15\% \textbar\ DBCV 0.14 &
+      \tiny K\,$=$\,4 \textbar\ noise 70\% \textbar\ \textbf{DBCV 0.19} \\
+  \end{tabular}
+  \end{center}
+\end{frame}
+
+%--- DBCV: high-level interpretation -----------------------------------------
+\begin{frame}{DBCV — Density-Based Clustering Validation}
+  \footnotesize
+  Density-Based Clustering Validation: internal score for non-spherical,
+  density-based clusters (Moulavi et al., 2014).
+  \vspace{0.45em}
+
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \scriptsize
+      \textbf{Core idea}
+      \begin{itemize}\setlength\itemsep{0.25em}
+        \item \textbf{Reward:} dense, connected clusters.
+        \item \textbf{Reward:} low-density gaps between clusters.
+        \item \textbf{Penalize:} sparse bridges and weak internal links.
+        \item \textbf{Penalize:} high noise share via the final weighting.
+      \end{itemize}
+      \vspace{0.45em}
+      \textbf{Validity per cluster}
+      \[
+        V(C_i)=
+        \frac{\min_{j\neq i}\text{DSPC}(C_i,C_j)-\text{DSC}(C_i)}
+             {\max\!\bigl(\min_{j\neq i}\text{DSPC}(C_i,C_j),\,
+                          \text{DSC}(C_i)\bigr)}
+      \]
+      \vspace{-0.6em}
+      \begin{itemize}\setlength\itemsep{0.15em}
+        \item $\text{DSC}$: sparsest internal cluster link.
+        \item $\text{DSPC}$: nearest density separation to another cluster.
+      \end{itemize}
+    \end{column}
+
+    \begin{column}{0.48\textwidth}
+      \scriptsize
+      \textbf{Overall score}
+      \[
+        \text{DBCV} =
+        \sum_{i=1}^{K} \frac{|C_i|}{|\mathcal{O}|}\, V(C_i)
+      \]
+      Noise has no own validity term, but remains in $\mathcal{O}$.
+      \vspace{0.45em}
+      
+      \textbf{How to read it}
+      \begin{itemize}\setlength\itemsep{0.15em}
+        \item Range: $[-1,1]$; higher is better.
+        \item Positive: dense clusters, lower-density gaps.
+        \item Near $0$: ambiguous density structure.
+        \item Negative: implausible partition.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
