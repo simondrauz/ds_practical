@@ -55,16 +55,16 @@
 
 %--- Slide: Additive effects & SHAP -------------------------------------------
 %--- Slide 12 ------------------------------------------------------------------
-\begin{frame}{Validating the Tuning Procedure — Nested \\ Resampling}
+\begin{frame}[t]{Validating the Tuning Procedure — Nested Resampling}
   \begin{itemize}
-    \item \textbf{Problem:} hyperparameter tuning risks overfitting to a
+    \item<1-> \textbf{Problem:} hyperparameter tuning risks overfitting to a
           particular data split
-    \item \textbf{Solution:} nested cross-validation
+    \item<2-> \textbf{Solution:} nested cross-validation
     \begin{itemize}
       \item Outer folds: evaluate generalization of the full tuning procedure
       \item Inner folds: tune hyperparameters on each outer-fold training set via cross-validation
     \end{itemize}
-    \item OOF evaluation: inspect out-of-fold predictions for instability
+    \item<3-> OOF evaluation: inspect out-of-fold predictions for instability
           and bias
   \end{itemize}
 \end{frame}
@@ -113,7 +113,7 @@
 \end{frame}
 
 %--- Return to validation slide with conclusion --------------------------------
-\begin{frame}{Validating the Tuning Procedure — Nested Resampling}
+\begin{frame}[t]{Validating the Tuning Procedure — Nested Resampling}
   \begin{itemize}
     \item \textbf{Problem:} hyperparameter tuning risks overfitting to a
           particular data split
@@ -127,28 +127,29 @@
     \item \textbf{Conclusion:} tuning generalises stably $\to$ proceed to
           full-data tuning + refit
   \end{itemize}
-  \vspace{0.4em}
-  \footnotesize Final models are refit on \emph{all} data with optimal
+  \vspace{0.6em}
+  \onslide<2->{\textcolor{lmugreen}{$\Rightarrow$} Final models are refit on \emph{all} data with optimal
   hyperparameters — no held-out test set, because the goal is understanding,
-  not out-of-fold performance.
+  not out-of-fold performance.}
 \end{frame}
 
 %--- Slide: GAM Variant Selection ----------------------------------------------
 \begin{frame}{GAM Variant Selection}
   \begin{columns}[T]
     \begin{column}{0.44\textwidth}
-      \textbf{Three candidates:}
+      \onslide<1->{\textbf{Three candidates:}
       \begin{itemize}
         \item \textbf{LinearGAM (no log)} — fitted on raw \texttt{ml\_ade}
         \item \textbf{LinearGAM (log)} — fitted on
               $\log(1+\texttt{ml\_ade})$, evaluated on original scale
         \item \textbf{GammaGAM} — Gamma distribution with log link,
               suited for positive right-skewed targets
-      \end{itemize}
+      \end{itemize}}
       \vspace{0.5em}
-      Selection criterion: lowest mean outer-fold RMSE (original scale).
+      \onslide<2->{\textcolor{lmugreen}{$\Rightarrow$} Selection criterion: lowest mean outer-fold RMSE (original scale).}
     \end{column}
     \begin{column}{0.53\textwidth}
+      \onslide<3->{%
       \renewcommand{\arraystretch}{1.3}
       \begin{tabular}{lccc}
         \toprule
@@ -160,7 +161,7 @@
         \bottomrule
       \end{tabular}\\[0.4em]
       \footnotesize Outer-fold means, 3-fold nested CV\@.\\
-      \textcolor{lmugreen}{\textbf{LinearGAM (log) selected.}}
+      \textcolor{lmugreen}{\textbf{LinearGAM (log) selected.}}}
     \end{column}
   \end{columns}
 \end{frame}
@@ -188,6 +189,7 @@
       \end{tabular}
     \end{column}
     \begin{column}{0.48\textwidth}
+      \onslide<2->{%
       \begin{minipage}[t][0.32\textheight][t]{\linewidth}
         \textbf{XGBoost}
         \begin{itemize}
@@ -205,11 +207,13 @@
         R$^2$ & \textbf{0.619} \\
         MAE  & \textbf{0.214} \\
         \bottomrule
-      \end{tabular}
+      \end{tabular}}
     \end{column}
   \end{columns}
   \vspace{0.5em}
-  \footnotesize
-  XGBoost outperforms GAM on all metrics. Both models are used as a
-  cross-check: the feature-effect narratives should agree across approaches.
+  \onslide<3->{%
+    \textcolor{lmugreen}{$\Rightarrow$ \textbf{XGBoost outperforms GAM on all metrics.}}\\[0.2em]
+    \footnotesize
+    Both models are used as a cross-check: the feature-effect narratives should agree across approaches.
+  }
 \end{frame}

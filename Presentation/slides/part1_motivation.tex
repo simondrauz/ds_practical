@@ -28,21 +28,23 @@
 \begin{frame}{Trajectron++}
   \begin{columns}
     \begin{column}{0.52\textwidth}
-      \begin{itemize}[<+->]
-        \item State-of-the-art probabilistic trajectory prediction model
+      \begin{itemize}
+        \item<1-> State-of-the-art probabilistic trajectory prediction model
               \textnormal{\small[Salzmann et al., 2020]}
-        \item \emph{Spatio-temporal graph encoder}
+        \item<2-> \emph{Spatio-temporal graph encoder}
         \begin{itemize}
-          \item LSTM per agent 
+          \item LSTM per agent
           \item edges encode agent--agent interactions
         \end{itemize}
-        \item \emph{CVAE decoder}
+        \item<3-> \emph{CVAE decoder}
         \begin{itemize}
           \item Outputs a distribution over future
               trajectories
         \end{itemize}
-        \item Handles \emph{heterogeneous} agent types jointly
+        \item<4-> Handles \emph{heterogeneous} agent types jointly
               (pedestrian, bicycle, motorcycle, car) and integrates HD map context
+        \item<6-> \small \textbf{ADE:} avg.\ L2 distance over all predicted timesteps
+        \item<7-> \small \textbf{FDE:} L2 distance at the final predicted timestep
       \end{itemize}
     \end{column}
     \begin{column}{0.45\textwidth}
@@ -50,14 +52,16 @@
         \includegraphics[width=\textwidth]{trajectronpp}\\
         {\tiny Source: Salzmann et al.\ (2020)}
       \end{center}
-      \onslide<8->{
-        \textbf{trajdata} \textnormal{\small[NVLabs]}\\[0.4em]
-        \begin{itemize}
-          \item Unified interface to many trajectory datasets
-                (nuScenes, ETH/UCY, \ldots)
-          \item[$\Rightarrow$] Our analysis pipeline applies to
-                \emph{any} trajdata-supported dataset
-        \end{itemize}
+      \onslide<5->{
+        \vspace{0.3em}
+        \footnotesize
+        \textbf{Performance metrics:}\\[0.2em]
+        \begin{tabular}{ll}
+          \texttt{ml\_ade}     & most-likely ADE \only<8->{\textcolor{lmugreen}{\textbf{$\leftarrow$ used}}}\\
+          \texttt{ml\_fde}     & most-likely FDE \\
+          \texttt{min\_ade\_5} & best-of-5 ADE \\
+          \texttt{nll\_mean}   & neg.\ log-likelihood \\
+        \end{tabular}
       }
     \end{column}
   \end{columns}
@@ -67,17 +71,12 @@
 \begin{frame}{nuScenes Dataset}
   \begin{columns}
     \begin{column}{0.50\textwidth}
-      \begin{itemize}[<+->]
-        \item 1\,000 urban driving scenes, Boston \& Singapore
-        \item Agent types: pedestrians, cyclists, motorcyclists, vehicles
-        \item Rich sensor suite: camera, LiDAR, radar, GPS, HD map
-        \item Standard split: 700 / 150 / 150 (train / val / test)
-        \item Target Features:
-        \begin{itemize}
-        \item \small \textbf{ADE:} avg.\ L2 distance over all predicted timesteps\\
-        \item \small \textbf{FDE:} L2 distance at the final predicted timestep
-        \end{itemize}
-        \item \textbf{Scope:} we predict \emph{pedestrian} trajectories
+      \begin{itemize}
+        \item<1-> 1\,000 urban driving scenes, Boston \& Singapore
+        \item<2-> Agent types: pedestrians, cyclists, motorcyclists, vehicles
+        \item<3-> Rich sensor suite: camera, LiDAR, radar, GPS, HD map
+        \item<4-> Standard split: 700 / 150 / 150 (train / val / test)
+        \item<5-> \textbf{Scope:} we predict \emph{pedestrian} trajectories
               only, all agent types serve as scene context
       \end{itemize}
     \end{column}
@@ -87,16 +86,16 @@
       \includegraphics[width=0.75\textwidth]{nuscenes_maps}\\[0.1em]
       {\tiny Source: Caesar et al.\ (2020)}
 
-      \only<7->{%
+      \onslide<6->{%
         \vspace{0.3em}
         \footnotesize
-        \textbf{Prediction metrics:}\\[0.2em]
-        \begin{tabular}{ll}
-          \texttt{ml\_ade}     & most-likely ADE \textcolor{lmugreen}{\textbf{$\leftarrow$ used}}\\
-          \texttt{ml\_fde}     & most-likely FDE \\
-          \texttt{min\_ade\_5} & best-of-5 ADE \\
-          \texttt{nll\_mean}   & neg.\ log-likelihood \\
-        \end{tabular}
+        \textbf{trajdata} \textnormal{\small[NVLabs]}\\[0.2em]
+        \begin{itemize}
+          \item Unified interface to many trajectory datasets
+                (nuScenes, ETH/UCY, \ldots)
+          \item[$\Rightarrow$] Our analysis pipeline applies to
+                \emph{any} trajdata-supported dataset
+        \end{itemize}
       }
     \end{column}
   \end{columns}
