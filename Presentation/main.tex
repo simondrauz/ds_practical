@@ -120,7 +120,7 @@ belowskip = -1.2 \baselineskip,
   \end{tikzpicture}%
   \fi}
 
-\title[Trajectron++ Analysis]{Why Are Some Trajectories Harder Than Others?}
+\title[Interpreting Trajectron++ Prediction Errors]{Why Are Some Trajectories Harder Than Others?}
 \subtitle{Interpreting Trajectron++ Prediction Errors}
 
 \author[Drauz \& Matrullo]{Simon Drauz and Zoe Matrullo}
@@ -135,13 +135,18 @@ belowskip = -1.2 \baselineskip,
 %--- Slide 1: Title -------------------------------------------------------------
 {
 \usebackgroundtemplate{\includegraphics[width=\paperwidth]{lmu-background.pdf}}
-\begin{frame}
+\begin{frame}[plain]
+\begin{tikzpicture}[remember picture, overlay]
+	\node[anchor=north east, inner sep=0pt] at
+		([xshift=-3.55cm, yshift=-0.78cm]current page.north east)
+		{\includegraphics[height=0.60cm,trim=0 52 0 50,clip]{images/denso_logo_2.png}};
+\end{tikzpicture}
 \begin{columns}[T,onlytextwidth]
 	\begin{column}{0.48\textwidth}
-		\vspace*{2.3cm}
+		\vspace*{2.12cm}
 		\begin{minipage}{0.85\linewidth}
 		\raggedright
-		\LARGE
+		\fontsize{19}{22}\selectfont
 		\textbf{\textcolor{white}{Why Are Some Trajectories Harder Than Others?}}
 		\vspace{0.24cm}
 
@@ -149,9 +154,15 @@ belowskip = -1.2 \baselineskip,
 		\textcolor{white}{
 		Interpreting Trajectron++ Prediction Errors}
 		\end{minipage}\par
-		\vspace{0.85cm}
-		\textcolor{white}{\footnotesize Simon Drauz and Zoe Matrullo \\
-			\today}
+		\vspace{0.42cm}
+		\textcolor{white}{%
+			\begin{minipage}{0.95\linewidth}
+			\raggedright
+			\footnotesize Simon Drauz and Zoe Matrullo\\[0.18cm]
+			\scriptsize DENSO supervisor: PhD Candidate Ajay Menon\\[0.035cm]
+			\scriptsize LMU Supervisor: Prof. Dr. Matthias Schuber\\[0.12cm]
+			\footnotesize \today
+			\end{minipage}}
 	\end{column}
 	\begin{column}{0.46\textwidth}
 		\vspace*{1.75cm}
