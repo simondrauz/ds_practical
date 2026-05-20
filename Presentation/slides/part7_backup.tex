@@ -12,7 +12,7 @@
 
 
 %--- SHAP explanation ---------------------------------------------------------
-\begin{frame}{SHAP Values - SHapley Additive exPlanations}
+\begin{frame}[noframenumbering]{SHAP Values - SHapley Additive exPlanations}
   \footnotesize
   For each trajectory $i$, SHAP decomposes the XGBoost prediction into
   per-feature contributions — quantifying how much each feature
@@ -60,7 +60,7 @@
 \end{frame}
 
 %--- Trajectron++ configuration -----------------------------------------------
-\begin{frame}{Trajectron++ — Model Configuration}
+\begin{frame}[noframenumbering]{Trajectron++ — Model Configuration}
   \scriptsize
   \renewcommand{\arraystretch}{1.0}
   \begin{columns}[T]
@@ -131,7 +131,7 @@
 \end{frame}
 
 %--- Hyperparameter tuning search space --------------------------------------
-\begin{frame}{Hyperparameter Tuning — Search Space}
+\begin{frame}[noframenumbering]{Hyperparameter Tuning — Search Space}
   \footnotesize
   Bayesian optimization with Optuna (TPE sampler) on a $3$-fold inner CV;
   $15$ trials per study.
@@ -195,7 +195,7 @@
 \end{frame}
 
 %--- Best XGBoost configurations across runs ---------------------------------
-\begin{frame}{Hyperparameter Tuning — XGBoost Configurations}
+\begin{frame}[noframenumbering]{Hyperparameter Tuning — XGBoost Configurations}
   \footnotesize
   Full-data retuned configurations of the exported XGBoost models.
   \vspace{0.3em}
@@ -230,7 +230,7 @@
 \end{frame}
 
 %--- Best GAM configurations across runs -------------------------------------
-\begin{frame}{Hyperparameter Tuning — GAM Configurations}
+\begin{frame}[noframenumbering]{Hyperparameter Tuning — GAM Configurations}
   \footnotesize
   Full-data retuned configurations of the exported GAM winners.
   \vspace{0.3em}
@@ -262,7 +262,7 @@
 \end{frame}
 
 %--- OOF diagnostics: GAM MI+VIF ---------------------------------------------
-\begin{frame}{OOF Diagnostics — GAM}
+\begin{frame}[noframenumbering]{OOF Diagnostics — GAM}
   \framesubtitle{MI\,+\,VIF feature set — main analysis}
   \centering
   \vspace{-0.25em}
@@ -283,7 +283,7 @@
 \end{frame}
 
 %--- OOF diagnostics: GAM VIF only -------------------------------------------
-\begin{frame}{OOF Diagnostics — GAM}
+\begin{frame}[noframenumbering]{OOF Diagnostics — GAM}
   \framesubtitle{VIF-only feature set — follow-up comparison}
   \centering
   \vspace{-0.25em}
@@ -305,7 +305,7 @@
 \end{frame}
 
 %--- Interaction PDPs: XGBoost MI+VIF -----------------------------------------
-\begin{frame}{Interaction PDPs — XGBoost}
+\begin{frame}[noframenumbering]{Interaction PDPs — XGBoost}
   \framesubtitle{MI\,+\,VIF feature set; log1p transformed target}
   \centering
   \includegraphics[
@@ -316,7 +316,7 @@
 \end{frame}
 
 %--- Algorithm comparison with noise: OPTICS vs HDBSCAN ----------------------
-\begin{frame}{Algorithm Choice — OPTICS vs.\ HDBSCAN (with noise)}
+\begin{frame}[noframenumbering]{Algorithm Choice — OPTICS vs.\ HDBSCAN (with noise)}
   \footnotesize
   Same XGBoost effect space; algorithm differs. Noise points shown.
   \vspace{0.2em}
@@ -345,7 +345,7 @@
 \end{frame}
 
 %--- Model comparison with noise: XGBoost vs GAM -----------------------------
-\begin{frame}{Effect Source — XGBoost vs.\ GAM (with noise)}
+\begin{frame}[noframenumbering]{Effect Source — XGBoost vs.\ GAM (with noise)}
   \footnotesize
   Same OPTICS algorithm; feature-effect source differs. Noise points shown.
   \vspace{0.2em}
@@ -374,7 +374,7 @@
 \end{frame}
 
 %--- Per-regime detail: Easy -------------------------------------------------
-\begin{frame}{Easy Regime — Success Modes}
+\begin{frame}[noframenumbering]{Easy Regime — Success Modes}
   \small
   DBCV \textbf{0.41} \hspace{0.4em}\textbar\hspace{0.4em} 2 clusters
   \hspace{0.4em}\textbar\hspace{0.4em} group median \texttt{ml\_ade}
@@ -414,7 +414,7 @@
 \end{frame}
 
 %--- Per-regime detail: Medium -----------------------------------------------
-\begin{frame}{Medium Regime — Transition Zone}
+\begin{frame}[noframenumbering]{Medium Regime — Transition Zone}
   \small
   DBCV \textbf{0.40} \hspace{0.4em}\textbar\hspace{0.4em} 2 clusters
   \hspace{0.4em}\textbar\hspace{0.4em} group median \texttt{ml\_ade}
@@ -455,7 +455,7 @@
 \end{frame}
 
 %--- Per-regime detail: Hard -------------------------------------------------
-\begin{frame}{Hard Regime — Failure Modes}
+\begin{frame}[noframenumbering]{Hard Regime — Failure Modes}
   \small
   DBCV \textbf{0.09} \hspace{0.4em}\textbar\hspace{0.4em} 4 clusters
   \hspace{0.4em}\textbar\hspace{0.4em} group median \texttt{ml\_ade}
@@ -501,7 +501,7 @@ dominant driver
 \end{frame}
 
 %--- DBCV: high-level interpretation -----------------------------------------
-\begin{frame}{DBCV — Density-Based Clustering Validation}
+\begin{frame}[noframenumbering]{DBCV — Density-Based Clustering Validation}
   \footnotesize
   Density-Based Clustering Validation: internal score for non-spherical,
   density-based clusters (Moulavi et al., 2014).
