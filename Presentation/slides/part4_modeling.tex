@@ -16,7 +16,7 @@
     \item Per-trajectory \texttt{ml\_ade} alone do not tell us \emph{why} some trajectories are hard
     \item Interpretable models let us directly read off feature effects: how does speed, heading change or scene density affect prediction error?
     \item Two tested approaches:
-    \begin{itemize}
+    \begin{itemize}[<3->]
         \item \textbf{GAM:} smooth effects directly readable from the model
         \item \textbf{XGBoost:} post-hoc via SHAP values and partial
           dependence plots
@@ -32,7 +32,7 @@
     \begin{column}{0.48\textwidth}
       \textbf{GAM (Generalized Additive Model)}\\
       \textit{\footnotesize Inherently interpretable}
-      \visible<2->{\begin{itemize}[<+->]
+      \visible<2->{\begin{itemize}
         \item Models target as a sum of smooth functions: $f(x) = \sum_j s_j(x_j)$
         \item One spline per feature — no interaction terms
         \item p-values for significance testing
@@ -42,7 +42,7 @@
     \begin{column}{0.48\textwidth}
       \textbf{XGBoost}\\
       \textit{\footnotesize Black-box, interpreted post-hoc}
-      \visible<3->{\begin{itemize}[<+->]
+      \visible<3->{\begin{itemize}
         \item Gradient-boosted decision trees
         \item Flexibly captures non-linearities
               and feature interactions

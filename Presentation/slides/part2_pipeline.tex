@@ -23,7 +23,7 @@
   \begin{columns}
     \begin{column}{0.46\textwidth}
       \textbf{Standard Trajectron++}
-      \begin{itemize}[<+->]
+      \begin{itemize}[<1->]
         \item Evaluation outputs \emph{batch-averaged} ADE / FDE
         \item No way to link prediction error back to an
               individual trajectory
@@ -31,11 +31,11 @@
       \end{itemize}
     \end{column}
     \begin{column}{0.50\textwidth}
-      \onslide<4->{\textbf{Our Modification}}
+      \onslide<2->{\textbf{Our Modification}}
       \begin{itemize}
-        \item<5-> Recover \emph{individual trajectory loss \& characteristics}\\
+        \item<2-> Recover \emph{individual trajectory loss \& characteristics}\\
               by modifying Trajectron++'s evaluation loop
-        \item<6-> \texttt{data\_idx}: stable trajdata identifier,
+        \item<2-> \texttt{data\_idx}: stable trajdata identifier,
               used to join evaluation output with computed
               trajectory \& scene characteristics
       \end{itemize}

@@ -40,14 +40,14 @@
 \begin{frame}{Limitations}
   \begin{itemize}[<+->]
     \item \textbf{Meta-models explain Trajectron++, not ground truth}
-      \begin{itemize}
+      \begin{itemize}[<1->]
         \item Targets are Trajectron++ \texttt{ml\_ade} values
               $\to$ effects are model-specific
         \item Drivers are inferred via meta-models as proxies —
               Trajectron++ does not expose them directly
       \end{itemize}
     \item \textbf{Meta-model under-prediction at high ADE}
-      \begin{itemize}
+      \begin{itemize}[<2->]
         \item OOF diagnostics: strong agreement at low/moderate ADE,
               systematic under-prediction in the high-error tail
         \item Implication: trajectory + scene features do not cover
@@ -59,7 +59,7 @@
               differentiate within the high-error tail
       \end{itemize}
     \item \textbf{Scope}
-      \begin{itemize}
+      \begin{itemize}[<3->]
         \item Pedestrian trajectories on nuScenes only — no transfer
               guarantee to other agent types or datasets
         \item Settings sweep uses nuScenes \emph{mini} — results may
@@ -72,7 +72,7 @@
 \begin{frame}{Future Work}
   \begin{itemize}[<+->]
     \item \textbf{Pipeline as a tool — model- and dataset-agnostic by design}
-      \begin{itemize}
+      \begin{itemize}[<1->]
         \item Meta-model + feature-effect clustering is decoupled from
               the prediction model and the dataset
         \item Via the \texttt{trajdata} interface, the same pipeline
@@ -80,17 +80,17 @@
               with minimal effort
       \end{itemize}
     \item \textbf{Richer input space}
-      \begin{itemize}
+      \begin{itemize}[<2->]
         \item Add map / lane geometry, location, finer social context
         \item Targets the under-prediction ceiling and may unlock
               cleaner hard-regime sub-structure
       \end{itemize}
     \item \textbf{Other agents}
-      \begin{itemize}
+      \begin{itemize}[<3->]
         \item Extend to vehicle, cyclist, and motorcyclist trajectories
       \end{itemize}
     \item \textbf{Higher-capacity meta-models}
-      \begin{itemize}
+      \begin{itemize}[<4->]
         \item Explore architectures that can isolate failure modes
               even in noisy high-ADE regions
       \end{itemize}
