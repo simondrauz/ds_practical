@@ -55,9 +55,17 @@
 \end{frame}
 
 %--- Slide 2: std_speed & heading_change_per_sec ------------------------------
-\begin{frame}{Feature Effects — \texttt{std\_speed} \& \texttt{heading\_change\_per\_sec}}
+\begin{frame}[t]{Feature Effects}
+  % Header row
   \begin{columns}[T]
-    \begin{column}{0.4\textwidth}
+    \begin{column}{0.40\textwidth}\end{column}
+    \begin{column}{0.27\textwidth}\centering\scriptsize\textbf{PDP}\end{column}
+    \begin{column}{0.27\textwidth}\centering\scriptsize\textbf{GAM smooth}\end{column}
+  \end{columns}
+  \vspace{0.15em}
+  % Row 1: std_speed
+  \begin{columns}[T]
+    \begin{column}{0.40\textwidth}
       \footnotesize
       \onslide<1->{%
         {\small\textbf{\texttt{std\_speed}} — strong, monotone positive}
@@ -67,7 +75,21 @@
           \item[$\rightarrow$] \textit{Erratic speed is harder to forecast}
         \end{itemize}
       }
-      \vspace{0.3em}
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \onslide<1->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_std_speed.png}}
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \onslide<1->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_std_speed.png}}
+    \end{column}
+  \end{columns}
+  \vspace{0.3em}
+  % Row 2: heading_change_per_sec
+  \begin{columns}[T]
+    \begin{column}{0.40\textwidth}
+      \footnotesize
       \onslide<2->{%
         {\small\textbf{\texttt{heading\_change\_per\_sec}} — positive, non-linear}
         \begin{itemize}\setlength\itemsep{0.05em}
@@ -77,24 +99,29 @@
         \end{itemize}
       }
     \end{column}
-    \begin{column}{0.57\textwidth}
+    \begin{column}{0.27\textwidth}
       \centering
-      {\setlength\tabcolsep{2pt}%
-      \begin{tabular}{@{}cc@{}}
-        \scriptsize\textbf{PDP} & \scriptsize\textbf{GAM smooth} \\[0.1em]
-        \onslide<1->{\includegraphics[width=0.48\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_std_speed.png}} &
-        \onslide<1->{\includegraphics[width=0.48\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_std_speed.png}} \\[0.2em]
-        \onslide<2->{\includegraphics[width=0.48\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_heading_change_per_sec.png}} &
-        \onslide<2->{\includegraphics[width=0.48\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_heading_change_per_sec.png}}
-      \end{tabular}}
+      \onslide<2->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_heading_change_per_sec.png}}
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \onslide<2->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_heading_change_per_sec.png}}
     \end{column}
   \end{columns}
 \end{frame}
 
-%--- Slide 3: max_speed & mean_acceleration ----------------------------------
-\begin{frame}{Feature Effects — \texttt{max\_speed} \& \texttt{mean\_acceleration}}
+%--- Slide 3: max_speed & mean_acceleration -----------------------------------
+\begin{frame}[t]{Feature Effects}
+  % Header row
   \begin{columns}[T]
-    \begin{column}{0.4\textwidth}
+    \begin{column}{0.40\textwidth}\end{column}
+    \begin{column}{0.27\textwidth}\centering\scriptsize\textbf{PDP}\end{column}
+    \begin{column}{0.27\textwidth}\centering\scriptsize\textbf{GAM smooth}\end{column}
+  \end{columns}
+  \vspace{0.15em}
+  % Row 1: max_speed
+  \begin{columns}[T]
+    \begin{column}{0.40\textwidth}
       \footnotesize
       \onslide<1->{%
         {\small\textbf{\texttt{max\_speed}} — positive, increasing}
@@ -105,7 +132,21 @@
                 model's confidence run thin}
         \end{itemize}
       }
-      \vspace{0.3em}
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \onslide<1->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_max_speed.png}}
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \onslide<1->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_max_speed.png}}
+    \end{column}
+  \end{columns}
+  \vspace{0.3em}
+  % Row 2: mean_acceleration
+  \begin{columns}[T]
+    \begin{column}{0.40\textwidth}
+      \footnotesize
       \onslide<2->{%
         {\small\textbf{\texttt{mean\_acceleration}} — near-zero, mixed}
         \begin{itemize}\setlength\itemsep{0.05em}
@@ -117,45 +158,48 @@
         \end{itemize}
       }
     \end{column}
-    \begin{column}{0.57\textwidth}
+    \begin{column}{0.27\textwidth}
       \centering
-      {\setlength\tabcolsep{2pt}%
-      \begin{tabular}{@{}cc@{}}
-        \scriptsize\textbf{PDP} & \scriptsize\textbf{GAM smooth} \\[0.1em]
-        \onslide<1->{\includegraphics[width=0.48\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_max_speed.png}} &
-        \onslide<1->{\includegraphics[width=0.48\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_max_speed.png}} \\[0.2em]
-        \onslide<2->{\includegraphics[width=0.48\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_mean_acceleration.png}} &
-        \onslide<2->{\includegraphics[width=0.48\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_mean_acceleration.png}}
-      \end{tabular}}
+      \onslide<2->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_mean_acceleration.png}}
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \onslide<2->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_mean_acceleration.png}}
     \end{column}
   \end{columns}
 \end{frame}
 
 %--- Slide 4: scene_density_VEHICLE ------------------------------------------
-\begin{frame}{Feature Effects — \texttt{scene\_density\_VEHICLE}}
+\begin{frame}[t]{Feature Effects}
+  % Header row (identical to two-feature slides)
   \begin{columns}[T]
-    \begin{column}{0.4\textwidth}
+    \begin{column}{0.40\textwidth}\end{column}
+    \begin{column}{0.27\textwidth}\centering\scriptsize\textbf{PDP}\end{column}
+    \begin{column}{0.27\textwidth}\centering\scriptsize\textbf{GAM smooth}\end{column}
+  \end{columns}
+  \vspace{0.15em}
+  % Row 1: scene_density_VEHICLE (same layout as first row of two-feature slides)
+  \begin{columns}[T]
+    \begin{column}{0.40\textwidth}
       \footnotesize
       {\small\textbf{\texttt{scene\_density\_VEHICLE}} — negligible, noisy}
       \begin{itemize}\setlength\itemsep{0.05em}
-        \item lower density seems to increase predicted ADE, but PDP is noisy
-        \item GAM smooth not significant — CI spans zero
+        \item Lower density seems to increase predicted ADE, but PDP is noisy
         \item Other scene / social features
               (\texttt{scene\_num\_VEHICLE},
                \texttt{min\_neighbor\_distance})
-              show similar near-flat PDPs
+              show near-flat PDPs
         \item[$\rightarrow$] \textit{Scene features do not robustly explain
                       individual trajectory error}
       \end{itemize}
     \end{column}
-    \begin{column}{0.57\textwidth}
+    \begin{column}{0.27\textwidth}
       \centering
-      {\setlength\tabcolsep{2pt}%
-      \begin{tabular}{@{}cc@{}}
-        \scriptsize\textbf{PDP} & \scriptsize\textbf{GAM smooth} \\[0.1em]
-        \includegraphics[width=0.46\columnwidth,height=0.42\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_vif_only_no_collision_target_ml_ade_log_pdp_scene_density_VEHICLE.png} &
-        \includegraphics[width=0.46\columnwidth,height=0.42\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_vif_only_no_collision_target_ml_ade_raw_smooth_additive_effect_scene_density_VEHICLE.png}
-      \end{tabular}}
+      \includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_vif_only_no_collision_target_ml_ade_log_pdp_scene_density_VEHICLE.png}
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_vif_only_no_collision_target_ml_ade_raw_smooth_additive_effect_scene_density_VEHICLE.png}
     \end{column}
   \end{columns}
 \end{frame}
