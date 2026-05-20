@@ -1,6 +1,6 @@
 # Fdb version 4
-["pdflatex"] 1779269122.66696 "/Users/zoe/Desktop/ds_practical/Presentation/main.tex" "main.pdf" "main" 1779269141.10208 0
-  "/Users/zoe/Desktop/ds_practical/Presentation/main.tex" 1779267847.2478 7002 35b736bc1a884b2f337d0e2f0b2ce39f ""
+["pdflatex"] 1779282161.36606 "/Users/zoe/Desktop/ds_practical/Presentation/main.tex" "main.pdf" "main" 1779282177.10614 0
+  "/Users/zoe/Desktop/ds_practical/Presentation/main.tex" 1779282172.67599 7928 56ddee28abcae308719221bc34c57fc7 ""
   "/Users/zoe/Library/TinyTeX/texmf-dist/fonts/enc/dvips/cm-super/cm-super-t1.enc" 1136849721 2971 def0b6c1f0b107b3b936def894055589 ""
   "/Users/zoe/Library/TinyTeX/texmf-dist/fonts/enc/dvips/sourcesanspro/a_emkxm5.enc" 1587936753 3021 665788e9679767ade2a71155215d25e0 ""
   "/Users/zoe/Library/TinyTeX/texmf-dist/fonts/tfm/adobe/sourcesanspro/SourceSansPro-Bold-tlf-t1--base.tfm" 1587936753 1648 77a748afe0a406be1ac3f29e1cd365cb ""
@@ -283,6 +283,7 @@
   "figures/cornerpipeline/pipeline-modelling.png" 1779182197.27782 322290 60eca229c49dd4f5a4e129ab2525e116 ""
   "figures/cornerpipeline/pipeline-modelsetting.png" 1779182197.2805 485293 0401c13077f7e27e075174273a578c02 ""
   "figures/cornerpipeline/pipeline-traj-adapt.png" 1779182197.28332 324338 2fb960d70553443a0574489a4735dbea ""
+  "figures/densologo.png" 1779281631.04902 5278 e450a2250578652183d3e8eac677d532 ""
   "figures/feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_heading_change_per_sec.png" 1779182306.8986 72406 072775457f1fb2e996d19e6a985c58d7 ""
   "figures/feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_max_speed.png" 1779182306.90065 67912 dd17eb9a029629430e20695e5f364e07 ""
   "figures/feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_mean_acceleration.png" 1779182306.90163 70914 1203d398ea035bd9db57de0bc1b2ff9a ""
@@ -337,11 +338,11 @@
   "figures/xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_medium_rank1_hdbscan_raw-euclidean_mcs13_ms20_K3_N24pct_DBCV0p04.png" 1779222917.8329 107507 ce4e78e32fc62f2a1700ed2308e7c803 ""
   "figures/xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_medium_rank1_optics_raw-euclidean_eps0p0243_mcs13_ms15_K2_N40pct_DBCV0p40.png" 1779222917.83366 104257 4b35ce0ddc39b700eb048c04fe662d60 ""
   "lmu-background.pdf" 1778663556 66051 db0b87484d5e254e6f8288c8895b57e1 ""
-  "main.aux" 1779269140.67479 13358 bb9453a6e508dc2d05c98318aeac2dcb "pdflatex"
-  "main.nav" 1779269140.67816 7083 fd412808340b54860adcae8b0b7f07aa "pdflatex"
-  "main.out" 1779269140.67782 1221 c40c56c11bb3d257fb26cb781b8250ca "pdflatex"
-  "main.tex" 1779267847.2478 7002 35b736bc1a884b2f337d0e2f0b2ce39f ""
-  "slides/part1_motivation.tex" 1779267915.83553 5842 3a44031f14a3bb2f1667fb90eea0e424 ""
+  "main.aux" 1779282176.77517 13481 aaa6b5504dfbc666241d3607dabb019d "pdflatex"
+  "main.nav" 1779282176.77834 7173 ca2dbd618c5eb2788e8c425fa2ffe556 "pdflatex"
+  "main.out" 1779282176.77799 1221 c40c56c11bb3d257fb26cb781b8250ca "pdflatex"
+  "main.tex" 1779282172.67599 7928 56ddee28abcae308719221bc34c57fc7 ""
+  "slides/part1_motivation.tex" 1779282051.23955 5842 6c24eb8422020e352833525eb49048af ""
   "slides/part2_pipeline.tex" 1779268604.37069 1587 c0333dbc5af8dd9d9b97797bc1eed661 ""
   "slides/part3_data_prep.tex" 1779268810.93096 3751 a238abc64ae0965a667fe719d6c9feaf ""
   "slides/part4_modeling.tex" 1779268954.36755 8705 e82b8743aad4f00a8fa14d8b84981c06 ""
