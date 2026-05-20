@@ -261,6 +261,49 @@
   \end{itemize}
 \end{frame}
 
+%--- OOF diagnostics: GAM MI+VIF ---------------------------------------------
+\begin{frame}{OOF Diagnostics — GAM}
+  \framesubtitle{MI\,+\,VIF feature set — main analysis}
+  \centering
+  \vspace{-0.25em}
+
+  \begin{minipage}[t][0.55\textheight][t]{0.95\textwidth}
+    \centering
+    \includegraphics[width=\textwidth,height=0.55\textheight,keepaspectratio]{oof_diagnostics_gam_mi_vif}
+  \end{minipage}
+
+  \vspace{0.15em}
+  \begin{minipage}[t][0.22\textheight][t]{0.88\textwidth}
+    \footnotesize
+    \begin{itemize}
+      \item Similar high-ADE compression as XGBoost; the log-GAM still
+            underpredicts the largest OOF errors
+    \end{itemize}
+  \end{minipage}
+\end{frame}
+
+%--- OOF diagnostics: GAM VIF only -------------------------------------------
+\begin{frame}{OOF Diagnostics — GAM}
+  \framesubtitle{VIF-only feature set — follow-up comparison}
+  \centering
+  \vspace{-0.25em}
+
+  \begin{minipage}[t][0.55\textheight][t]{0.95\textwidth}
+    \centering
+    \includegraphics[width=\textwidth,height=0.55\textheight,keepaspectratio]{oof_diagnostics_gam_vif_only}
+  \end{minipage}
+
+  \vspace{0.15em}
+  \begin{minipage}[t][0.22\textheight][t]{0.88\textwidth}
+    \footnotesize
+    \begin{itemize}
+      \item Residual spread remains wider at larger predictions
+      \item VIF-only kept as a complementary check against the MI\,+\,VIF
+            main analysis
+    \end{itemize}
+  \end{minipage}
+\end{frame}
+
 %--- Interaction PDPs: XGBoost MI+VIF -----------------------------------------
 \begin{frame}{Interaction PDPs — XGBoost}
   \framesubtitle{MI\,+\,VIF feature set; log1p transformed target}

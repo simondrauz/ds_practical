@@ -56,19 +56,40 @@
 \end{frame}
 
 %--- Slide: Additive effects & SHAP -------------------------------------------
+\newcommand{\nestedResamplingFigure}{%
+  \begin{minipage}[c][0.58\textheight][c]{\linewidth}
+    \centering
+    \makebox[\linewidth][c]{%
+      \includegraphics[
+        width=1.05\linewidth,
+        height=0.56\textheight,
+        keepaspectratio
+      ]{nested_resampling_slide}%
+    }%
+  \end{minipage}%
+}
+
 %--- Slide 12 ------------------------------------------------------------------
-\begin{frame}[t]{Validating the Tuning Procedure — Nested Resampling}
-  \begin{itemize}
-    \item<1-> \textbf{Problem:} hyperparameter tuning risks overfitting to a
-          particular data split
-    \item<2-> \textbf{Solution:} nested cross-validation
-    \begin{itemize}
-      \item Outer folds: evaluate generalization of the full tuning procedure
-      \item Inner folds: tune hyperparameters on each outer-fold training set via cross-validation
-    \end{itemize}
-    \item<3-> OOF evaluation: inspect out-of-fold predictions for instability
-          and bias
-  \end{itemize}
+\begin{frame}[t]{Validating Tuning Procedure - Nested Resampling}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.53\textwidth}
+      \small
+      \begin{itemize}
+        \item<1-> \textbf{Problem:} hyperparameter tuning risks overfitting to a
+              particular data split
+        \item<2-> \textbf{Solution:} nested cross-validation
+        \begin{itemize}
+          \item Outer folds: evaluate generalization of the full tuning procedure
+          \item Inner folds: tune hyperparameters on each outer-fold training set via cross-validation
+        \end{itemize}
+        \item<3-> OOF evaluation: inspect out-of-fold predictions for instability
+              and bias
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.43\textwidth}
+      \onslide<2->{\nestedResamplingFigure}
+    \end{column}
+  \end{columns}
 \end{frame}
 
 %--- OOF diagnostics: XGBoost MI+VIF -------------------------------------------
@@ -115,21 +136,32 @@
 \end{frame}
 
 %--- Return to validation slide with conclusion --------------------------------
-\begin{frame}[t]{Validating the Tuning Procedure — Nested Resampling}
+\begin{frame}[t]{Validating Tuning Procedure - Nested Resampling}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.53\textwidth}
+      \small
+      \begin{itemize}
+        \item \textbf{Problem:} hyperparameter tuning risks overfitting to a
+              particular data split
+        \item \textbf{Solution:} nested cross-validation
+        \begin{itemize}
+          \item Outer folds: evaluate generalization of the full tuning procedure
+          \item Inner folds: tune hyperparameters on each outer-fold training set via cross-validation
+        \end{itemize}
+        \item OOF evaluation: inspect out-of-fold predictions for instability
+              and bias
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.43\textwidth}
+      \nestedResamplingFigure
+    \end{column}
+  \end{columns}
+  \small
   \begin{itemize}
-    \item \textbf{Problem:} hyperparameter tuning risks overfitting to a
-          particular data split
-    \item \textbf{Solution:} nested cross-validation
-    \begin{itemize}
-      \item Outer folds: evaluate generalization of the full tuning procedure
-      \item Inner folds: tune hyperparameters on each outer-fold training set via cross-validation
-    \end{itemize}
-    \item OOF evaluation: inspect out-of-fold predictions for instability
-          and bias
     \item \textbf{Conclusion:} tuning generalises stably $\to$ proceed to
           full-data tuning + refit
   \end{itemize}
-  \vspace{0.6em}
+  \vspace{0.3em}
   \onslide<2->{\textcolor{lmugreen}{$\Rightarrow$} Final models are refit on \emph{all} data with optimal
   hyperparameters — no held-out test set, because the goal is understanding,
   not out-of-fold performance.}
