@@ -211,6 +211,7 @@
           \item Additive smooth terms, one per feature
         \end{itemize}
       \end{minipage}
+      \onslide<3->{%
       \renewcommand{\arraystretch}{1.3}
       \begin{tabular}{lc}
         \toprule
@@ -220,7 +221,7 @@
         R$^2$ & 0.498 \\
         MAE  & 0.250 \\
         \bottomrule
-      \end{tabular}
+      \end{tabular}}
     \end{column}
     \begin{column}{0.48\textwidth}
       \onslide<2->{%
@@ -231,7 +232,8 @@
           \item Fitted on \texttt{log1p(ml\_ade)}
           \item Post-hoc interpretation via SHAP
         \end{itemize}
-      \end{minipage}
+      \end{minipage}}
+      \onslide<3->{%
       \renewcommand{\arraystretch}{1.3}
       \begin{tabular}{lc}
         \toprule
@@ -245,7 +247,7 @@
     \end{column}
   \end{columns}
   \vspace{0.5em}
-  \onslide<3->{%
+  \onslide<4->{%
     \textcolor{lmugreen}{$\Rightarrow$ \textbf{XGBoost outperforms GAM on all metrics.}}\\[0.2em]
     \footnotesize
     Both models are used as a cross-check: the feature-effect narratives should agree across approaches.
