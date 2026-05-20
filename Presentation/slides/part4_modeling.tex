@@ -167,35 +167,45 @@
   not out-of-fold performance.}
 \end{frame}
 
-%--- Slide: GAM Variant Selection ----------------------------------------------
-\begin{frame}{GAM Variant Selection}
+%--- Slide: model variant selection ---------------------------------------------
+\begin{frame}{Model Variant Selection}
   \begin{columns}[T]
-    \begin{column}{0.44\textwidth}
-      \onslide<1->{\textbf{Three candidates:}
-      \begin{itemize}
-        \item \textbf{LinearGAM (no log)} — fitted on raw \texttt{ml\_ade}
+    \begin{column}{0.5\textwidth}
+      \small
+      \onslide<1->{\textbf{GAM variants:}
+      \begin{itemize}\setlength\itemsep{0.15em}
+          \item \textbf{LinearGAM (no log)} — fitted on raw \texttt{ml\_ade}
         \item \textbf{LinearGAM (log)} — fitted on
               $\log(1+\texttt{ml\_ade})$, evaluated on original scale
         \item \textbf{GammaGAM} — Gamma distribution with log link,
               suited for positive right-skewed targets
+      \end{itemize}
+      \vspace{0.25em}
+      \textbf{XGBoost variants:}
+      \begin{itemize}\setlength\itemsep{0.15em}
+        \item fitted on raw
+        \item fitted on \texttt{log1p} target
       \end{itemize}}
       \vspace{0.5em}
-      \onslide<2->{\textcolor{lmugreen}{$\Rightarrow$} Selection criterion: lowest mean outer-fold RMSE (original scale).}
+      \onslide<2->{\textcolor{lmugreen}{$\Rightarrow$} Selection by OOF metrics on the original \texttt{ml\_ade} scale.}
     \end{column}
-    \begin{column}{0.53\textwidth}
+    \begin{column}{0.46\textwidth}
       \onslide<3->{%
-      \renewcommand{\arraystretch}{1.3}
+      \scriptsize
+      \renewcommand{\arraystretch}{1.18}
       \begin{tabular}{lccc}
         \toprule
         \textbf{Variant} & \textbf{RMSE} & \textbf{R$^2$} & \textbf{MAE} \\
         \midrule
-        LinearGAM & 0.448 & 0.491 & 0.263 \\
+        LinearGAM (raw) & 0.448 & 0.491 & 0.263 \\
         \textcolor{lmugreen}{\textbf{LinearGAM (log)}} & \textcolor{lmugreen}{\textbf{0.445}} & \textcolor{lmugreen}{\textbf{0.498}} & \textcolor{lmugreen}{0.250} \\
-        GammaGAM         & 0.445          & 0.498          & 0.253 \\
+        GammaGAM (Gamma/log) & 0.445 & 0.498 & 0.253 \\
+        XGBoost (raw) & 0.389 & 0.617 & 0.223 \\
+        \textcolor{lmugreen}{\textbf{XGBoost (log)}} & \textcolor{lmugreen}{\textbf{0.388}} & \textcolor{lmugreen}{\textbf{0.619}} & \textcolor{lmugreen}{\textbf{0.214}} \\
         \bottomrule
       \end{tabular}\\[0.4em]
-      \footnotesize Outer-fold means, 3-fold nested CV\@.\\
-      \textcolor{lmugreen}{\textbf{LinearGAM (log) selected.}}}
+      \footnotesize
+      \textcolor{lmugreen}{\textbf{Selected: LinearGAM (log) and XGBoost (log).}}}
     \end{column}
   \end{columns}
 \end{frame}
@@ -228,7 +238,6 @@
       \begin{minipage}[t][0.32\textheight][t]{\linewidth}
         \textbf{XGBoost}
         \begin{itemize}
-          \item Gradient-boosted trees
           \item Fitted on \texttt{log1p(ml\_ade)}
           \item Post-hoc interpretation via SHAP
         \end{itemize}

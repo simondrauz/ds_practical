@@ -177,9 +177,9 @@
 
       \textbf{Variants compared:}
       \begin{itemize}\setlength\itemsep{0.05em}
-        \item LinearGAM on log target
-        \item LinearGAM on raw target
+        \item LinearGAM on log and raw targets
         \item GammaGAM on raw target
+        \item XGBoost on log and raw targets
       \end{itemize}
       Winner selected by lowest mean outer-fold RMSE on original scale.
     \end{column}
@@ -187,17 +187,45 @@
   \vspace{0.4em}
   \scriptsize
   \begin{itemize}\setlength\itemsep{0.08em}
-    \item XGBoost tuning minimizes RMSE on \texttt{ml\_ade\_log}; GAM tuning
-      converts predictions back to original \texttt{ml\_ade} scale.
+    \item Each model is tuned on its training target; final comparison uses OOF
+      metrics on original \texttt{ml\_ade} scale.
     \item Nested resampling: $3$ outer folds $\times$ $3$ inner folds; tuning
       rerun on all rows for the final refit.
   \end{itemize}
 \end{frame}
 
+%--- XGBoost target-scale comparison ------------------------------------------
+\begin{frame}[noframenumbering]{XGBoost Target-Scale Comparison}
+  \footnotesize
+  OOF metrics reported on the original \texttt{ml\_ade} scale.
+  \vspace{0.35em}
+
+  \begin{center}
+  \scriptsize
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabular}{llccc}
+    \toprule
+    \textbf{Context} & \textbf{Target} & \textbf{RMSE} & \textbf{R$^2$} & \textbf{MAE} \\
+    \midrule
+    MI\,+\,VIF (main) & raw \texttt{ml\_ade} & 0.389 & 0.617 & 0.223 \\
+    \textcolor{lmugreen}{\textbf{MI\,+\,VIF (main)}} &
+      \textcolor{lmugreen}{\textbf{\texttt{log1p(ml\_ade)}}}
+      & \textcolor{lmugreen}{\textbf{0.388}}
+      & \textcolor{lmugreen}{\textbf{0.619}}
+      & \textcolor{lmugreen}{\textbf{0.214}} \\
+    VIF only & raw \texttt{ml\_ade} & 0.386 & 0.626 & 0.220 \\
+    VIF only & \texttt{log1p(ml\_ade)} & 0.387 & 0.624 & 0.213 \\
+    Settings sweep & raw \texttt{ml\_ade} & 0.134 & 0.896 & 0.081 \\
+    Settings sweep & \texttt{log1p(ml\_ade)} & 0.133 & 0.897 & 0.079 \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+\end{frame}
+
 %--- Best XGBoost configurations across runs ---------------------------------
 \begin{frame}[noframenumbering]{Hyperparameter Tuning — XGBoost Configurations}
   \footnotesize
-  Full-data retuned configurations of the exported XGBoost models.
+  Full-data retuned configurations of the selected log-target XGBoost models.
   \vspace{0.3em}
 
   \scriptsize
@@ -223,9 +251,44 @@
   \vspace{0.3em}
   \scriptsize
   \begin{itemize}\setlength\itemsep{0.08em}
-    \item CV scores are on \texttt{ml\_ade\_log}.
-    \item Original-scale RMSE is reported by the nested/OOF evaluation, not by
-      the XGBoost tuning objective.
+    \item CV scores in this table are on \texttt{ml\_ade\_log}.
+    \item Cross-target comparison uses OOF metrics on original
+      \texttt{ml\_ade} scale.
+  \end{itemize}
+\end{frame}
+
+%--- Best XGBoost raw-target configurations ----------------------------------
+\begin{frame}[noframenumbering]{Hyperparameter Tuning — XGBoost Raw Target}
+  \footnotesize
+  Full-data retuned configurations of the raw-target XGBoost variants.
+  \vspace{0.3em}
+
+  \scriptsize
+  \renewcommand{\arraystretch}{1.05}
+  \begin{center}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+     & \textbf{MI\,+\,VIF} & \textbf{VIF only} & \textbf{Settings sweep (MI\,+\,VIF)} \\
+    \midrule
+    \texttt{learning\_rate}    & $0.0174$ & $0.0219$ & $0.0486$ \\
+    \texttt{max\_depth}        & $10$     & $9$      & $9$ \\
+    \texttt{min\_child\_weight}& $16$     & $6$      & $17$ \\
+    \texttt{subsample}         & $0.97$   & $0.88$   & $0.92$ \\
+    \texttt{colsample\_bytree} & $0.95$   & $0.80$   & $0.99$ \\
+    \texttt{reg\_alpha}        & $2.4\!\times\!10^{-3}$ & $1.6\!\times\!10^{-4}$ & $1.9\!\times\!10^{-2}$ \\
+    \texttt{reg\_lambda}       & $5.38$                 & $0.45$                 & $3.5\!\times\!10^{-4}$ \\
+    best iteration             & $568$    & $1724$   & $1508$ \\
+    full-data CV RMSE (raw target) & $0.388$ & $0.388$ & $0.133$ \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+
+  \vspace{0.3em}
+  \scriptsize
+  \begin{itemize}\setlength\itemsep{0.08em}
+    \item CV scores in this table are on raw \texttt{ml\_ade}.
+    \item Cross-target comparison uses OOF metrics on original
+      \texttt{ml\_ade} scale.
   \end{itemize}
 \end{frame}
 
