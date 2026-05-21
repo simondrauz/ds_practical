@@ -10,6 +10,11 @@
 
 \renewcommand{\cornerpipeline}{cornerpipeline/pipeline-featureeffect}
 
+\newcommand{\featureEffectRangeNote}{%
+  \vfill
+  \hfill{\tiny\textcolor{gray}{PDPs: 5th--95th feature percentiles; GAM smooths: full observed feature range.}}\par
+}
+
 %--- Slide 1: Global Feature Importance (combined) ----------------------------
 \begin{frame}{Global Feature Importance}
   \small
@@ -46,9 +51,8 @@
     \end{column}
     \begin{column}{0.36\textwidth}
       \begin{itemize}[<+->]\setlength\itemsep{0.6em}
-        \item Motion features dominate; \texttt{std\_speed} is the top driver
-              in both feature sets
-        \item Scene / social features carry little signal for per-trajectory error
+        \item Motion features dominate; Scene / social features carry little signal for per-trajectory error
+        \item \texttt{std\_speed} is the top driver in both feature sets
       \end{itemize}
     \end{column}
   \end{columns}
@@ -72,7 +76,7 @@
         \begin{itemize}\setlength\itemsep{0.05em}
           \item More variation $\Rightarrow$ higher ADE, monotonically
           \item GAM confirms the trend within the PDP range
-          \item[$\rightarrow$] \textit{Erratic speed is harder to forecast}
+          \item<2->[$\rightarrow$] \textit{Erratic speed is harder to forecast}
         \end{itemize}
       }
     \end{column}
@@ -90,24 +94,25 @@
   \begin{columns}[T]
     \begin{column}{0.40\textwidth}
       \footnotesize
-      \onslide<2->{%
+      \onslide<3->{%
         {\small\textbf{\texttt{heading\_change\_per\_sec}} — positive, non-linear}
         \begin{itemize}\setlength\itemsep{0.05em}
           \item Turning generally raises ADE; drop-off at high values
           \item GAM confirms the trend within the PDP range
-          \item[$\rightarrow$] \textit{Turns hurt accuracy — but only up to a point}
+          \item<4->[$\rightarrow$] \textit{Turns hurt accuracy — up to a point}
         \end{itemize}
       }
     \end{column}
     \begin{column}{0.27\textwidth}
       \centering
-      \onslide<2->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_heading_change_per_sec.png}}
+      \onslide<3->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_heading_change_per_sec.png}}
     \end{column}
     \begin{column}{0.27\textwidth}
       \centering
-      \onslide<2->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_heading_change_per_sec.png}}
+      \onslide<3->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_heading_change_per_sec.png}}
     \end{column}
   \end{columns}
+  \featureEffectRangeNote
 \end{frame}
 
 %--- Slide 3: max_speed & mean_acceleration -----------------------------------
@@ -128,8 +133,7 @@
         \begin{itemize}\setlength\itemsep{0.05em}
           \item Higher peak speeds raise predicted ADE
           \item GAM agrees; CI widens at the tail
-          \item[$\rightarrow$] \textit{At the upper tail, both the data and the
-                model's confidence run thin}
+          \item<2->[$\rightarrow$] \textit{Increasing top speed drives error}
         \end{itemize}
       }
     \end{column}
@@ -147,26 +151,27 @@
   \begin{columns}[T]
     \begin{column}{0.40\textwidth}
       \footnotesize
-      \onslide<2->{%
+      \onslide<3->{%
         {\small\textbf{\texttt{mean\_acceleration}} — near-zero, mixed}
         \begin{itemize}\setlength\itemsep{0.05em}
           \item Oscillates around zero
           \item Population-level effect $\approx 0$, but signed
                 per-trajectory effects still vary
-          \item[$\rightarrow$] \textit{What matters more is that pedestrians are
+          \item<4->[$\rightarrow$] \textit{What matters is that pedestrians are
                 changing speed, not how quickly}
         \end{itemize}
       }
     \end{column}
     \begin{column}{0.27\textwidth}
       \centering
-      \onslide<2->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_mean_acceleration.png}}
+      \onslide<3->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_mean_acceleration.png}}
     \end{column}
     \begin{column}{0.27\textwidth}
       \centering
-      \onslide<2->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_mean_acceleration.png}}
+      \onslide<3->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_mean_acceleration.png}}
     \end{column}
   \end{columns}
+  \featureEffectRangeNote
 \end{frame}
 
 %--- Slide 4: scene_density_VEHICLE ------------------------------------------
@@ -189,7 +194,7 @@
               (\texttt{scene\_num\_VEHICLE},
                \texttt{min\_neighbor\_distance})
               show near-flat PDPs
-        \item[$\rightarrow$] \textit{Scene features do not robustly explain
+        \item<2->[$\rightarrow$] \textit{Scene features do not robustly explain
                       individual trajectory error}
       \end{itemize}
     \end{column}
@@ -202,4 +207,5 @@
       \includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_vif_only_no_collision_target_ml_ade_raw_smooth_additive_effect_scene_density_VEHICLE.png}
     \end{column}
   \end{columns}
+  \featureEffectRangeNote
 \end{frame}
