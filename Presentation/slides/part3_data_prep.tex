@@ -13,14 +13,15 @@
 %--- Slide: Feature Engineering -----------------------------------------------
 \begin{frame}{Feature Engineering — Trajectory \\ \& Scene Characteristics}
   \onslide<1->{%
-  \footnotesize\textit{Trajectron++ outputs only $(x,y)$ position sequences —
+  \small
+  \textit{Trajectron++ outputs only $(x,y)$ position sequences and time stamps —
   all features below are computed by us from those trajectories.}
   \vspace{0.4em}
   }
   \begin{columns}
     \begin{column}{0.48\textwidth}
-      \textbf{Agent motion features}
-      \begin{itemize}
+      \onslide<2->{\textbf{Agent motion features}}
+      \begin{itemize}\setlength\itemsep{0.05em}
         \item<2-> Speed: mean, max, std
         \item<2-> Acceleration: mean, max
         \item<2-> Jerk: mean, max
@@ -31,15 +32,15 @@
     \begin{column}{0.48\textwidth}
       \onslide<3->{
       \textbf{Scene context features}
-      \begin{itemize}
-        \item<4-> Number of agents in scene
-        \item<4-> Number of vehicles
-        \item<4-> Scene bounding box area
-        \item<4-> Spatial agent density
+      \begin{itemize}\setlength\itemsep{0.05em}
+        \item<3-> Number of agents in scene
+        \item<3-> Number of vehicles
+        \item<3-> Scene bounding box area
+        \item<3-> Spatial agent density
       \end{itemize}
       }
       \vspace{0.5em}
-      \onslide<5->{
+      \onslide<3->{
       $\Rightarrow$ \textbf{18 candidate features} joined with
       Trajectron++ evaluation output via \texttt{data\_idx}
       }
@@ -70,13 +71,13 @@
 \begin{frame}{Feature Selection — Two Approaches}
   \begin{columns}[t]
     \begin{column}{0.48\textwidth}
-      \textbf{Approach 1: MI elbow + VIF}
-      \begin{itemize}[<+->]
+      \onslide<1->{\textbf{Approach 1: MI elbow + VIF}}
+      \begin{itemize}[<2->]
         \item Rank features by Mutual Information with target
         \item Drop low-signal tail below the elbow: 18 $\to$ 10
         \item Apply VIF filter (threshold $= 5$): 10 $\to$ \textbf{4 features}
       \end{itemize}
-      \onslide<4->{
+      \onslide<2->{
       \vspace{0.4em}
       \small
       \texttt{std\_speed}, \texttt{mean\_acceleration},\\
@@ -86,12 +87,12 @@
       }
     \end{column}
     \begin{column}{0.48\textwidth}
-      \onslide<5->{\textbf{Approach 2: VIF only}}
+      \onslide<3->{\textbf{Approach 2: VIF only}}
       \begin{itemize}
-        \item<5-> Skip MI; apply VIF directly to all 18 candidates
-        \item<5-> VIF filter (threshold $= 5$): 18 $\to$ \textbf{6 features}
+        \item<3-> Skip MI; apply VIF directly to all 18 candidates
+        \item<3-> VIF filter (threshold $= 5$): 18 $\to$ \textbf{6 features}
       \end{itemize}
-      \onslide<6->{
+      \onslide<3->{
       \vspace{0.4em}
       \small
       \texttt{std\_speed}, \texttt{mean\_acceleration},\\

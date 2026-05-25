@@ -1,3 +1,16 @@
+# LaTeX build artifacts
+Presentation/*.aux
+Presentation/*.fdb_latexmk
+Presentation/*.fls
+Presentation/*.log
+Presentation/*.nav
+Presentation/*.out
+Presentation/*.pdf
+Presentation/*.snm
+Presentation/*.synctex.gz
+Presentation/*.synctex(busy)
+Presentation/*.toc
+
 # Python
 __pycache__/
 *.py[cod]

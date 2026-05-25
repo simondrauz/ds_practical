@@ -30,14 +30,56 @@
 \DeclareCaptionFont{tiny}{\tiny}
 \captionsetup{font=scriptsize,labelfont=scriptsize,justification=centering}
 
-% Automatic section outline slide
-\AtBeginSection[]{
-	\begin{frame}[noframenumbering, plain]
-	\frametitle{Outline}
-	\setcounter{tocdepth}{1}
-	\tableofcontents[currentsection]
-\end{frame}
+\newcommand{\regimeBoxesTikz}{%
+\begin{tikzpicture}[
+    every node/.style={font=\scriptsize},
+    box/.style={draw=lmugreen!40, rounded corners=2pt,
+                inner sep=4pt, minimum width=2.55cm, minimum height=2.0cm,
+                align=center, fill=lmugreen!5},
+    hardbox/.style={draw=red!40, rounded corners=2pt,
+                inner sep=4pt, minimum width=2.55cm, minimum height=2.0cm,
+                align=center, fill=red!5},
+    medbox/.style={draw=orange!50, rounded corners=2pt,
+                inner sep=4pt, minimum width=2.55cm, minimum height=2.0cm,
+                align=center, fill=orange!5},
+    traj/.style={->, >=Stealth, thick, lmugreen!70!black},
+    trajm/.style={->, >=Stealth, thick, orange!80!black},
+    trajh/.style={->, >=Stealth, thick, red!70!black},
+]
+  \useasboundingbox (-1.35,-1.65) rectangle (13.35,1.2);
+  \node[box] (easy1) at (0,0) {};
+  \node[box] (easy2) at (3.0,0) {};
+  \node[medbox] (med) at (6.0,0) {};
+  \node[hardbox] (hard1) at (9.0,0) {};
+  \node[hardbox] (hard2) at (12.0,0) {};
+
+  \draw[traj] (-0.9,-0.4) .. controls (-0.6,0.4) and (-0.2,-0.4) ..
+              (0.1,0.3) .. controls (0.4,-0.2) and (0.7,0.4) .. (0.9,-0.1);
+  \node at (0,0.7) {\textbf{Slow turner}};
+
+  \draw[traj] (2.1,0) -- (3.9,0);
+  \node at (3.0,0.7) {\textbf{Straight walker}};
+
+  \draw[trajm] (5.1,-0.2) .. controls (5.5,0.3) and (5.9,-0.3) ..
+               (6.3,0.2) .. controls (6.6,0.4) .. (6.9,0.0);
+  \node at (6.0,0.7) {\textbf{Ordinary mover}};
+
+  \draw[trajh] (8.05,-0.2) -- (8.35,0.35) -- (8.6,-0.3) --
+               (8.9,0.4) -- (9.2,-0.2) -- (9.5,0.3) -- (9.85,-0.1);
+  \node at (9.0,0.7) {\textbf{Erratic turner}};
+
+  \draw[trajh, line width=1.2pt] (11.0,-0.3) .. controls
+        (11.5,0.1) and (12.3,-0.1) .. (12.95,0.3);
+  \node at (12.0,0.7) {\textbf{Fast \& turning}};
+
+  \node[lmugreen!70!black] at (0,-1.25) {\textbf{EASY}};
+  \node[lmugreen!70!black] at (3.0,-1.25) {\textbf{EASY}};
+  \node[orange!80!black]   at (6.0,-1.25) {\textbf{MEDIUM}};
+  \node[red!70!black]      at (9.0,-1.25) {\textbf{HARD}};
+  \node[red!70!black]      at (12.0,-1.25){\textbf{HARD}};
+\end{tikzpicture}%
 }
+
 
 % Remove navigation symbols
 \beamertemplatenavigationsymbolsempty
@@ -78,8 +120,8 @@ belowskip = -1.2 \baselineskip,
   \end{tikzpicture}%
   \fi}
 
-\title[Trajectron++ Analysis]{Understanding Trajectron++: \\
-A Interpretable Performance Analysis Pipeline}
+\title[Interpreting Trajectron++ Prediction Errors]{Why Are Some Trajectories Harder Than Others?}
+\subtitle{Interpreting Trajectron++ Prediction Errors}
 
 \author[Drauz \& Matrullo]{Simon Drauz and Zoe Matrullo}
 \institute[LMU]{LMU Munich}
@@ -93,37 +135,48 @@ A Interpretable Performance Analysis Pipeline}
 %--- Slide 1: Title -------------------------------------------------------------
 {
 \usebackgroundtemplate{\includegraphics[width=\paperwidth]{lmu-background.pdf}}
-\begin{frame}
-\begin{columns}
-	\begin{column}{0.4\textwidth}
-		\vspace*{3cm}
-		\textbf{\textcolor{white}{\Large 
-		\\ Understanding Trajectron++:\\
-A Per-Trajectory Performance Analysis \\}}
-		\vspace{1cm}
-		\textcolor{white}{\footnotesize Simon Drauz and Zoe Matrullo \\
-			\today}
+\begin{frame}[plain]
+\begin{tikzpicture}[remember picture, overlay]
+	\node[anchor=north east, inner sep=0pt] at
+		([xshift=-3.55cm, yshift=-0.78cm]current page.north east)
+		{\includegraphics[height=0.60cm,trim=0 52 0 50,clip]{images/denso_logo_2.png}};
+\end{tikzpicture}
+\begin{columns}[T,onlytextwidth]
+	\begin{column}{0.48\textwidth}
+		\vspace*{2.12cm}
+		\begin{minipage}{0.85\linewidth}
+		\raggedright
+		\fontsize{19}{22}\selectfont
+		\textbf{\textcolor{white}{Why Are Some Trajectories Harder Than Others?}}
+		\vspace{0.24cm}
+
+		\Large
+		\textcolor{white}{
+		Interpreting Trajectron++ Prediction Errors}
+		\end{minipage}\par
+		\vspace{0.42cm}
+		\textcolor{white}{%
+			\begin{minipage}{0.95\linewidth}
+			\raggedright
+			\footnotesize Simon Drauz and Zoe Matrullo\\
+			\footnotesize DENSO supervisor: PhD Candidate Ajay Menon\\
+			\footnotesize LMU Supervisor: Prof. Dr. Matthias Schubert\\[0.12cm]
+			\footnotesize \today
+			\end{minipage}}
 	\end{column}
-	\begin{column}{0.49\textwidth}
-		\vspace*{1.5cm}
+	\begin{column}{0.46\textwidth}
+		\vspace*{1.75cm}
 		\begin{center}
-			\includegraphics[width=0.85\textwidth]{nuscenes_example2}\\[0.3em]
-			\begin{columns}[c]
-				\begin{column}{0.43\textwidth}
-					\includegraphics[width=\textwidth]{nuscenes_maps}
-				\end{column}
-				\begin{column}{0.43\textwidth}
-					\includegraphics[width=\textwidth]{clustering-cover}
-				\end{column}
-			\end{columns}
+			\hspace*{-0.75cm}%
+			\includegraphics[width=\textwidth,height=2.75cm,keepaspectratio]{performance_groups}\\[0.55cm]
+			\hspace*{-0.75cm}%
+			\resizebox{\textwidth}{!}{\regimeBoxesTikz}
 		\end{center}
 	\end{column}
 \end{columns}
 \end{frame}
 }
 
-%--- Slide 2: Outline -----------------------------------------------------------
-\input{slides/part0_outline}
 
 %--- Part 1: Motivation ---------------------------------------------------------
 \def\cornerpipeline{}
@@ -156,6 +209,20 @@ A Per-Trajectory Performance Analysis \\}}
 %--- Part 6: Conclusions --------------------------------------------------------
 \def\cornerpipeline{}
 \input{slides/part6_conclusions}
+
+%--- Questions -----------------------------------------------------------------
+\def\cornerpipeline{}
+\begin{frame}
+  \begin{center}
+    \vspace{0.2cm}
+    {\Huge \textcolor{lmugreen}{\textbf{Questions?}}}\\[0.55cm]
+    \includegraphics[width=0.88\textwidth]{pipeline}
+  \end{center}
+\end{frame}
+
+%--- Backup Slides --------------------------------------------------------------
+\def\cornerpipeline{}
+\input{slides/part7_backup}
 
 %--- References -----------------------------------------------------------------
 % Uncomment once \cite{} commands are added to the slides
