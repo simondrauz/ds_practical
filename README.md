@@ -4,7 +4,7 @@ This repository contains an integrated pipeline for analysing trajectory-predict
 
 ## Analysis Pipeline
 
-![Pipeline Overview](figures/pipeline.png)
+![Pipeline Overview](Report/figures/pipeline.png)
 
 ## Repository Contents
 
