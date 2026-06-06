@@ -1,22 +1,10 @@
 # Trajectron++ nuScenes Interpretation Pipelines
 
-This repository contains an integrated Trajectron++ training/evaluation setup,
-trajectory and scene metric joins, and interpretable modelling notebooks for
-analysing trajectory-prediction error on nuScenes.
+This repository contains an integrated pipeline for analysing trajectory-prediction error on nuScenes using Trajectron++. The pipeline recovers per-trajectory prediction losses, engineers interpretable features, and uses GAM and XGBoost to understand what drives model performance.
 
-There are two supported analysis paths:
+## Analysis Pipeline
 
-1. **Full trainval path**
-   Run one Trajectron++ configuration on the full nuScenes trainval split, join
-   evaluation output with trajectory and scene characteristics, fit GAM and
-   XGBoost interpretable models, run model inference, then continue into
-   performance-regime clustering and cluster inspection.
-
-2. **Mini model-settings sweep path**
-   Run a Cartesian sweep of Trajectron++ settings on nuScenes mini, combine only
-   the joined outputs from the current sweep, fit GAM and XGBoost interpretable
-   models, and stop after `model_inference_analysis.ipynb`. This path does not
-   run clustering or cluster inspection.
+![Pipeline Overview](figures/pipeline.png)
 
 ## Repository Contents
 
