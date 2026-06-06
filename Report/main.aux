@@ -1,0 +1,97 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{helbing1995social}
+\citation{alahi2016social}
+\citation{gupta2018social}
+\citation{lee2017desire}
+\citation{salzmann2020trajectron}
+\citation{yuan2021agentformer}
+\citation{gu2022mid}
+\citation{caesar2020nuscenes}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Background and Related Work}{1}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.1}Trajectory Prediction}{1}{subsection.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2}The nuScenes Dataset}{1}{subsection.1.2}\protected@file@percent }
+\citation{hastie1990gam}
+\citation{lou2013ebm,nori2019ebm}
+\citation{friedman2001gbm}
+\citation{lundberg2017shap}
+\citation{mcmahan2017fedavg}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.3}Evaluation Metrics for Trajectory Prediction}{2}{subsection.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.4}Interpretable Machine Learning for Model Analysis}{2}{subsection.1.4}\protected@file@percent }
+\citation{arivazhagan2019fedper,collins2021fedRep}
+\citation{dinh2020pfedme}
+\citation{li2021ditto}
+\citation{fallah2020perfedavg}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.5}Federated Learning and Personalisation}{3}{subsection.1.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}Problem Statement and Research Questions}{3}{section.2}\protected@file@percent }
+\newlabel{sec:research_questions}{{2}{3}{Problem Statement and Research Questions}{section.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Trajectron++ Adaptation for Per-Trajectory Evaluation}{4}{section.3}\protected@file@percent }
+\newlabel{sec:trajectron_adaptation}{{3}{4}{Trajectron++ Adaptation for Per-Trajectory Evaluation}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Limitations of the Standard Evaluation Loop}{4}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Recovering Individual Trajectory Errors}{5}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Scope of the Prediction Task}{5}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Feature Engineering and Data Preparation}{5}{section.4}\protected@file@percent }
+\newlabel{sec:feature_engineering}{{4}{5}{Feature Engineering and Data Preparation}{section.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Trajectory and Scene Characteristics}{6}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Agent motion features.}{6}{section*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Scene context features.}{6}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Target Distribution and Log Transformation}{6}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Feature Selection}{7}{subsection.4.3}\protected@file@percent }
+\newlabel{sec:feature_selection}{{4.3}{7}{Feature Selection}{subsection.4.3}{}}
+\@writefile{toc}{\contentsline {paragraph}{Approach 1: Mutual-information elbow followed by VIF.}{7}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Approach 2: VIF only.}{7}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Interpretable Models: GAM and XGBoost}{7}{section.5}\protected@file@percent }
+\newlabel{sec:interpretable_models}{{5}{7}{Interpretable Models: GAM and XGBoost}{section.5}{}}
+\citation{chen2016xgboost}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Generalized Additive Model}{8}{subsection.5.1}\protected@file@percent }
+\newlabel{eq:gam}{{1}{8}{Generalized Additive Model}{equation.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}XGBoost}{8}{subsection.5.2}\protected@file@percent }
+\newlabel{eq:xgboost}{{2}{8}{XGBoost}{equation.2}{}}
+\newlabel{eq:shap}{{3}{9}{XGBoost}{equation.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Rationale for Using Both Models}{9}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Model Setting Sweep}{9}{section.6}\protected@file@percent }
+\newlabel{sec:settings_sweep}{{6}{9}{Model Setting Sweep}{section.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Sweep Design}{9}{subsection.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Pooled Model and Confound Control}{10}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Feature Importance of Model Settings}{10}{section.7}\protected@file@percent }
+\newlabel{sec:settings_importance}{{7}{10}{Feature Importance of Model Settings}{section.7}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Mean absolute SHAP values from the pooled XGBoost model, ranking the influence of model settings and trajectory features on per-trajectory prediction error. Larger values indicate greater influence.}}{11}{table.1}\protected@file@percent }
+\newlabel{tab:settings_shap}{{1}{11}{Mean absolute SHAP values from the pooled XGBoost model, ranking the influence of model settings and trajectory features on per-trajectory prediction error. Larger values indicate greater influence}{table.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Prediction Horizon}{11}{subsection.7.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Attention Radius}{11}{subsection.7.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}History Window}{12}{subsection.7.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8}Conclusion}{12}{section.8}\protected@file@percent }
+\newlabel{sec:conclusion}{{8}{12}{Conclusion}{section.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.1}Summary of Findings}{12}{subsection.8.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{RQ1 — Which characteristics drive prediction error?}{12}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{RQ2 — What are the success and failure modes?}{12}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{RQ3 — How do model settings affect performance?}{12}{section*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.2}Limitations}{13}{subsection.8.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.3}Future Work}{13}{subsection.8.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A}Appendix}{V}{appendix.A}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {B}Electronic appendix}{VI}{appendix.B}\protected@file@percent }
+\newlabel{el_app}{{B}{VI}{Electronic appendix}{appendix.B}{}}
+\bibdata{bibliography}
+\bibcite{alahi2016social}{{1}{2016}{{Alahi et~al.}}{{Alahi, Goel, Ramanathan, Robicquet, Fei-Fei and\ Savarese}}}
+\bibcite{arivazhagan2019fedper}{{2}{2019}{{Arivazhagan et~al.}}{{Arivazhagan, Aggarwal, Singh and\ Choudhary}}}
+\bibcite{caesar2020nuscenes}{{3}{2020}{{Caesar et~al.}}{{Caesar, Bankiti, Lang, Vora, Liong, Xu, Krishnan, Pan, Baldan and\ Beijbom}}}
+\bibcite{chen2016xgboost}{{4}{2016}{{Chen and\ Guestrin}}{{}}}
+\bibcite{collins2021fedRep}{{5}{2021}{{Collins et~al.}}{{Collins, Hassani, Mokhtari and\ Shakkottai}}}
+\bibcite{dinh2020pfedme}{{6}{2020}{{Dinh et~al.}}{{Dinh, Tran and\ Nguyen}}}
+\bibcite{fallah2020perfedavg}{{7}{2020}{{Fallah et~al.}}{{Fallah, Mokhtari and\ Ozdaglar}}}
+\bibcite{friedman2001gbm}{{8}{2001}{{Friedman}}{{}}}
+\bibcite{gu2022mid}{{9}{2022}{{Gu et~al.}}{{Gu, Yang and\ Zhang}}}
+\bibcite{gupta2018social}{{10}{2018}{{Gupta et~al.}}{{Gupta, Johnson, Fei-Fei, Savarese and\ Alahi}}}
+\bibcite{hastie1990gam}{{11}{1990}{{Hastie and\ Tibshirani}}{{}}}
+\bibcite{helbing1995social}{{12}{1995}{{Helbing and\ Molnar}}{{}}}
+\bibcite{lee2017desire}{{13}{2017}{{Lee et~al.}}{{Lee, Choi, Vernaza, Choy, Torr and\ Chandraker}}}
+\bibcite{li2021ditto}{{14}{2021}{{Li et~al.}}{{Li, Hu, Beirami and\ Smith}}}
+\bibcite{lou2013ebm}{{15}{2013}{{Lou et~al.}}{{Lou, Caruana, Gehrke and\ Hooker}}}
+\bibcite{lundberg2017shap}{{16}{2017}{{Lundberg and\ Lee}}{{}}}
+\bibcite{mcmahan2017fedavg}{{17}{2017}{{McMahan et~al.}}{{McMahan, Moore, Ramage, Hampson and\ Ag{\"u}era~y Arcas}}}
+\bibcite{nori2019ebm}{{18}{2019}{{Nori et~al.}}{{Nori, Jenkins, Koch and\ Caruana}}}
+\bibcite{yuan2021agentformer}{{19}{2021}{{Yuan et~al.}}{{Yuan, Weng, Ou and\ Kitani}}}
+\bibstyle{dcu}
+\gdef \@abspage@last{21}

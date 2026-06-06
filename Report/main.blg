@@ -1,0 +1,49 @@
+This is BibTeX, Version 0.99d (TeX Live 2025)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: main.aux
+The style file: dcu.bst
+Database file #1: bibliography.bib
+Warning--I didn't find a database entry for "salzmann2020trajectron"
+Warning--empty booktitle in nori2019ebm
+You've used 19 entries,
+            2921 wiz_defined-function locations,
+            740 strings with 8517 characters,
+and the built_in function-call counts, 110022 in all, are:
+= -- 17982
+> -- 1675
+< -- 3
++ -- 8743
+- -- 518
+* -- 9624
+:= -- 21513
+add.period$ -- 38
+call.type$ -- 19
+change.case$ -- 265
+chr.to.int$ -- 19
+cite$ -- 20
+duplicate$ -- 395
+empty$ -- 752
+format.name$ -- 586
+if$ -- 19986
+int.to.chr$ -- 5
+int.to.str$ -- 0
+missing$ -- 20
+newline$ -- 79
+num.names$ -- 204
+pop$ -- 101
+preamble$ -- 1
+purify$ -- 285
+quote$ -- 0
+skip$ -- 392
+stack$ -- 0
+substring$ -- 25599
+swap$ -- 129
+text.length$ -- 269
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 74
+warning$ -- 1
+while$ -- 435
+width$ -- 0
+write$ -- 290
+(There were 2 warnings)
