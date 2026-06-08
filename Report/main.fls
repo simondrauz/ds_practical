@@ -161,8 +161,8 @@ INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/tfm/public/cm/cmex10.tfm
 INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex8.tfm
 INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex7.tfm
 OUTPUT main.toc
-INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/tfm/public/cm/cmbx12.tfm
 INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/tfm/public/cm/cmti12.tfm
+INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/tfm/public/cm/cmbx12.tfm
 INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/tfm/public/cm/cmtt12.tfm
 INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/tfm/jknappen/ec/tcrm1200.tfm
 INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/enc/dvips/cm-super/cm-super-ts1.enc
@@ -179,7 +179,6 @@ INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi1
 INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb
 INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb
 INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb
-INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb
 INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb
 INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb
 INPUT /Users/zoe/Library/TinyTeX/texmf-dist/fonts/type1/public/amsfonts/cm/cmti12.pfb

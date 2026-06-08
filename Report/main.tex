@@ -46,8 +46,6 @@ bindingoffset = 0mm]{geometry}
 \begin{titlepage}
 \begin{center}
     
-\LARGE
-Master's Thesis
     
 \vspace{0.5cm}
       
@@ -116,23 +114,44 @@ culpa qui officia deserunt mollit anim id est laborum.
     
 
 
+\section{Introduction}
+\label{sec:introduction}
+
+Trajectory prediction models are almost universally evaluated through aggregate error metrics computed over an entire test set, most commonly the Average Displacement Error (ADE) and the Final Displacement Error (FDE). While such summary statistics are useful for ranking models against one another, they provide a fundamentally incomplete picture of model behaviour. A single averaged number reveals neither the conditions under which a model succeeds nor those under which it fails. Two models with identical mean ADE may behave very differently in practice: one might perform uniformly across all situations, while another might excel on common, easy cases and fail catastrophically on rarer, safety-critical ones.
+
+This limitation is particularly consequential in the autonomous driving context. Some trajectories are inherently hard to predict, such as those of a pedestrian who abruptly changes direction or navigates a densely crowded crossing, whereas others are close to trivial, such as an agent walking in a straight line at constant speed across an empty scene. An aggregate metric collapses this heterogeneity into a single value and offers no insight into \emph{why} certain predictions fail and others succeed. Consequently, the standard evaluation paradigm provides no understanding of which trajectory characteristics or scene properties drive the per-trajectory prediction error of a given model.
+
+This work addresses that gap by developing a comprehensive pipeline to understand the drivers of prediction error. Rather than proposing a new prediction architecture or attempting to improve aggregate accuracy, we build an interpretable analysis pipeline that decomposes Trajectron++ prediction errors into their constituent factors. The pipeline combines per-trajectory error recovery, feature engineering, and interpretable meta-models to characterise which trajectory and scene characteristics, as well as which model configurations, systematically influence prediction performance.
+
+We structure the investigation around three research questions:
+
+\begin{description}
+  \item[RQ1 — Which trajectory and scene characteristics affect model performance?] We seek to identify the features, such as speed, speed variability, acceleration, heading change, and scene density, that systematically influence the per-trajectory prediction error, and to quantify the direction and magnitude of their effects.
+
+  \item[RQ2 — What are the success and failure modes that explain model performance?] Beyond the marginal effect of individual features, we ask whether trajectories cluster into coherent regimes that the model consistently handles well or poorly, and whether these regimes can be characterised in human-interpretable terms.
+
+  \item[RQ3 — How do model settings affect performance?] Finally, we ask how Trajectron++'s own configuration, specifically the observation history length, the prediction horizon, and the attention radius, influences prediction quality, independently of the intrinsic difficulty of each trajectory.
+\end{description}
+
+These three questions map directly onto the structure of the remainder of this report. RQ1 and RQ2 are addressed through an interpretable meta-modelling and clustering pipeline applied to a fixed model configuration, while RQ3 is addressed through a controlled sweep over model settings.
+
 \section{Background and Related Work}
- 
+
 \subsection{Trajectory Prediction}
  
 Trajectory prediction is the task of forecasting the future positions of agents such as pedestrians, cyclists, or vehicles, given a sequence of their observed past movements. It is a foundational problem in autonomous driving, robotics, and smart city applications, where anticipating agent behaviour is critical for safe and efficient operation.
  
-Early approaches relied on physics-based models such as the Social Force Model \cite{helbing1995social}, which simulates pedestrian motion as a system of attractive and repulsive forces. While interpretable and computationally lightweight, these models struggle to capture the complexity and variability of real-world behaviour.
+Early approaches relied on physics-based models such as the Social Force Model \citep{helbing1995social}, which simulates pedestrian motion as a system of attractive and repulsive forces. While interpretable and computationally lightweight, these models struggle to capture the complexity and variability of real-world behaviour.
  
-The introduction of recurrent neural networks marked a significant shift. Social-LSTM \cite{alahi2016social} extended the LSTM architecture with a social pooling mechanism that allows agents to share hidden states with their neighbours, enabling the model to account for crowd interactions. Social-GAN \cite{gupta2018social} built on this by framing prediction as a generative task using a generative adversarial network, producing a diverse set of socially plausible future trajectories rather than a single deterministic output.
+The introduction of recurrent neural networks marked a significant shift. Social-LSTM \citep{alahi2016social} extended the LSTM architecture with a social pooling mechanism that allows agents to share hidden states with their neighbours, enabling the model to account for crowd interactions. Social-GAN \citep{gupta2018social} built on this by framing prediction as a generative task using a generative adversarial network, producing a diverse set of socially plausible future trajectories rather than a single deterministic output.
  
-More recent work has embraced graph-based and attention-based architectures to better capture structured interactions. DESIRE \cite{lee2017desire} and Trajectron++ \cite{salzmann2020trajectron} combine probabilistic reasoning with multi-agent interaction modelling. Trajectron++ in particular offers a principled framework for heterogeneous, multi-agent trajectory prediction: it represents the scene as a dynamic graph, uses recurrent encoders to model each agent's history, and employs conditional variational autoencoders (CVAEs) to produce a distribution over future trajectories. Importantly, Trajectron++ supports integration of map and semantic context, and accommodates multiple agent types including pedestrians, cars, and cyclists, making it well-suited to complex real-world datasets.
+More recent work has embraced graph-based and attention-based architectures to better capture structured interactions. DESIRE \citep{lee2017desire} and Trajectron++ \citep{salzmann2020trajectron+} combine probabilistic reasoning with multi-agent interaction modelling. Trajectron++ in particular offers a principled framework for heterogeneous, multi-agent trajectory prediction: it represents the scene as a dynamic graph, uses recurrent encoders to model each agent's history, and employs conditional variational autoencoders (CVAEs) to produce a distribution over future trajectories. Importantly, Trajectron++ supports integration of map and semantic context, and accommodates multiple agent types including pedestrians, cars, and cyclists, making it well-suited to complex real-world datasets.
  
-Transformer-based models such as AgentFormer \cite{yuan2021agentformer} have further advanced the field by jointly modelling spatial and temporal dependencies across agents using self-attention, avoiding the sequential bottleneck of recurrent networks. Diffusion-based approaches such as MID \cite{gu2022mid} have also been explored, applying denoising diffusion probabilistic models to generate diverse and accurate multimodal futures.
+Transformer-based models such as AgentFormer \citep{yuan2021agentformer} have further advanced the field by jointly modelling spatial and temporal dependencies across agents using self-attention, avoiding the sequential bottleneck of recurrent networks. Diffusion-based approaches such as MID \citep{gu2022mid} have also been explored, applying denoising diffusion probabilistic models to generate diverse and accurate multimodal futures.
  
 \subsection{The nuScenes Dataset}
  
-nuScenes \cite{caesar2020nuscenes} is a large-scale, multimodal autonomous driving dataset collected in Boston and Singapore. It provides 1000 driving scenes, each 20 seconds long, with 3D bounding box annotations for 23 object categories at 2 Hz. The dataset includes data from six cameras, a 32-beam LiDAR, and five radars, enabling rich multi-sensor perception. Each annotated object is assigned a semantic category such as car, pedestrian, or bicycle, as well as an attribute such as moving, stopped, or parked.
+nuScenes \citep{caesar2020nuscenes} is a large-scale, multimodal autonomous driving dataset collected in Boston and Singapore. It provides 1000 driving scenes, each 20 seconds long, with 3D bounding box annotations for 23 object categories at 2 Hz. The dataset includes data from six cameras, a 32-beam LiDAR, and five radars, enabling rich multi-sensor perception. Each annotated object is assigned a semantic category such as car, pedestrian, or bicycle, as well as an attribute such as moving, stopped, or parked.
  
 For trajectory prediction, nuScenes offers a standardised benchmark with defined observation and prediction horizons, typically 2 seconds of history and 6 seconds of future prediction, along with an official set of evaluation metrics. The dataset's diversity across two cities, varying traffic densities, and heterogeneous agent types makes it a challenging and realistic testbed. At the same time, this heterogeneity means that prediction difficulty varies substantially across scenes and agent types, motivating a deeper investigation of which trajectory characteristics drive model performance.
  
@@ -140,7 +159,7 @@ For trajectory prediction, nuScenes offers a standardised benchmark with defined
  
 Trajectory prediction is most commonly evaluated using displacement-based metrics. The Average Displacement Error (ADE) measures the mean Euclidean distance between predicted and ground-truth positions across all future timesteps. The Final Displacement Error (FDE) measures this distance only at the final predicted timestep, capturing whether the model correctly anticipates the agent's eventual position.
  
-Since modern models are generative and produce multiple hypotheses, metrics are often computed under a best-of-$K$ protocol: $K$ samples are drawn from the model, and the minimum error across samples is reported as $\text{minADE}@K$ and $\text{minFDE}@K$. This rewards a model for including the correct future within its predictive distribution, without penalising it for also generating other plausible alternatives. Common values of $K$ are 5 and 10.
+Since modern models are generative and produce multiple hypotheses, metrics are often computed under a best-of-$k$ protocol: $k$ samples are drawn from the model, and the minimum error across samples is reported as $\text{ADE-k}$ and $\text{FDE-k}$. This rewards a model for including the correct future within its predictive distribution, without penalising it for also generating other plausible alternatives. Common values of $k$ are 5 and 10.
  
 Beyond aggregate statistics, recent work has highlighted the importance of disaggregated evaluation. Performance can vary significantly across agent types, motion patterns such as straight-line versus turning trajectories, scene density, and speed regimes. Understanding these sources of variation is important both for characterising model limitations and for guiding further development.
  
@@ -148,43 +167,25 @@ Beyond aggregate statistics, recent work has highlighted the importance of disag
  
 When the goal is not to maximise predictive accuracy but to understand what drives a model's performance, interpretable machine learning methods offer a valuable toolkit. Rather than treating a complex model as a black box, these methods build transparent secondary models that relate input features to an outcome of interest, in this case prediction error.
  
-Generalised Additive Models (GAMs) \cite{hastie1990gam} decompose the prediction into a sum of smooth univariate functions, one per feature, making it possible to visualise each feature's marginal contribution to the outcome. Explainable Boosting Machines (EBMs) \cite{lou2013ebm, nori2019ebm} extend this framework using gradient boosting to learn these shape functions and additionally capture pairwise interaction terms, achieving accuracy competitive with more complex models while retaining full interpretability. Gradient Boosted Trees \cite{friedman2001gbm}, as implemented in libraries such as XGBoost or LightGBM, sacrifice some interpretability for higher flexibility; feature importance scores and SHAP values \cite{lundberg2017shap} can then be used to recover post-hoc explanations.
+Generalised Additive Models (GAMs) \citep{hastie1990gam} decompose the prediction into a sum of smooth univariate functions, one per feature, making it possible to visualise each feature's marginal contribution to the outcome. Explainable Boosting Machines (EBMs) \citep{lou2013ebm, nori2019ebm} extend this framework using gradient boosting to learn these shape functions and additionally capture pairwise interaction terms, achieving accuracy competitive with more complex models while retaining full interpretability. Gradient Boosted Trees \citep{friedman2001gbm}, as implemented in libraries such as XGBoost or LightGBM, sacrifice some interpretability for higher flexibility; feature importance scores and SHAP values \citep{lundberg2017shap} can then be used to recover post-hoc explanations.
  
 In the context of trajectory prediction analysis, these methods allow one to formally quantify how trajectory-level features such as agent speed, trajectory curvature, observation length, or scene density relate to the prediction error assigned by Trajectron++. This provides a principled, data-driven characterisation of the model's strengths and failure modes, going beyond anecdotal inspection of individual examples.
  
 \subsection{Federated Learning and Personalisation}
  
-Federated learning \cite{mcmahan2017fedavg} is a distributed training paradigm in which multiple clients such as vehicles or edge cameras collaboratively train a shared model without exchanging raw data. Each client trains locally and shares only model updates with a central server, which aggregates them into an updated global model via algorithms such as FedAvg. This preserves data privacy and reduces communication overhead.
+Federated learning \citep{mcmahan2017fedavg} is a distributed training paradigm in which multiple clients such as vehicles or edge cameras collaboratively train a shared model without exchanging raw data. Each client trains locally and shares only model updates with a central server, which aggregates them into an updated global model via algorithms such as FedAvg. This preserves data privacy and reduces communication overhead.
  
-A key challenge in federated learning arises when client data distributions are heterogeneous, a setting commonly referred to as non-IID. In the trajectory prediction setting, this corresponds to clients located in environments with structurally different movement patterns, such as a highway versus a pedestrian plaza. A single global model may perform well on average but poorly for individual clients whose data deviates from the mean. Personalised federated learning addresses this by allowing clients to maintain partially or fully individualised models. Strategies include split-model approaches such as FedPer and FedRep \cite{arivazhagan2019fedper, collins2021fedRep}, which share a common encoder while giving each client its own prediction head; regularisation-based approaches such as pFedMe \cite{dinh2020pfedme} and DITTO \cite{li2021ditto}, which penalise deviation from the global model during local training; and meta-learning approaches such as Per-FedAvg \cite{fallah2020perfedavg}, which optimise for rapid local adaptation with few gradient steps.
+A key challenge in federated learning arises when client data distributions are heterogeneous, a setting commonly referred to as non-IID. In the trajectory prediction setting, this corresponds to clients located in environments with structurally different movement patterns, such as a highway versus a pedestrian plaza. A single global model may perform well on average but poorly for individual clients whose data deviates from the mean. Personalised federated learning addresses this by allowing clients to maintain partially or fully individualised models. Strategies include split-model approaches such as FedPer and FedRep \citep{arivazhagan2019fedper, collins2021fedRep}, which share a common encoder while giving each client its own prediction head; regularisation-based approaches such as pFedMe \citep{dinh2020pfedme} and DITTO \citep{li2021ditto}, which penalise deviation from the global model during local training; and meta-learning approaches such as Per-FedAvg \citep{fallah2020perfedavg}, which optimise for rapid local adaptation with few gradient steps.
  
 While the present work focuses on a centralised, in-depth analysis of Trajectron++ rather than a federated deployment, understanding the factors that govern prediction quality across diverse trajectory types is directly relevant to motivating and designing personalisation strategies in future federated settings.
 
-\section{Problem Statement and Research Questions}
-\label{sec:research_questions}
- 
-Trajectory prediction models are almost universally evaluated through aggregate error metrics computed over an entire test set, most commonly the Average Displacement Error (ADE) and the Final Displacement Error (FDE). While such summary statistics are useful for ranking models against one another, they provide a fundamentally incomplete picture of model behaviour. A single averaged number reveals neither the conditions under which a model succeeds nor those under which it fails. Two models with identical mean ADE may behave very differently in practice: one might perform uniformly across all situations, while another might excel on common, easy cases and fail catastrophically on rarer, safety-critical ones.
- 
-This limitation is particularly consequential in the autonomous driving context. Some trajectories are inherently hard to predict, such as those of a pedestrian who abruptly changes direction or navigates a densely crowded crossing, whereas others are close to trivial, such as an agent walking in a straight line at constant speed across an empty scene. An aggregate metric collapses this heterogeneity into a single value and offers no insight into \emph{why} certain predictions fail and others succeed. Consequently, the standard evaluation paradigm provides no understanding of which trajectory characteristics or scene properties drive the per-trajectory prediction error of a given model.
- 
-This work addresses that gap. Rather than proposing a new prediction architecture or attempting to improve aggregate accuracy, we treat an existing, well-established model, Trajectron++, as the object of study and ask what its error distribution can teach us about the structure of the prediction problem itself. We adopt an interpretability-driven perspective: by relating per-trajectory prediction errors to interpretable trajectory and scene features, we aim to characterise the model's competence in a fine-grained and actionable way.
- 
-We structure the investigation around three research questions:
- 
-\begin{description}
-  \item[RQ1 — Which trajectory and scene characteristics affect model performance?] We seek to identify the features, such as speed, speed variability, acceleration, heading change, and scene density, that systematically influence the per-trajectory prediction error, and to quantify the direction and magnitude of their effects.
- 
-  \item[RQ2 — What are the success and failure modes that explain model performance?] Beyond the marginal effect of individual features, we ask whether trajectories cluster into coherent regimes that the model consistently handles well or poorly, and whether these regimes can be characterised in human-interpretable terms.
- 
-  \item[RQ3 — How do model settings affect performance?] Finally, we ask how Trajectron++'s own configuration, specifically the observation history length, the prediction horizon, and the attention radius, influences prediction quality, independently of the intrinsic difficulty of each trajectory.
-\end{description}
- 
-These three questions map directly onto the structure of the remainder of this report. RQ1 and RQ2 are addressed through an interpretable meta-modelling and clustering pipeline applied to a fixed model configuration, while RQ3 is addressed through a controlled sweep over model settings. The following section describes the analysis pipeline that ties these components together.
 
-\section{Trajectron++ Adaptation for Per-Trajectory Evaluation}
+\section{Methodology}
+
+\subsection{Trajectron++ Adaptation for Per-Trajectory Evaluation}
 \label{sec:trajectron_adaptation}
 
-Answering the research questions posed in Section~\ref{sec:research_questions} requires prediction errors at the granularity of individual trajectories. The standard Trajectron++ evaluation procedure does not expose this information, and overcoming this limitation is the first methodological contribution of our pipeline.
+Answering the research questions posed in Section~\ref{sec:introduction} requires prediction errors at the granularity of individual trajectories. The standard Trajectron++ evaluation procedure does not expose this information, and overcoming this limitation is the first methodological contribution of our pipeline.
 
 \subsection{Limitations of the Standard Evaluation Loop}
 
@@ -204,7 +205,7 @@ Without this stable join key, the two halves of the analysis, the prediction err
 
 Consistent with the dataset scope described in Section~\ref{sec:dataset}, we focus the prediction and evaluation on pedestrian trajectories, while all other agent types remain present in each scene and contribute to the model's interaction reasoning as context. The per-trajectory errors recovered through the modified evaluation loop therefore correspond to pedestrian targets, and it is these errors that serve as the response variable for the interpretable models in the subsequent sections.
 
-\section{Feature Engineering and Data Preparation}
+\subsection{Feature Engineering and Data Preparation}
 \label{sec:feature_engineering}
 
 With per-trajectory prediction errors available, the next stage of the pipeline constructs the set of interpretable features that will be related to those errors. A key point is that Trajectron++ itself outputs only sequences of $(x, y)$ positions together with their associated time stamps; it does not expose any higher-level descriptors of motion or scene structure. Every feature described below is therefore computed by us directly from the raw trajectory coordinates and the scene context, not taken from the model.
@@ -243,7 +244,7 @@ With $18$ candidate features, many of which are correlated by construction (for 
 
 Comparing the two feature sets serves as a robustness check. The MI-elbow-plus-VIF set is more parsimonious and motion-focused, whereas the VIF-only set deliberately preserves scene-context information that the MI filter would otherwise remove. Carrying both forward allows us to assess whether the inclusion of scene features materially changes the conclusions of the interpretable analysis, an assessment we return to in the results.
 
-\section{Interpretable Models: GAM and XGBoost}
+\subsection{Interpretable Models: GAM and XGBoost}
 \label{sec:interpretable_models}
 
 The per-trajectory \texttt{ml\_ade} values, together with the selected features, allow us to ask not merely \emph{how large} the prediction error is for a given trajectory, but \emph{why} it is large or small. The error value alone is uninformative in this respect: it tells us that variation exists but not what drives it. To uncover the drivers, we fit a second-stage, interpretable model, a \emph{meta-model}, that takes the engineered trajectory and scene features as inputs and predicts the Trajectron++ prediction error as output. If this meta-model is itself interpretable, then its learned structure can be read as an explanation of the conditions under which Trajectron++ performs well or poorly.
@@ -263,7 +264,7 @@ This additive structure makes the GAM inherently interpretable. Each $s_j$ can b
 
 \subsection{XGBoost}
 
-XGBoost~\cite{chen2016xgboost} is an ensemble method based on gradient-boosted decision trees. Rather than fitting a single model, it constructs a sequence of decision trees in which each new tree is trained to correct the residual errors of the trees already in the ensemble. The prediction for an input $x$ after $T$ boosting rounds is the sum of the outputs of all the individual trees:
+XGBoost~\citep{chen2016xgboost} is an ensemble method based on gradient-boosted decision trees. Rather than fitting a single model, it constructs a sequence of decision trees in which each new tree is trained to correct the residual errors of the trees already in the ensemble. The prediction for an input $x$ after $T$ boosting rounds is the sum of the outputs of all the individual trees:
 \begin{equation}
   \hat{y}(x) = \sum_{t=1}^{T} f_t(x),
   \label{eq:xgboost}
@@ -281,7 +282,7 @@ where $\phi_0$ is the baseline (the mean model prediction) and each $\phi_j(x)$ 
 
 The two meta-models occupy complementary positions on the interpretability–flexibility spectrum. The GAM is fully transparent and provides significance tests, but its additive assumption blinds it to interactions. XGBoost can capture those interactions and typically attains a better fit, but requires post-hoc tools to be interpreted and offers no native significance testing. Reading the two together mitigates the weaknesses of each: agreement between a transparent additive model and a flexible interaction-aware ensemble is strong evidence that an identified effect is real rather than an artefact of one model's assumptions. This dual-model strategy underpins the feature-importance and feature-effect analyses that answer RQ1 and RQ2.
 
-\section{Model Setting Sweep}
+\subsection{Model Setting Sweep}
 \label{sec:settings_sweep}
 
 The analysis described so far holds the Trajectron++ configuration fixed and studies how trajectory and scene characteristics relate to prediction error. RQ3 turns to a complementary question: how does the model's own configuration affect prediction quality? To answer this, we conducted a controlled sweep over three of Trajectron++'s key settings and analysed their effect using the same interpretable meta-modelling framework developed in Section~\ref{sec:interpretable_models}.
@@ -303,7 +304,19 @@ To isolate the effect of the model settings from the intrinsic difficulty of ind
 
 A subtle but important issue in this setup is mechanical confounding between the settings and certain trajectory features. Some features scale trivially with a setting: for instance, the total path length of a trajectory grows mechanically with the prediction horizon, simply because a longer horizon covers more time, irrespective of any change in the agent's behaviour or the difficulty of the prediction. If left uncorrected, such features would absorb part of the genuine effect of the setting and distort the analysis. To prevent this, we used setting-agnostic, normalised versions of the affected features, for example \texttt{mean\_path\_length\_per\_second} in place of the raw \texttt{path\_length}. This normalisation ensures that the estimated effects of the model settings reflect genuine changes in prediction difficulty rather than arithmetic artefacts of the sweep.
 
-\section{Feature Importance of Model Settings}
+\section{Results}
+
+\subsection{Feature Effects on Prediction Error}
+\label{sec:rq1_results}
+
+Speed variability (\texttt{std\_speed}) and turning (\texttt{heading\_change\_per\_sec}) emerge as the dominant drivers of per-trajectory error, and they do so consistently across both the GAM and the XGBoost meta-model. Maximum speed (\texttt{max\_speed}) is a secondary contributor, whereas mean acceleration has a near-zero effect. A clear and somewhat unexpected result is that scene-context features such as agent density and vehicle count carry little explanatory power for per-trajectory error: the difficulty of a prediction is governed far more by the focal agent's own motion than by the crowdedness of its surroundings.
+
+\subsection{Success and Failure Modes}
+\label{sec:rq2_results}
+
+The feature effects resolve into coherent behavioural regimes. The model succeeds on two broad classes of trajectory: slow turners, where low speed bounds the impact of turning, and straight walkers, where stable heading bounds the impact of speed. Conversely, the failure mode is erratic motion in which speed variability and turning occur together. Crucially, raw speed alone is not a failure driver; high speed becomes problematic only when paired with turning. The hardest cases for Trajectron++ are thus those that combine the two dominant difficulty factors simultaneously.
+
+\subsection{Feature Importance of Model Settings}
 \label{sec:settings_importance}
 
 Applying the pooled meta-model of Section~\ref{sec:settings_sweep}, we quantified the influence of each model setting on prediction error using mean absolute SHAP values from the XGBoost model, cross-validated against the GAM. Table~\ref{tab:settings_shap} reports the resulting global feature importance.
@@ -346,18 +359,12 @@ The attention radius is the second most influential feature, and its effect is m
 
 The history window has the smallest effect of the three settings. Its partial dependence plot is comparatively flat across the swept range, indicating that the model is robust to the amount of past motion it observes, at least within the values we tested. From a practical standpoint, this is a reassuring finding: it suggests that Trajectron++ does not depend critically on a long observation window to produce reasonable predictions, and that the history length can be chosen with relatively little concern for its impact on accuracy within this regime.
 
-\section{Conclusion}
+\section{Conclusion and Discussion}
 \label{sec:conclusion}
 
-This work set out to look beyond aggregate error metrics and ask \emph{why} some trajectories are harder for Trajectron++ to predict than others. By recovering per-trajectory prediction errors, relating them to interpretable trajectory and scene features through GAM and XGBoost meta-models, and conducting a controlled sweep over model settings, we are able to give concrete answers to the three research questions posed at the outset.
+This work set out to look beyond aggregate error metrics and ask \emph{why} some trajectories are harder for Trajectron++ to predict than others. By recovering per-trajectory prediction errors, relating them to interpretable trajectory and scene features through GAM and XGBoost meta-models, and conducting a controlled sweep over model settings, we have characterised the model's competence in a fine-grained and actionable way.
 
-\subsection{Summary of Findings}
-
-\paragraph{RQ1 — Which characteristics drive prediction error?} Speed variability (\texttt{std\_speed}) and turning (\texttt{heading\_change\_per\_sec}) emerge as the dominant drivers of per-trajectory error, and they do so consistently across both the GAM and the XGBoost meta-model. Maximum speed (\texttt{max\_speed}) is a secondary contributor, whereas mean acceleration has a near-zero effect. A clear and somewhat unexpected result is that scene-context features such as agent density and vehicle count carry little explanatory power for per-trajectory error: the difficulty of a prediction is governed far more by the focal agent's own motion than by the crowdedness of its surroundings.
-
-\paragraph{RQ2 — What are the success and failure modes?} The feature effects resolve into coherent behavioural regimes. The model succeeds on two broad classes of trajectory: slow turners, where low speed bounds the impact of turning, and straight walkers, where stable heading bounds the impact of speed. Conversely, the failure mode is erratic motion in which speed variability and turning occur together. Crucially, raw speed alone is not a failure driver; high speed becomes problematic only when paired with turning. The hardest cases for Trajectron++ are thus those that combine the two dominant difficulty factors simultaneously.
-
-\paragraph{RQ3 — How do model settings affect performance?} Among the swept settings, the prediction horizon (\texttt{prediction\_sec}) has the largest effect, with longer horizons raising error strongly. The attention radius (\texttt{attention\_radius\_m}) ranks second and exhibits a non-linear effect in which a shorter radius is beneficial, reflecting a trade-off between useful context and added noise. The history window (\texttt{history\_sec}) has little overall impact within the range we examined. Notably, the two leading settings rival the trajectory features themselves in importance, underscoring that configuration choices matter as much as the data.
+The results reveal that trajectory characteristics, particularly speed variability and turning, are dominant drivers of prediction difficulty. Model configuration also plays a critical role, with the prediction horizon and attention radius exerting effects comparable to the trajectory features themselves. These findings provide concrete guidance for understanding and improving trajectory prediction performance.
 
 \subsection{Limitations}
 

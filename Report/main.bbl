@@ -72,6 +72,10 @@ McMahan, H.~B., Moore, E., Ramage, D., Hampson, S. \harvardand\ Ag{\"u}era~y Arc
 Nori, H., Jenkins, S., Koch, P. \harvardand\ Caruana, R.  \harvardyearleft 2019\harvardyearright .
 \newblock {InterpretML}: A unified framework for machine learning interpretability.
 
+\harvarditem[Salzmann et~al.]{Salzmann, Ivanovic, Chakravarty \harvardand\ Pavone}{2020}{salzmann2020trajectron+}
+Salzmann, T., Ivanovic, B., Chakravarty, P. \harvardand\ Pavone, M.  \harvardyearleft 2020\harvardyearright .
+\newblock Trajectron++: Dynamically-feasible trajectory forecasting with heterogeneous data, {\em European conference on computer vision}, Springer, pp.~683--700.
+
 \harvarditem[Yuan et~al.]{Yuan, Weng, Ou \harvardand\ Kitani}{2021}{yuan2021agentformer}
 Yuan, Y., Weng, X., Ou, Y. \harvardand\ Kitani, K.  \harvardyearleft 2021\harvardyearright .
 \newblock {AgentFormer}: Agent-aware transformers for socio-temporal multi-agent forecasting, {\em Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)}, pp.~9813--9823.
