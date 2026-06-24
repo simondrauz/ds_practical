@@ -205,6 +205,15 @@ Without this stable join key, the two halves of the analysis, the prediction err
 
 Consistent with the dataset scope described in Section~\ref{sec:dataset}, we focus the prediction and evaluation on pedestrian trajectories, while all other agent types remain present in each scene and contribute to the model's interaction reasoning as context. The per-trajectory errors recovered through the modified evaluation loop therefore correspond to pedestrian targets, and it is these errors that serve as the response variable for the interpretable models in the subsequent sections.
 
+\subsection{Trajectron++ Training and Evaluation Configuration}
+\label{sec:trajectron_configuration}
+
+For the main per-trajectory error extraction, Trajectron++ was trained under a fixed nuScenes-style forecasting protocol with $2.0$ seconds of observed history and a $6.0$ second prediction horizon. Training used $12$ epochs, a batch size of $256$, an initial learning rate of $0.003$, exponential learning-rate decay with decay rate $0.9999$, a minimum learning rate of $10^{-5}$, and gradient clipping at $1.0$. This fixed configuration provides the baseline prediction-error dataset used for the feature and regime analyses; the separate settings sweep in Section~\ref{sec:settings_sweep} deliberately varies selected model settings.
+
+Map encoding was not used in this run. The recurrent encoder dimensions for history, future, edge, and edge-influence encoders were all set to $32$, while the decoder recurrent dimension was $128$. The latent CVAE setup used $25$ prediction samples, one Gaussian mixture component, KL weight $100.0$, KL minimum $0.07$, and Gumbel temperature annealing from $2.0$ to $0.05$.
+
+Evaluation was then run through the modified loop described above, so the aggregate Trajectron++ evaluation was converted into trajectory-level records identified by \texttt{data\_idx}. The resulting response variable for the downstream analysis is the per-trajectory ADE of the most-likely predicted trajectory, denoted \texttt{ml\_ade}.
+
 \subsection{Feature Engineering and Data Preparation}
 \label{sec:feature_engineering}
 
@@ -229,7 +238,7 @@ Taken together, these two groups yield $18$ candidate features. Each feature vec
 
 \subsection{Target Distribution and Log Transformation}
 
-The response variable for the interpretable models is the per-trajectory most-likely ADE, denoted \texttt{ml\_ade}. Before fitting any model, we examined the distribution of this target. The raw \texttt{ml\_ade} distribution is strongly right-skewed, with a skewness of approximately $2.59$: the majority of trajectories incur low prediction error, but a long tail of high-error cases extends far to the right.
+The response variable for the interpretable models is the per-trajectory most-likely ADE, \texttt{ml\_ade}, defined above. Before fitting any model, we examined the distribution of this target. The raw \texttt{ml\_ade} distribution is strongly right-skewed, with a skewness of approximately $2.59$: the majority of trajectories incur low prediction error, but a long tail of high-error cases extends far to the right.
 
 Such pronounced skewness is problematic for regression models that assume approximately symmetric, homoscedastic residuals, as is the case for the additive model discussed in Section~\ref{sec:interpretable_models}. To address this, we considered a $\log(1+x)$ (\texttt{log1p}) transformation of the target, which compresses the long upper tail and yields a substantially more symmetric distribution. Whether to model the error on the original scale or the log scale was treated as an explicit modelling choice that we evaluated in the subsequent stage rather than fixing a priori, so that the decision could be made on the basis of model fit and diagnostic behaviour.
 
@@ -243,6 +252,73 @@ With $18$ candidate features, many of which are correlated by construction (for 
 \paragraph{Approach 2: VIF only.} As a contrasting strategy, we skipped the MI ranking entirely and applied the VIF filter (again with a threshold of $5$) directly to all $18$ candidates. This yielded $6$ features: \texttt{std\_speed}, \texttt{mean\_acceleration}, \texttt{min\_neighbor\_distance}, \texttt{heading\_change\_per\_sec}, \texttt{scene\_num\_VEHICLE}, and \texttt{scene\_density\_VEHICLE}. In contrast to the first approach, this set retains several scene-level features alongside the motion features.
 
 Comparing the two feature sets serves as a robustness check. The MI-elbow-plus-VIF set is more parsimonious and motion-focused, whereas the VIF-only set deliberately preserves scene-context information that the MI filter would otherwise remove. Carrying both forward allows us to assess whether the inclusion of scene features materially changes the conclusions of the interpretable analysis, an assessment we return to in the results.
+
+\subsection{Model Selection and Validation Protocol}
+\label{sec:model_selection_validation}
+
+The target transformation and model family were treated as empirical choices rather than fixed assumptions. We compared five meta-model variants: LinearGAM on the raw \texttt{ml\_ade} target, LinearGAM on the \texttt{log1p}-transformed target, GammaGAM with a log link on the raw positive target, XGBoost on the raw target, and XGBoost on the \texttt{log1p}-transformed target. Each model was tuned on the target scale on which it was trained, but all variants were compared using out-of-fold metrics transformed back to the original \texttt{ml\_ade} scale.
+
+Hyperparameters were tuned with Bayesian optimization using Optuna's TPE sampler. We used nested resampling because ordinary, non-nested cross-validation would use the same validation structure both to choose hyperparameters and to report model performance. This risks overfitting the model-selection procedure itself to a favourable split and can produce overly optimistic diagnostics. In the nested design, hyperparameter tuning is confined to the inner folds, while the outer folds evaluate the complete tuning procedure on data that were not used for either fitting or tuning.
+
+Concretely, we used $3$ outer folds and $3$ inner folds. For each outer fold, hyperparameters were selected by inner cross-validation on the corresponding training portion using $15$ trials per study; the fitted model was then evaluated on the held-out outer fold. Because every row serves as an outer-fold holdout exactly once, the resulting out-of-fold predictions cover the full analysis dataset without relying on in-sample predictions. Table~\ref{tab:hyperparameter_search_space} reports the search space. After model selection, tuning was rerun on all rows for the final refit.
+
+\begin{table}[t]
+  \centering
+  \caption{Hyperparameter search space used for Optuna/TPE tuning.}
+  \label{tab:hyperparameter_search_space}
+  \small
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabular}{@{}p{0.18\textwidth}p{0.35\textwidth}p{0.34\textwidth}@{}}
+    \toprule
+    \textbf{Model} & \textbf{Hyperparameter} & \textbf{Search range} \\
+    \midrule
+    XGBoost & \texttt{learning\_rate} & $[0.01,\,0.2]$ (log) \\
+    XGBoost & \texttt{max\_depth} & $\{3,\dots,10\}$ \\
+    XGBoost & \texttt{min\_child\_weight} & $\{1,\dots,20\}$ \\
+    XGBoost & \texttt{subsample} & $[0.5,\,1.0]$ \\
+    XGBoost & \texttt{colsample\_bytree} & $[0.5,\,1.0]$ \\
+    XGBoost & \texttt{reg\_alpha} & $[10^{-8},\,10]$ (log) \\
+    XGBoost & \texttt{reg\_lambda} & $[10^{-6},\,20]$ (log) \\
+    XGBoost & \texttt{num\_boost\_round} & up to $2000$, early-stop $50$ \\
+    GAM & \texttt{n\_splines} & $\{10,\dots,50\}$ \\
+    GAM & \texttt{spline\_order} & $\{3,\,4\}$ \\
+    GAM & \texttt{lam} & $[10^{-3},\,10^{3}]$ (log) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The out-of-fold predictions also make it possible to inspect diagnostic plots for instability and bias. Figure~\ref{fig:oof_diagnostics} shows the diagnostics for the main MI\,+\,VIF feature set. The diagnostics show strong agreement between predicted and observed error for low-to-moderate ADE values, but systematic under-prediction in the high-error tail. This pattern appears for both the XGBoost and GAM diagnostics and is therefore treated as a limitation of the available feature representation rather than as evidence for a single-model artefact.
+
+\begin{figure}[t]
+  \centering
+  \textbf{XGBoost}\\[0.2em]
+  \includegraphics[width=\textwidth]{figures/oof_diagnostics_xgb_mi_vif.png}
+  \vspace{0.6em}
+
+  \textbf{GAM}\\[0.2em]
+  \includegraphics[width=\textwidth]{figures/oof_diagnostics_gam_mi_vif.png}
+  \caption{Out-of-fold diagnostic plots for the main MI\,+\,VIF feature set. Both selected meta-model families show good agreement at low-to-moderate ADE and under-prediction in the high-error tail.}
+  \label{fig:oof_diagnostics}
+\end{figure}
+
+\begin{table}[t]
+  \centering
+  \caption{Out-of-fold model-variant comparison on the original \texttt{ml\_ade} scale. Bold rows indicate the selected variants carried forward for interpretation.}
+  \label{tab:model_variant_selection}
+  \begin{tabular}{lccc}
+    \toprule
+    \textbf{Variant} & \textbf{RMSE} & \textbf{R$^2$} & \textbf{MAE} \\
+    \midrule
+    LinearGAM (raw) & 0.448 & 0.491 & 0.263 \\
+    \textbf{LinearGAM (log)} & \textbf{0.445} & \textbf{0.498} & \textbf{0.250} \\
+    GammaGAM (Gamma/log) & 0.445 & 0.498 & 0.253 \\
+    XGBoost (raw) & 0.389 & 0.617 & 0.223 \\
+    \textbf{XGBoost (log)} & \textbf{0.388} & \textbf{0.619} & \textbf{0.214} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The selected variants were therefore LinearGAM with a log-transformed target and XGBoost with a log-transformed target. The XGBoost log model achieved the best out-of-fold performance overall, with RMSE $0.388$, $R^2 = 0.619$, and MAE $0.214$ on the original \texttt{ml\_ade} scale, while the log-GAM retained the transparent additive structure needed for direct effect interpretation. Both models were carried forward so that feature-effect conclusions could be checked across an interpretable additive model and a more flexible interaction-capable model.
 
 \subsection{Interpretable Models: GAM and XGBoost}
 \label{sec:interpretable_models}
@@ -378,7 +454,7 @@ Third, the scope of the study is bounded. We predict pedestrian trajectories on 
 
 These limitations suggest several directions for future work. A central strength of our approach is that the pipeline is model- and dataset-agnostic by design: the meta-modelling and feature-effect clustering are decoupled from the prediction model and the dataset, and through the \texttt{trajdata} interface the same pipeline can be ported to other trajectory prediction models and datasets with little additional effort. This makes broad replication straightforward.
 
-A natural next step is to enrich the input space with map and lane geometry, location information, and finer social context. Such features directly target the under-prediction ceiling identified in the diagnostics and may unlock cleaner structure in the hard-error regime that the current feature set fails to separate. Finally, extending the analysis to vehicle, cyclist, and motorcyclist trajectories would test whether the same drivers of difficulty, speed variability and turning, govern prediction error across agent types, or whether each agent class exhibits its own characteristic failure modes.
+A natural next step is to enrich the input space with map and lane geometry, location information, and finer social context. In particular, enabling and evaluating map-based inputs is reserved for future work rather than part of the present experimental setup. Such features directly target the under-prediction ceiling identified in the diagnostics and may unlock cleaner structure in the hard-error regime that the current feature set fails to separate. Finally, extending the analysis to vehicle, cyclist, and motorcyclist trajectories would test whether the same drivers of difficulty, speed variability and turning, govern prediction error across agent types, or whether each agent class exhibits its own characteristic failure modes.
 
 
 
