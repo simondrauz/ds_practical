@@ -385,19 +385,181 @@ A subtle but important issue in this setup is mechanical confounding between the
 \subsection{Feature Effects on Prediction Error}
 \label{sec:rq1_results}
 
-Speed variability (\texttt{std\_speed}) and turning (\texttt{heading\_change\_per\_sec}) emerge as the dominant drivers of per-trajectory error, and they do so consistently across both the GAM and the XGBoost meta-model. Maximum speed (\texttt{max\_speed}) is a secondary contributor, whereas mean acceleration has a near-zero effect. A clear and somewhat unexpected result is that scene-context features such as agent density and vehicle count carry little explanatory power for per-trajectory error: the difficulty of a prediction is governed far more by the focal agent's own motion than by the crowdedness of its surroundings.
+Table~\ref{tab:feature_effect_importance} reports the global feature-importance comparison for the two feature sets introduced in Section~\ref{sec:feature_selection}. The values are mean absolute SHAP contributions from the XGBoost meta-model on the log-transformed target scale. The same table also reports whether the corresponding GAM smooth was statistically significant.
+
+\begin{table}[t]
+  \centering
+  \caption{Global feature importance for the MI\,+\,VIF and VIF-only feature sets. SHAP values are mean absolute XGBoost contributions on the log-target scale; GAM significance is taken from the corresponding GAM fit.}
+  \label{tab:feature_effect_importance}
+  \small
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    \textbf{Feature} & \textbf{MI\,+\,VIF} & \textbf{VIF-only} & \textbf{GAM} \\
+    & $|\mathrm{SHAP}|$ & $|\mathrm{SHAP}|$ & \textbf{significance} \\
+    \midrule
+    \texttt{std\_speed}                & \textbf{0.109} & \textbf{0.129} & yes, both \\
+    \texttt{max\_speed}                & 0.103          & --             & yes, MI\,+\,VIF \\
+    \texttt{heading\_change\_per\_sec} & 0.090          & 0.070          & yes, both \\
+    \texttt{mean\_acceleration}        & 0.026          & 0.027          & yes, both \\
+    \midrule
+    \texttt{min\_neighbor\_distance}   & --             & 0.027          & yes, VIF-only \\
+    \texttt{scene\_density\_VEHICLE}   & --             & 0.020          & no ($p=0.796$) \\
+    \texttt{scene\_num\_VEHICLE}       & --             & 0.016          & yes, VIF-only \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The ranking gives a clear answer to RQ1: motion features dominate the explanation of per-trajectory prediction error. In the main MI\,+\,VIF feature set, the three largest XGBoost effects are \texttt{std\_speed} ($0.109$), \texttt{max\_speed} ($0.103$), and \texttt{heading\_change\_per\_sec} ($0.090$). Mean acceleration is much smaller at $0.026$. The VIF-only comparison preserves this ordering in substance: \texttt{std\_speed} remains the largest feature by a clear margin, \texttt{heading\_change\_per\_sec} remains the next important motion feature, and the retained scene or social features have small SHAP magnitudes. In the GAM comparison, all listed terms except \texttt{scene\_density\_VEHICLE} are significant at the $5\%$ level; the non-significant density smooth reinforces that the scene-density signal is weak and unstable.
+
+Figures~\ref{fig:feature_effects_motion} and~\ref{fig:feature_effects_scene_social} show the feature-effect shapes behind this ranking. The XGBoost PDPs are plotted over the feature interval between the 5th and 95th percentiles, while the GAM smooths cover the full observed range. The two plots should therefore be read together: the PDP gives the black-box model's average effect in the data-dense range, and the GAM smooth checks whether an additive model recovers a compatible marginal pattern.
+
+\begin{figure}[t]
+  \centering
+  \begin{minipage}{0.49\textwidth}
+    \centering
+    \textbf{\texttt{std\_speed}}\\[0.2em]
+    \begin{minipage}{0.48\linewidth}
+      \centering
+      \scriptsize XGBoost PDP\\[0.1em]
+      \includegraphics[width=\linewidth]{figures/pdp_std_speed.png}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.48\linewidth}
+      \centering
+      \scriptsize GAM smooth\\[0.1em]
+      \includegraphics[width=\linewidth]{figures/gam_std_speed.png}
+    \end{minipage}
+  \end{minipage}
+  \hfill
+  \begin{minipage}{0.49\textwidth}
+    \centering
+    \textbf{\texttt{heading\_change\_per\_sec}}\\[0.2em]
+    \begin{minipage}{0.48\linewidth}
+      \centering
+      \scriptsize XGBoost PDP\\[0.1em]
+      \includegraphics[width=\linewidth]{figures/pdp_heading_change_per_sec.png}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.48\linewidth}
+      \centering
+      \scriptsize GAM smooth\\[0.1em]
+      \includegraphics[width=\linewidth]{figures/gam_heading_change_per_sec.png}
+    \end{minipage}
+  \end{minipage}
+
+  \vspace{0.7em}
+
+  \begin{minipage}{0.49\textwidth}
+    \centering
+    \textbf{\texttt{max\_speed}}\\[0.2em]
+    \begin{minipage}{0.48\linewidth}
+      \centering
+      \scriptsize XGBoost PDP\\[0.1em]
+      \includegraphics[width=\linewidth]{figures/pdp_max_speed.png}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.48\linewidth}
+      \centering
+      \scriptsize GAM smooth\\[0.1em]
+      \includegraphics[width=\linewidth]{figures/gam_max_speed.png}
+    \end{minipage}
+  \end{minipage}
+  \hfill
+  \begin{minipage}{0.49\textwidth}
+    \centering
+    \textbf{\texttt{mean\_acceleration}}\\[0.2em]
+    \begin{minipage}{0.48\linewidth}
+      \centering
+      \scriptsize XGBoost PDP\\[0.1em]
+      \includegraphics[width=\linewidth]{figures/pdp_mean_acceleration.png}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.48\linewidth}
+      \centering
+      \scriptsize GAM smooth\\[0.1em]
+      \includegraphics[width=\linewidth]{figures/gam_mean_acceleration.png}
+    \end{minipage}
+  \end{minipage}
+  \caption{Feature-effect plots for the four motion features retained in the main MI\,+\,VIF feature set.}
+  \label{fig:feature_effects_motion}
+\end{figure}
+
+The strongest and most stable effect is \texttt{std\_speed}. Its XGBoost PDP increases monotonically across the feature interval shown in the PDP, and over that same interval, the GAM smooth supports the positive trend observed in the PDP. Trajectories whose speed varies more strongly therefore receive larger predicted ADE: erratic speed is harder for Trajectron++ to forecast. \texttt{heading\_change\_per\_sec} is also important but less monotone. Both models show that turning raises error in the low-to-moderate range, while the effect flattens or drops at high heading-change values where the relationship is less stable.
+
+\texttt{max\_speed} is the third major motion feature. The XGBoost PDP is broadly increasing, and the GAM smooth agrees over the feature interval shown in the PDP, although its confidence interval widens in the high-speed tail. Peak speed therefore contributes to error, but it is weaker than speed variability and turning. By contrast, \texttt{mean\_acceleration} has a small global SHAP value and a mixed effect shape. Its PDP oscillates around zero and the GAM smooth is not as stable as the leading motion features. This means that acceleration is detectable in the additive significance test, but its population-level effect is small compared with the dominant speed-variation and heading-change effects. A useful interpretation is that prediction error is driven more by how often a pedestrian changes speed than by the presence of non-zero acceleration alone.
+
+The scene-context comparison is weaker. \texttt{scene\_density\_VEHICLE} has only a small VIF-only SHAP value ($0.020$), a noisy PDP, and a non-significant GAM smooth. The other retained VIF-only scene or social features are also small: \texttt{scene\_num\_VEHICLE} has mean absolute SHAP $0.016$, and \texttt{min\_neighbor\_distance} has $0.027$. Both are significant in the VIF-only GAM, so they are not pure noise, but their SHAP magnitudes remain small enough to support the broader conclusion that scene and social features are secondary. The main message is therefore not that scene context is irrelevant in principle, but that these engineered scene and social descriptors do not robustly explain individual Trajectron++ error in this analysis. Within the current feature representation, the focal agent's own motion dominates.
+
+\newpage
+\begin{figure}[t]
+  \centering
+  \begin{minipage}{0.49\textwidth}
+    \centering
+    \textbf{\texttt{scene\_num\_VEHICLE}}\\[0.2em]
+    \begin{minipage}{0.48\linewidth}
+      \centering
+      \scriptsize XGBoost PDP\\[0.1em]
+      \includegraphics[width=\linewidth]{figures/pdp_scene_num_vehicle.png}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.48\linewidth}
+      \centering
+      \scriptsize GAM smooth\\[0.1em]
+      \includegraphics[width=\linewidth]{figures/gam_scene_num_vehicle.png}
+    \end{minipage}
+  \end{minipage}
+  \hfill
+  \begin{minipage}{0.49\textwidth}
+    \centering
+    \textbf{\texttt{scene\_density\_VEHICLE}}\\[0.2em]
+    \begin{minipage}{0.48\linewidth}
+      \centering
+      \scriptsize XGBoost PDP\\[0.1em]
+      \includegraphics[width=\linewidth]{figures/pdp_scene_density_vehicle.png}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.48\linewidth}
+      \centering
+      \scriptsize GAM smooth\\[0.1em]
+      \includegraphics[width=\linewidth]{figures/gam_scene_density_vehicle.png}
+    \end{minipage}
+  \end{minipage}
+
+  \vspace{0.7em}
+
+  \begin{minipage}{0.49\textwidth}
+    \centering
+    \textbf{\texttt{min\_neighbor\_distance}}\\[0.2em]
+    \begin{minipage}{0.48\linewidth}
+      \centering
+      \scriptsize XGBoost PDP\\[0.1em]
+      \includegraphics[width=\linewidth]{figures/pdp_min_neighbor_distance.png}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.48\linewidth}
+      \centering
+      \scriptsize GAM smooth\\[0.1em]
+      \includegraphics[width=\linewidth]{figures/gam_min_neighbor_distance.png}
+    \end{minipage}
+  \end{minipage}
+  \hfill\null
+  \caption{Feature-effect plots for the social and scene-context features retained by the VIF-only feature set.}
+  \label{fig:feature_effects_scene_social}
+\end{figure}
 
 \subsection{Success and Failure Modes}
 \label{sec:rq2_results}
 
 The feature effects resolve into coherent behavioural regimes. The model succeeds on two broad classes of trajectory: slow turners, where low speed bounds the impact of turning, and straight walkers, where stable heading bounds the impact of speed. Conversely, the failure mode is erratic motion in which speed variability and turning occur together. Crucially, raw speed alone is not a failure driver; high speed becomes problematic only when paired with turning. The hardest cases for Trajectron++ are thus those that combine the two dominant difficulty factors simultaneously.
 
+\newpage
 \subsection{Feature Importance of Model Settings}
 \label{sec:settings_importance}
 
 Applying the pooled meta-model of Section~\ref{sec:settings_sweep}, we quantified the influence of each model setting on prediction error using mean absolute SHAP values from the XGBoost model, cross-validated against the GAM. Table~\ref{tab:settings_shap} reports the resulting global feature importance.
 
-\begin{table}[t]
+\begin{table}[h]
   \centering
   \caption{Mean absolute SHAP values from the pooled XGBoost model, ranking the influence of model settings and trajectory features on per-trajectory prediction error. Larger values indicate greater influence.}
   \label{tab:settings_shap}
