@@ -307,7 +307,7 @@ The out-of-fold predictions also make it possible to inspect diagnostic plots fo
 
 \begin{table}[t]
   \centering
-  \caption{Out-of-fold model-variant comparison on the original \texttt{ml\_ade} scale. Bold rows indicate the selected variants carried forward for interpretation.}
+  \caption{Out-of-fold model-variant comparison on the original \texttt{ml\_ade} scale for models fitted on the main MI\,+\,VIF feature set. Bold rows indicate the selected variants carried forward for interpretation.}
   \label{tab:model_variant_selection}
   \begin{tabular}{lccc}
     \toprule
@@ -322,7 +322,7 @@ The out-of-fold predictions also make it possible to inspect diagnostic plots fo
   \end{tabular}
 \end{table}
 
-The selected variants were therefore LinearGAM with a log-transformed target and XGBoost with a log-transformed target. The XGBoost log model achieved the best out-of-fold performance overall, with RMSE $0.388$, $R^2 = 0.619$, and MAE $0.214$ on the original \texttt{ml\_ade} scale, while the log-GAM retained the transparent additive structure needed for direct effect interpretation. Both models were carried forward so that feature-effect conclusions could be checked across an interpretable additive model and a more flexible interaction-capable model.
+The selected variants were therefore LinearGAM with a log-transformed target and XGBoost with a log-transformed target. The XGBoost log model achieved the best out-of-fold performance overall, with RMSE $0.388$, $R^2 = 0.619$, and MAE $0.214$ on the original \texttt{ml\_ade} scale, while the log-GAM retained the transparent additive structure needed for direct effect interpretation. Both models were carried forward so that feature-effect conclusions could be checked across an interpretable additive model and a more flexible interaction-capable model. Appendix~\ref{app:tuning_details} reports the corresponding target-scale comparison and the full-data tuned configurations used for the exported meta-models.
 
 \subsection{Interpretable Models: GAM and XGBoost}
 \label{sec:interpretable_models}
@@ -727,6 +727,129 @@ A natural next step is to enrich the input space with map and lane geometry, loc
 
 
 \section{Appendix}
+
+\subsection{Meta-Model Tuning Details}
+\label{app:tuning_details}
+
+Table~\ref{tab:appendix_xgboost_target_scale} reports the XGBoost target-scale comparison used to select the log-transformed target for the main analysis. All metrics are out-of-fold metrics evaluated on the original \texttt{ml\_ade} scale, even when the model was trained on \texttt{log1p(ml\_ade)}.
+
+\begin{table}[H]
+  \centering
+  \caption{XGBoost target-scale comparison across the main feature set, the VIF-only robustness feature set, and the settings sweep.}
+  \label{tab:appendix_xgboost_target_scale}
+  \footnotesize
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabular}{llccc}
+    \toprule
+    \textbf{Context} & \textbf{Target} & \textbf{RMSE} & \textbf{R$^2$} & \textbf{MAE} \\
+    \midrule
+    MI\,+\,VIF (main) & raw \texttt{ml\_ade} & 0.389 & 0.617 & 0.223 \\
+    MI\,+\,VIF (main) & \texttt{log1p(ml\_ade)} & \textbf{0.388} & \textbf{0.619} & \textbf{0.214} \\
+    VIF only & raw \texttt{ml\_ade} & 0.386 & 0.626 & 0.220 \\
+    VIF only & \texttt{log1p(ml\_ade)} & 0.387 & 0.624 & 0.213 \\
+    Settings sweep & raw \texttt{ml\_ade} & 0.134 & 0.896 & 0.081 \\
+    Settings sweep & \texttt{log1p(ml\_ade)} & 0.133 & 0.897 & 0.079 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Table~\ref{tab:appendix_gam_variant_contexts} gives the corresponding GAM variant comparison. Unlike XGBoost, this is not only a raw-versus-log target comparison: the GammaGAM also changes the response distribution and link function. All rows are nevertheless evaluated out of fold on the original \texttt{ml\_ade} scale, making the metrics comparable within each context.
+
+\begin{table}[H]
+  \centering
+  \caption{GAM variant comparison across the main feature set, the VIF-only robustness feature set, and the settings sweep. Metrics are out-of-fold metrics on the original \texttt{ml\_ade} scale.}
+  \label{tab:appendix_gam_variant_contexts}
+  \footnotesize
+  \renewcommand{\arraystretch}{1.10}
+  \begin{tabular}{llccc}
+    \toprule
+    \textbf{Context} & \textbf{Variant} & \textbf{RMSE} & \textbf{R$^2$} & \textbf{MAE} \\
+    \midrule
+    MI\,+\,VIF (main) & \textbf{LinearGAM (log)} & \textbf{0.445} & \textbf{0.498} & \textbf{0.250} \\
+    MI\,+\,VIF (main) & GammaGAM & 0.445 & 0.498 & 0.253 \\
+    MI\,+\,VIF (main) & LinearGAM (raw) & 0.448 & 0.491 & 0.263 \\
+    \midrule
+    VIF only & \textbf{LinearGAM (raw)} & \textbf{0.440} & \textbf{0.515} & 0.268 \\
+    VIF only & LinearGAM (log) & 0.444 & 0.506 & \textbf{0.255} \\
+    VIF only & GammaGAM & 0.475 & 0.434 & 0.277 \\
+    \midrule
+    Settings sweep & \textbf{GammaGAM} & \textbf{0.244} & \textbf{0.654} & \textbf{0.153} \\
+    Settings sweep & LinearGAM (log) & 0.251 & 0.636 & 0.162 \\
+    Settings sweep & LinearGAM (raw) & 0.260 & 0.609 & 0.176 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Table~\ref{tab:appendix_xgboost_configs} gives the full-data retuned configurations for the selected log-target XGBoost models. The CV scores in the final row are computed on the \texttt{ml\_ade\_log} target used for tuning; cross-target comparison should therefore use Table~\ref{tab:appendix_xgboost_target_scale}.
+
+\begin{table}[H]
+  \centering
+  \caption{Full-data retuned XGBoost configurations for the selected log-target models.}
+  \label{tab:appendix_xgboost_configs}
+  \footnotesize
+  \renewcommand{\arraystretch}{1.08}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    & \textbf{MI\,+\,VIF} & \textbf{VIF only} & \textbf{Settings sweep} \\
+    \midrule
+    \texttt{learning\_rate}     & 0.0174 & 0.0219 & 0.0486 \\
+    \texttt{max\_depth}         & 10     & 9      & 9 \\
+    \texttt{min\_child\_weight} & 16     & 6      & 17 \\
+    \texttt{subsample}          & 0.97   & 0.88   & 0.92 \\
+    \texttt{colsample\_bytree}  & 0.95   & 0.80   & 0.99 \\
+    \texttt{reg\_alpha}         & $2.4\!\times\!10^{-3}$ & $1.6\!\times\!10^{-4}$ & $1.9\!\times\!10^{-2}$ \\
+    \texttt{reg\_lambda}        & 5.38   & 0.45   & $3.5\!\times\!10^{-4}$ \\
+    Best iteration              & 1475   & 1998   & 1585 \\
+    Full-data CV RMSE           & 0.176  & 0.177  & 0.078 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Table~\ref{tab:appendix_xgboost_raw_configs} reports the analogous full-data retuned configurations for the raw-target variants. These variants were not carried forward for interpretation, but they document the alternatives behind the raw-target rows in Table~\ref{tab:appendix_xgboost_target_scale}. The CV scores in the final row are computed on the raw \texttt{ml\_ade} target.
+
+\begin{table}[H]
+  \centering
+  \caption{Full-data retuned \mbox{XGBoost} configurations for the raw-target variants.}
+  \label{tab:appendix_xgboost_raw_configs}
+  \footnotesize
+  \renewcommand{\arraystretch}{1.08}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    & \textbf{MI\,+\,VIF} & \textbf{VIF only} & \textbf{Settings sweep} \\
+    \midrule
+    \texttt{learning\_rate}     & 0.0174 & 0.0219 & 0.0486 \\
+    \texttt{max\_depth}         & 10     & 9      & 9 \\
+    \texttt{min\_child\_weight} & 16     & 6      & 17 \\
+    \texttt{subsample}          & 0.97   & 0.88   & 0.92 \\
+    \texttt{colsample\_bytree}  & 0.95   & 0.80   & 0.99 \\
+    \texttt{reg\_alpha}         & $2.4\!\times\!10^{-3}$ & $1.6\!\times\!10^{-4}$ & $1.9\!\times\!10^{-2}$ \\
+    \texttt{reg\_lambda}        & 5.38   & 0.45   & $3.5\!\times\!10^{-4}$ \\
+    Best iteration              & 568    & 1724   & 1508 \\
+    Full-data CV RMSE           & 0.388  & 0.388  & 0.133 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Table~\ref{tab:appendix_gam_configs} reports the full-data retuned GAM configurations exported for the corresponding analyses. The settings-sweep column comes from the nuScenes mini settings sweep with model-setting predictors and a different row filter, so its lower RMSE is descriptive for that sweep and not a direct full-trainval comparison.
+
+\begin{table}[H]
+  \centering
+  \caption{Full-data retuned GAM configurations for the exported GAM winners.}
+  \label{tab:appendix_gam_configs}
+  \footnotesize
+  \renewcommand{\arraystretch}{1.08}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    & \textbf{MI\,+\,VIF} & \textbf{VIF only} & \textbf{Settings sweep} \\
+    \midrule
+    Variant                 & LinearGAM (log) & LinearGAM (raw) & GammaGAM (raw) \\
+    \texttt{n\_splines}     & 50              & 50              & 49 \\
+    \texttt{spline\_order}  & 4               & 4               & 4 \\
+    \texttt{lam}            & 39.11           & 39.11           & 0.087 \\
+    Full-data CV RMSE       & 0.431           & 0.439           & 0.246 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 \subsection{Cluster UMAP Diagnostics}
 \label{app:cluster_umaps}
