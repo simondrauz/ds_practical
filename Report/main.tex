@@ -17,6 +17,10 @@ bindingoffset = 0mm]{geometry}
 \usepackage[round, comma]{natbib}
 \usepackage{fancyhdr}
 \usepackage{booktabs}
+\usepackage{float}
+\makeatletter
+\newcommand{\captionof}[2]{\def\@captype{#1}\caption{#2}}
+\makeatother
 \newcommand{\changefont}{%
     \fontsize{8}{11}\selectfont
 }
@@ -358,6 +362,93 @@ where $\phi_0$ is the baseline (the mean model prediction) and each $\phi_j(x)$ 
 
 The two meta-models occupy complementary positions on the interpretability–flexibility spectrum. The GAM is fully transparent and provides significance tests, but its additive assumption blinds it to interactions. XGBoost can capture those interactions and typically attains a better fit, but requires post-hoc tools to be interpreted and offers no native significance testing. Reading the two together mitigates the weaknesses of each: agreement between a transparent additive model and a flexible interaction-aware ensemble is strong evidence that an identified effect is real rather than an artefact of one model's assumptions. This dual-model strategy underpins the feature-importance and feature-effect analyses that answer RQ1 and RQ2.
 
+\newpage
+\subsection{Cluster Analysis for Success and Failure Modes}
+\label{sec:cluster_methodology}
+
+The success-and-failure analysis proceeds in two stages. First, we divide trajectories into performance groups using k-means on the log-transformed target, $\log(1+\texttt{ml\_ade})$. Clustering on the log scale prevents the long high-error tail from dominating the grouping while still ordering the groups by the original ADE scale. The resulting groups are shown in Figure~\ref{fig:performance_groups} and Table~\ref{tab:performance_groups}.
+
+\begin{figure}[H]
+  \centering
+  \begin{minipage}[t]{0.56\textwidth}
+    \centering
+    \vspace{0pt}
+    \includegraphics[width=\linewidth]{figures/performance_groups.png}
+    \caption{Distribution of \texttt{ml\_ade} with the k-means performance groups. The vertical dashed lines mark the easy/medium and medium/hard boundaries on the original ADE scale.}
+    \label{fig:performance_groups}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[t]{0.40\textwidth}
+    \centering
+    \vspace{0pt}
+    {\small
+    \captionof{table}{Performance groups from k-means on $\log(1+\texttt{ml\_ade})$.}
+    \label{tab:performance_groups}}
+    
+    \footnotesize
+    \renewcommand{\arraystretch}{1.12}
+    {\setlength{\tabcolsep}{3pt}
+    \begin{tabular}{@{}lccc@{}}
+      \toprule
+      \textbf{Group} & \textbf{Range} & \textbf{N} & \textbf{Share} \\
+      \midrule
+      Easy   & $<0.39$ m       & 15,823 & 59\% \\
+      Medium & $0.39$--$1.20$ m & 8,320  & 31\% \\
+      Hard   & $>1.20$ m       & 2,743  & 10\% \\
+      \midrule
+      Total  &                  & 26,886 & 100\% \\
+      \bottomrule
+    \end{tabular}
+    }
+  \end{minipage}
+\end{figure}
+
+The split preserves the main structure of the target distribution: most trajectories are low-error cases, while a smaller hard group captures the heavy right tail. The maximum observed \texttt{ml\_ade} in this analysis is $9.33$ m, substantially above the hard-group threshold.
+
+Second, within each performance group we cluster the signed feature-effect vectors rather than the raw trajectory features directly. Formally, for trajectory $i$ we define one four-dimensional effect vector per meta-model. For the XGBoost meta-model, the vector consists of the SHAP contributions for \texttt{std\_speed}, \texttt{max\_speed}, \texttt{heading\_change\_per\_sec}, and \texttt{mean\_acceleration}. For the GAM, the analogous vector consists of the corresponding additive smooth contributions:
+
+\begin{equation}
+  \mathbf{v}^{\mathrm{XGB}}_i =
+  \left(\phi_{i,1}, \ldots, \phi_{i,4}\right),
+  \qquad
+  \mathbf{v}^{\mathrm{GAM}}_i =
+  \left(s_1(x_{i,1}), \ldots, s_4(x_{i,4})\right),
+  \label{eq:cluster_effect_vectors}
+\end{equation}
+
+where the four dimensions correspond to the main MI\,+\,VIF motion features: speed variability, maximum speed, heading change per second, and mean acceleration. Clustering in this effect space groups trajectories by the explanation pattern assigned by the meta-model: two trajectories are close if the same features push their predicted ADE up or down in a similar way.
+
+We compared OPTICS and HDBSCAN within each performance group and selected candidates using three criteria: Density-Based Clustering Validation (DBCV), the share of points labelled as noise, and semantic quality after mapping the clusters back to the raw trajectory characteristics. DBCV is an internal score for density-based cluster structure with range $[-1,1]$; values near $+1$ indicate well-separated dense groups, while values near $0$ indicate ambiguous density structure. Appendix~\ref{app:dbcv_details} gives the formal definition used to read this score.
+
+\begin{table}[H]
+  \centering
+  
+  \caption{Primary XGBoost effect-space clustering selection. OPTICS is compared with the best HDBSCAN candidate for the same performance group.}
+  \label{tab:cluster_selection}
+  \small
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabular}{lcccccc}
+    \toprule
+    & \multicolumn{3}{c}{\textbf{Selected OPTICS}} & \multicolumn{3}{c}{\textbf{Best HDBSCAN}} \\
+    \cmidrule(lr){2-4}\cmidrule(l){5-7}
+    \textbf{Group} & \textbf{K} & \textbf{Noise} & \textbf{DBCV} & \textbf{K} & \textbf{Noise} & \textbf{DBCV} \\
+    \midrule
+    Easy   & 2 & 30\% & 0.41 & 3 & 30\% & 0.30 \\
+    Medium & 2 & 40\% & 0.40 & 3 & 24\% & 0.04 \\
+    Hard   & 4 & 75\% & 0.09 & 4 & 73\% & 0.05 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Overall, the primary regime analysis uses OPTICS on XGBoost SHAP effect vectors. In the XGBoost effect space, OPTICS achieved higher DBCV than HDBSCAN for every performance group and produced the clearest easy and medium structures. The choice of XGBoost as the primary effect source is also supported by the model-selection results in Table~\ref{tab:model_variant_selection}: XGBoost fits the per-trajectory loss better than the GAM, and its selected effect-space clusters were semantically clearer after mapping them back to raw motion characteristics. The GAM additive-effect clustering was retained as a robustness check: it showed comparable easy-regime structure and corroborated the hard-regime speed-variation and turning pattern, but it produced weaker medium separation. Figure~\ref{fig:xgboost_optics_umaps} shows the selected XGBoost--OPTICS UMAP diagnostics with noise retained and removed. Appendix Table~\ref{tab:appendix_cluster_candidates} reports the corresponding OPTICS and HDBSCAN candidate scores for both XGBoost and GAM, and Appendix~\ref{app:cluster_umaps} shows the analogous UMAP diagnostics for the remaining algorithm--model combinations. The low hard-regime DBCV and high noise share in Table~\ref{tab:cluster_selection} are important caveats: the hard cases contain weaker, noisier density structure than the easy and medium cases.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.86\textwidth]{figures/cluster_umap_xgboost_optics_noise_compare.png}
+  \caption{Selected XGBoost--OPTICS effect-space UMAP diagnostics. Rows show the easy, medium, and hard performance groups; the left column includes OPTICS noise points and the right column removes them. These UMAP projections visualise the four-dimensional SHAP effect vectors from Equation~\ref{eq:cluster_effect_vectors} and were not used as clustering input.}
+  \label{fig:xgboost_optics_umaps}
+\end{figure}
+
 \subsection{Model Setting Sweep}
 \label{sec:settings_sweep}
 
@@ -551,6 +642,8 @@ The scene-context comparison is weaker. \texttt{scene\_density\_VEHICLE} has onl
 \subsection{Success and Failure Modes}
 \label{sec:rq2_results}
 
+Using the performance grouping and feature-effect clustering defined in Section~\ref{sec:cluster_methodology}, we interpret the selected clusters as explanation patterns for RQ2 rather than as clusters of raw trajectory coordinates.
+
 The feature effects resolve into coherent behavioural regimes. The model succeeds on two broad classes of trajectory: slow turners, where low speed bounds the impact of turning, and straight walkers, where stable heading bounds the impact of speed. Conversely, the failure mode is erratic motion in which speed variability and turning occur together. Crucially, raw speed alone is not a failure driver; high speed becomes problematic only when paired with turning. The hardest cases for Trajectron++ are thus those that combine the two dominant difficulty factors simultaneously.
 
 \newpage
@@ -634,6 +727,83 @@ A natural next step is to enrich the input space with map and lane geometry, loc
 
 
 \section{Appendix}
+
+\subsection{Cluster UMAP Diagnostics}
+\label{app:cluster_umaps}
+
+Table~\ref{tab:appendix_cluster_candidates} expands the main XGBoost selection table by adding the corresponding GAM additive-effect candidates. The table reports the rank-1 OPTICS and HDBSCAN candidates within each performance group under the same conservative quality screen used in Section~\ref{sec:cluster_methodology}.
+
+\begin{table}[H]
+  \centering
+  
+  \caption{Rank-1 effect-space clustering candidates for XGBoost SHAP and GAM additive effects. Noise is the share of trajectories labelled as noise by the candidate.}
+  \label{tab:appendix_cluster_candidates}
+  \footnotesize
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabular}{llcccccc}
+    \toprule
+    & & \multicolumn{3}{c}{\textbf{OPTICS}} & \multicolumn{3}{c}{\textbf{HDBSCAN}} \\
+    \cmidrule(lr){3-5}\cmidrule(l){6-8}
+    \textbf{Model} & \textbf{Group} & \textbf{K} & \textbf{Noise} & \textbf{DBCV} & \textbf{K} & \textbf{Noise} & \textbf{DBCV} \\
+    \midrule
+    XGBoost & Easy   & 2 & 30\% & 0.41 & 3 & 30\% & 0.30 \\
+    XGBoost & Medium & 2 & 40\% & 0.40 & 3 & 24\% & 0.04 \\
+    XGBoost & Hard   & 4 & 75\% & 0.09 & 4 & 73\% & 0.05 \\
+    GAM     & Easy   & 4 & 32\% & 0.40 & 5 & 25\% & 0.35 \\
+    GAM     & Medium & 3 & 15\% & 0.14 & 2 & 73\% & -0.03 \\
+    GAM     & Hard   & 4 & 70\% & 0.19 & 2 & 28\% & 0.12 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Figure~\ref{fig:xgboost_optics_umaps} gives the primary XGBoost--OPTICS diagnostic in the main text. Figures~\ref{fig:appendix_xgboost_hdbscan_umaps}--\ref{fig:appendix_gam_hdbscan_umaps} show the remaining rank-1 algorithm--model combinations. In each appendix figure, the left column includes noise points and the right column removes them, with easy, medium, and hard performance groups arranged from top to bottom. These are diagnostic projections of the four-dimensional effect vectors from Equation~\ref{eq:cluster_effect_vectors}; they were not used as clustering input.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.86\textwidth]{figures/cluster_umap_xgboost_hdbscan_noise_compare.png}
+  \caption{XGBoost--HDBSCAN effect-space UMAP diagnostics. Rows show the easy, medium, and hard performance groups; the left column includes HDBSCAN noise points and the right column removes them.}
+  \label{fig:appendix_xgboost_hdbscan_umaps}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.86\textwidth]{figures/cluster_umap_gam_optics_noise_compare.png}
+  \caption{GAM--OPTICS additive-effect UMAP diagnostics. Rows show the easy, medium, and hard performance groups; the left column includes OPTICS noise points and the right column removes them.}
+  \label{fig:appendix_gam_optics_umaps}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.86\textwidth]{figures/cluster_umap_gam_hdbscan_noise_compare.png}
+  \caption{GAM--HDBSCAN additive-effect UMAP diagnostics. Rows show the easy, medium, and hard performance groups; the left column includes HDBSCAN noise points and the right column removes them.}
+  \label{fig:appendix_gam_hdbscan_umaps}
+\end{figure}
+
+\subsection{DBCV Definition}
+\label{app:dbcv_details}
+
+Density-Based Clustering Validation (DBCV) evaluates whether clusters are internally dense and separated from other clusters by lower-density regions. For a cluster $C_i$, the cluster-level validity is
+
+\begin{equation}
+  V(C_i)=
+  \frac{\min_{j\neq i}\mathrm{DSPC}(C_i,C_j)-\mathrm{DSC}(C_i)}
+       {\max\!\left(\min_{j\neq i}\mathrm{DSPC}(C_i,C_j),\,\mathrm{DSC}(C_i)\right)}.
+  \label{eq:dbcv_cluster_validity}
+\end{equation}
+
+Here $\mathrm{DSC}(C_i)$ is the density sparseness of cluster $C_i$, interpreted as the weakest internal density connection, and $\mathrm{DSPC}(C_i,C_j)$ is the density separation between clusters $C_i$ and $C_j$. The overall score averages these cluster validities by cluster size:
+
+\begin{equation}
+  \mathrm{DBCV} =
+  \sum_{i=1}^{K} \frac{|C_i|}{|\mathcal{O}|}\, V(C_i).
+  \label{eq:dbcv_overall}
+\end{equation}
+
+The score ranges from $-1$ to $1$. Positive values indicate dense, separated clusters; values near $0$ indicate ambiguous density structure; negative values indicate an implausible partition. Noise points have no own validity term, but they remain part of $\mathcal{O}$ in the denominator and therefore reduce the weighted support of the clustered structure.
+
+\textcolor{red}{Note: add a formal reference for the DBCV score, e.g. Moulavi et al. (2014).}
+
+\textcolor{red}{Note: verify the DBCV formula and interpretation against the final cited source before submission.}
 
 \newpage
 
