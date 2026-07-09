@@ -212,7 +212,7 @@ This design is entirely adequate for the model's original purpose, namely benchm
 
 To enable per-trajectory analysis, we modified the Trajectron++ evaluation loop so that it preserves the individual prediction loss for every trajectory rather than only the batch average. Concretely, instead of reducing the displacement errors to a mean within each batch, we retain the full vector of per-trajectory errors together with the metadata required to identify each trajectory.
 
-The central enabling component of this modification is the use of a stable trajectory identifier provided by the \texttt{trajdata} library, which we refer to throughout as the \texttt{data\_idx}. This identifier uniquely and persistently labels each trajectory sample across the data-loading and evaluation stages. Because the same identifier is available both when the model produces its prediction error and when we compute the trajectory and scene features (described in Section~\ref{sec:feature_engineering}), the \texttt{data\_idx} acts as a join key. It allows us to construct, for every trajectory, a single record that pairs the Trajectron++ prediction error with the full set of characteristics describing that trajectory and its surrounding scene.
+The central enabling component of this modification is the use of a stable trajectory identifier provided by the \texttt{trajdata} library \citep{ivanovic2023trajdata}, which we refer to throughout as the \texttt{data\_idx}. This identifier uniquely and persistently labels each trajectory sample across the data-loading and evaluation stages. Because the same identifier is available both when the model produces its prediction error and when we compute the trajectory and scene features (described in Section~\ref{sec:feature_engineering}), the \texttt{data\_idx} acts as a join key. It allows us to construct, for every trajectory, a single record that pairs the Trajectron++ prediction error with the full set of characteristics describing that trajectory and its surrounding scene.
 
 Without this stable join key, the two halves of the analysis, the prediction errors on one side and the interpretable features on the other, could not be reliably aligned, and the entire downstream meta-modelling effort would be impossible. The modification is conceptually simple but is the linchpin that converts Trajectron++ from a black-box benchmark into a source of structured, per-trajectory observations suitable for interpretable analysis.
 
@@ -223,7 +223,7 @@ Consistent with the dataset scope described in Section~\ref{sec:dataset}, we foc
 \subsection{Trajectron++ Training and Evaluation Configuration}
 \label{sec:trajectron_configuration}
 
-For the main per-trajectory error extraction, Trajectron++ was trained under a fixed nuScenes-style forecasting protocol with $2.0$ seconds of observed history and a $6.0$ second prediction horizon. Training used $12$ epochs, a batch size of $256$, an initial learning rate of $0.003$, exponential learning-rate decay with decay rate $0.9999$, a minimum learning rate of $10^{-5}$, and gradient clipping at $1.0$. This fixed configuration provides the baseline prediction-error dataset used for the feature and regime analyses; the separate settings sweep in Section~\ref{sec:settings_sweep} deliberately varies selected model settings.
+For the main per-trajectory error extraction, Trajectron++ was trained under a fixed nuScenes-style forecasting protocol \citep{caesar2020nuscenes,salzmann2020trajectron+} with $2.0$ seconds of observed history and a $6.0$ second prediction horizon. Training used $12$ epochs, a batch size of $256$, an initial learning rate of $0.003$, exponential learning-rate decay with decay rate $0.9999$, a minimum learning rate of $10^{-5}$, and gradient clipping at $1.0$. This fixed configuration provides the baseline prediction-error dataset used for the feature and regime analyses; the separate settings sweep in Section~\ref{sec:settings_sweep} deliberately varies selected model settings.
 
 Map encoding was not used in this run. The recurrent encoder dimensions for history, future, edge, and edge-influence encoders were all set to $32$, while the decoder recurrent dimension was $128$. The latent CVAE setup used $25$ prediction samples, one Gaussian mixture component, KL weight $100.0$, KL minimum $0.07$, and Gumbel temperature annealing from $2.0$ to $0.05$.
 
@@ -262,7 +262,7 @@ Such pronounced skewness is problematic for regression models that assume approx
 
 With $18$ candidate features, many of which are correlated by construction (for example, the various speed statistics), an unfiltered feature set would introduce substantial multicollinearity. Multicollinearity is especially damaging for interpretability: when features are highly correlated, the estimated effect of any one of them becomes unstable and difficult to attribute, undermining the very goal of the analysis. We therefore performed feature selection, and to ensure that our conclusions were not an artefact of a single selection strategy, we implemented and compared two complementary approaches.
 
-\paragraph{Approach 1: Mutual-information elbow followed by VIF.} We first ranked all $18$ candidate features by their mutual information (MI) with the target, which measures the strength of the (possibly non-linear) statistical dependence between each feature and the prediction error. Inspecting the ranked MI curve revealed an elbow, and we discarded the low-signal features lying below it, reducing the set from $18$ to $10$. We then applied a variance inflation factor (VIF) filter with a threshold of $5$ to remove residual multicollinearity, which further reduced the set to $4$ features: \texttt{std\_speed}, \texttt{mean\_acceleration}, \texttt{max\_speed}, and \texttt{heading\_change\_per\_sec}. Notably, this procedure retains only motion features; all scene-context features fall below the MI elbow, indicating that, considered individually, they carry comparatively little information about per-trajectory prediction error. All four retained features are highly statistically significant ($p \ll 0.01$).
+\paragraph{Approach 1: Mutual-information elbow followed by VIF.} We first ranked all $18$ candidate features by their mutual information (MI) with the target \citep{kraskov2004estimating}, which measures the strength of the (possibly non-linear) statistical dependence between each feature and the prediction error. Inspecting the ranked MI curve revealed an elbow, and we discarded the low-signal features lying below it, reducing the set from $18$ to $10$. We then applied a variance inflation factor (VIF) filter \citep{kutner2005applied} with a threshold of $5$ to remove residual multicollinearity, which further reduced the set to $4$ features: \texttt{std\_speed}, \texttt{mean\_acceleration}, \texttt{max\_speed}, and \texttt{heading\_change\_per\_sec}. The threshold was used as a conservative operational cutoff rather than a universal criterion, since fixed VIF rules should be treated as diagnostics rather than hard statistical laws \citep{obrien2007vif}. Notably, this procedure retains only motion features; all scene-context features fall below the MI elbow, indicating that, considered individually, they carry comparatively little information about per-trajectory prediction error. All four retained features are highly statistically significant ($p \ll 0.01$).
 
 \paragraph{Approach 2: VIF only.} As a contrasting strategy, we skipped the MI ranking entirely and applied the VIF filter (again with a threshold of $5$) directly to all $18$ candidates. This yielded $6$ features: \texttt{std\_speed}, \texttt{mean\_acceleration}, \texttt{min\_neighbor\_distance}, \texttt{heading\_change\_per\_sec}, \texttt{scene\_num\_VEHICLE}, and \texttt{scene\_density\_VEHICLE}. In contrast to the first approach, this set retains several scene-level features alongside the motion features.
 
@@ -273,7 +273,7 @@ Comparing the two feature sets serves as a robustness check. The MI-elbow-plus-V
 
 The target transformation and model family were treated as empirical choices rather than fixed assumptions. We compared five meta-model variants: LinearGAM on the raw \texttt{ml\_ade} target, LinearGAM on the \texttt{log1p}-transformed target, GammaGAM with a log link on the raw positive target, XGBoost on the raw target, and XGBoost on the \texttt{log1p}-transformed target. Each model was tuned on the target scale on which it was trained, but all variants were compared using out-of-fold metrics transformed back to the original \texttt{ml\_ade} scale.
 
-Hyperparameters were tuned with Bayesian optimization using Optuna's TPE sampler. We used nested resampling because ordinary, non-nested cross-validation would use the same validation structure both to choose hyperparameters and to report model performance. This risks overfitting the model-selection procedure itself to a favourable split and can produce overly optimistic diagnostics. In the nested design, hyperparameter tuning is confined to the inner folds, while the outer folds evaluate the complete tuning procedure on data that were not used for either fitting or tuning.
+Hyperparameters were tuned with Bayesian optimization \citep{snoek2012bayesian} using Optuna's TPE sampler \citep{akiba2019optuna,bergstra2011algorithms}. We used nested resampling \citep{bischl2023hpo,cawley2010overfitting} because ordinary, non-nested cross-validation would use the same validation structure both to choose hyperparameters and to report model performance. This risks overfitting the model-selection procedure itself to a favourable split and can produce overly optimistic diagnostics. In the nested design, hyperparameter tuning is confined to the inner folds, while the outer folds evaluate the complete tuning procedure on data that were not used for either fitting or tuning.
 
 Concretely, we used $3$ outer folds and $3$ inner folds. For each outer fold, hyperparameters were selected by inner cross-validation on the corresponding training portion using $15$ trials per study; the fitted model was then evaluated on the held-out outer fold. Because every row serves as an outer-fold holdout exactly once, the resulting out-of-fold predictions cover the full analysis dataset without relying on in-sample predictions. Table~\ref{tab:hyperparameter_search_space} reports the search space. After model selection, tuning was rerun on all rows for the final refit.
 
@@ -362,7 +362,7 @@ XGBoost~\citep{chen2016xgboost} is an ensemble method based on gradient-boosted 
 \end{equation}
 where each $f_t$ is a regression tree. Each tree partitions the feature space through a sequence of threshold rules and assigns a constant correction to each resulting region; because a single tree can split on several features in succession, the ensemble naturally captures non-linearities and, importantly, interactions between features. This flexibility is precisely what the additive GAM lacks, and it allows XGBoost to represent effects such as ``high speed variability only increases error when it is accompanied by sharp turning''.
 
-The cost of this flexibility is that the fitted ensemble, typically comprising many trees, is not directly human-readable. We therefore interpret it post-hoc using two standard techniques: SHAP values and partial dependence plots. SHAP values decompose each individual prediction into additive, signed contributions from each feature on top of a baseline value:
+The cost of this flexibility is that the fitted ensemble, typically comprising many trees, is not directly human-readable. We therefore interpret it post-hoc using two standard techniques: SHAP values \citep{lundberg2017shap} and partial dependence plots \citep{friedman2001gbm}. SHAP values decompose each individual prediction into additive, signed contributions from each feature on top of a baseline value:
 \begin{equation}
   f(x) = \phi_0 + \sum_{j} \phi_j(x),
   \label{eq:shap}
@@ -377,7 +377,7 @@ The two meta-models occupy complementary positions on the interpretability–fle
 \subsection{Cluster Analysis for Success and Failure Modes}
 \label{sec:cluster_methodology}
 
-The success-and-failure analysis proceeds in two stages. First, we divide trajectories into performance groups using k-means on the log-transformed target, $\log(1+\texttt{ml\_ade})$. Clustering on the log scale prevents the long high-error tail from dominating the grouping while still ordering the groups by the original ADE scale. The resulting groups are shown in Figure~\ref{fig:performance_groups} and Table~\ref{tab:performance_groups}.
+The success-and-failure analysis proceeds in two stages. First, we divide trajectories into performance groups using k-means \citep{lloyd1982kmeans} on the log-transformed target, $\log(1+\texttt{ml\_ade})$. Clustering on the log scale prevents the long high-error tail from dominating the grouping while still ordering the groups by the original ADE scale. The resulting groups are shown in Figure~\ref{fig:performance_groups} and Table~\ref{tab:performance_groups}.
 
 \begin{figure}[H]
   \centering
@@ -429,7 +429,7 @@ Second, within each performance group we cluster the signed feature-effect vecto
 
 where the four dimensions correspond to the main MI\,+\,VIF motion features: speed variability, maximum speed, heading change per second, and mean acceleration. Clustering in this effect space groups trajectories by the explanation pattern assigned by the meta-model: two trajectories are close if the same features push their predicted ADE up or down in a similar way.
 
-We compared OPTICS and HDBSCAN within each performance group and selected candidates using three criteria: Density-Based Clustering Validation (DBCV), the share of points labelled as noise, and semantic quality after mapping the clusters back to the raw trajectory characteristics. DBCV is an internal score for density-based cluster structure with range $[-1,1]$; values near $+1$ indicate well-separated dense groups, while values near $0$ indicate ambiguous density structure. Appendix~\ref{app:dbcv_details} gives the formal definition used to read this score.
+We compared OPTICS \citep{ankerst1999optics} and HDBSCAN \citep{campello2015hdbscan} within each performance group and selected candidates using three criteria: Density-Based Clustering Validation (DBCV) \citep{moulavi2014density}, the share of points labelled as noise, and semantic quality after mapping the clusters back to the raw trajectory characteristics. DBCV is an internal score for density-based cluster structure with range $[-1,1]$; values near $+1$ indicate well-separated dense groups, while values near $0$ indicate ambiguous density structure. Appendix~\ref{app:dbcv_details} gives the formal definition used to read this score.
 
 \begin{table}[H]
   \centering
@@ -451,7 +451,7 @@ We compared OPTICS and HDBSCAN within each performance group and selected candid
   \end{tabular}
 \end{table}
 
-Overall, the primary regime analysis uses OPTICS on XGBoost SHAP effect vectors. In the XGBoost effect space, OPTICS achieved higher DBCV than HDBSCAN for every performance group and produced the clearest easy and medium structures. The choice of XGBoost as the primary effect source is also supported by the model-selection results in Table~\ref{tab:model_variant_selection}: XGBoost fits the per-trajectory loss better than the GAM, and its selected effect-space clusters were semantically clearer after mapping them back to raw motion characteristics. The GAM additive-effect clustering was retained as a robustness check: it showed comparable easy-regime structure and corroborated the hard-regime speed-variation and turning pattern, but it produced weaker medium separation. Figure~\ref{fig:xgboost_optics_umaps} shows the selected XGBoost--OPTICS UMAP diagnostics with noise retained and removed. Appendix Table~\ref{tab:appendix_cluster_candidates} reports the corresponding OPTICS and HDBSCAN candidate scores for both XGBoost and GAM, and Appendix~\ref{app:cluster_umaps} shows the analogous UMAP diagnostics for the remaining algorithm--model combinations. The low hard-regime DBCV and high noise share in Table~\ref{tab:cluster_selection} are important caveats: the hard cases contain weaker, noisier density structure than the easy and medium cases.
+Overall, the primary regime analysis uses OPTICS on XGBoost SHAP effect vectors. In the XGBoost effect space, OPTICS achieved higher DBCV than HDBSCAN for every performance group and produced the clearest easy and medium structures. The choice of XGBoost as the primary effect source is also supported by the model-selection results in Table~\ref{tab:model_variant_selection}: XGBoost fits the per-trajectory loss better than the GAM, and its selected effect-space clusters were semantically clearer after mapping them back to raw motion characteristics. The GAM additive-effect clustering was retained as a robustness check: it showed comparable easy-regime structure and corroborated the hard-regime speed-variation and turning pattern, but it produced weaker medium separation. Figure~\ref{fig:xgboost_optics_umaps} shows the selected XGBoost--OPTICS UMAP \citep{mcinnes2018umap} diagnostics with noise retained and removed. Appendix Table~\ref{tab:appendix_cluster_candidates} reports the corresponding OPTICS and HDBSCAN candidate scores for both XGBoost and GAM, and Appendix~\ref{app:cluster_umaps} shows the analogous UMAP diagnostics for the remaining algorithm--model combinations. The low hard-regime DBCV and high noise share in Table~\ref{tab:cluster_selection} are important caveats: the hard cases contain weaker, noisier density structure than the easy and medium cases.
 
 \begin{figure}[H]
   \centering
@@ -463,7 +463,7 @@ Overall, the primary regime analysis uses OPTICS on XGBoost SHAP effect vectors.
 \subsection{Model Setting Sweep}
 \label{sec:settings_sweep}
 
-The analysis described so far holds the Trajectron++ configuration fixed and studies how trajectory and scene characteristics relate to prediction error. RQ3 turns to a complementary question: how does the model's own configuration affect prediction quality? To answer this, we conducted a controlled sweep over three of Trajectron++'s key settings and analysed their effect using the same interpretable meta-modelling framework developed in Section~\ref{sec:interpretable_models}.
+The analysis described so far holds the Trajectron++ configuration fixed and studies how trajectory and scene characteristics relate to prediction error. RQ3 turns to a complementary question: how does the model's own configuration affect prediction quality? To answer this, we conducted a controlled sweep over three of Trajectron++'s key settings \citep{salzmann2020trajectron+} and analysed their effect using the same interpretable meta-modelling framework developed in Section~\ref{sec:interpretable_models}.
 
 \subsection{Sweep Design}
 
@@ -755,15 +755,15 @@ The results reveal that trajectory characteristics, particularly speed variabili
 
 Several limitations should temper the interpretation of these findings. First, our meta-models explain Trajectron++, not ground-truth difficulty. The identified drivers are inferred through the meta-models as proxies, since Trajectron++ does not expose its internal reasoning directly; the effects we report are therefore model-specific and may not generalise to other prediction architectures.
 
-Second, the meta-model under-predicts at high ADE. Out-of-fold diagnostics show strong agreement between predicted and actual error at low-to-moderate ADE but systematic under-prediction in the high-error tail. The implication is that our trajectory and scene features do not fully capture what makes the worst cases worst: factors such as map and lane geometry, location, or finer-grained social context appear to be missing from the current feature set. This shortfall is the most likely reason that the clustering of hard cases is comparatively weak, as the available feature effects do not differentiate cleanly within the high-error tail.
+Second, the meta-model under-predicts at high ADE. Out-of-fold diagnostics show strong agreement between predicted and actual error at low-to-moderate ADE but systematic under-prediction in the high-error tail. The implication is that our trajectory and scene features do not fully capture what makes the worst cases worst: factors such as map and lane geometry, location, or finer-grained social context may be missing from the current feature set. This shortfall is a plausible reason that the clustering of hard cases is comparatively weak, as the available feature effects do not differentiate cleanly within the high-error tail.
 
 Third, the scope of the study is bounded. We predict pedestrian trajectories on nuScenes only, so there is no guarantee that the conclusions transfer to other agent types or to other datasets. Moreover, the settings sweep was conducted on the nuScenes mini split for reasons of computational cost, and its results may not transfer directly to full-scale training.
 
 \subsection{Future Work}
 
-These limitations suggest several directions for future work. A central strength of our approach is that the pipeline is model- and dataset-agnostic by design: the meta-modelling and feature-effect clustering are decoupled from the prediction model and the dataset, and through the \texttt{trajdata} interface the same pipeline can be ported to other trajectory prediction models and datasets with little additional effort. This makes broad replication straightforward.
+These limitations suggest several directions for future work. A central strength of our approach is that the pipeline is model- and dataset-agnostic by design: the meta-modelling and feature-effect clustering are decoupled from the prediction model and the dataset, and through the \texttt{trajdata} interface \citep{ivanovic2023trajdata} the same pipeline can be ported to other trajectory prediction models and datasets with little additional effort. This makes broad replication straightforward.
 
-A natural next step is to enrich the input space with map and lane geometry, location information, and finer social context. In particular, enabling and evaluating map-based inputs is reserved for future work rather than part of the present experimental setup. Such features directly target the under-prediction ceiling identified in the diagnostics and may unlock cleaner structure in the hard-error regime that the current feature set fails to separate. Finally, extending the analysis to vehicle, cyclist, and motorcyclist trajectories would test whether the same drivers of difficulty, speed variability and turning, govern prediction error across agent types, or whether each agent class exhibits its own characteristic failure modes.
+A natural next step is to enrich the input space with map and lane geometry, location information, and finer social context. In particular, enabling and evaluating map-based inputs is reserved for future work rather than part of the present experimental setup. These additions would test whether the under-prediction ceiling identified in the diagnostics is partly due to missing environmental context, and whether richer context helps separate the hard-error regime more cleanly. Finally, extending the analysis to vehicle, cyclist, and motorcyclist trajectories would test whether the same drivers of difficulty, speed variability and turning, govern prediction error across agent types, or whether each agent class exhibits its own characteristic failure modes.
 
 
 
@@ -1001,7 +1001,7 @@ Figure~\ref{fig:xgboost_optics_umaps} gives the primary XGBoost--OPTICS diagnost
 \subsection{DBCV Definition}
 \label{app:dbcv_details}
 
-Density-Based Clustering Validation (DBCV) evaluates whether clusters are internally dense and separated from other clusters by lower-density regions. For a cluster $C_i$, the cluster-level validity is
+Density-Based Clustering Validation (DBCV) \citep{moulavi2014density} evaluates whether clusters are internally dense and separated from other clusters by lower-density regions. For a cluster $C_i$, the cluster-level validity is
 
 \begin{equation}
   V(C_i)=
@@ -1020,10 +1020,6 @@ Here $\mathrm{DSC}(C_i)$ is the density sparseness of cluster $C_i$, interpreted
 
 The score ranges from $-1$ to $1$. Positive values indicate dense, separated clusters; values near $0$ indicate ambiguous density structure; negative values indicate an implausible partition. Noise points have no own validity term, but they remain part of $\mathcal{O}$ in the denominator and therefore reduce the weighted support of the clustered structure.
 
-\textcolor{red}{Note: add a formal reference for the DBCV score, e.g. Moulavi et al. (2014).}
-
-\textcolor{red}{Note: verify the DBCV formula and interpretation against the final cited source before submission.}
-
 \newpage
 
 \section{Electronic appendix}
@@ -1039,7 +1035,7 @@ Data, code and figures are provided in electronic form.
 
 \RaggedRight
 \bibliography{bibliography}
-\bibliographystyle{dcu}
+\bibliographystyle{plainnat}
 \newpage
 
 % ------------------------------------------------------------------------------
