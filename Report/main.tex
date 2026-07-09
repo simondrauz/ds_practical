@@ -188,6 +188,15 @@ While the present work focuses on a centralised, in-depth analysis of Trajectron
 
 \section{Methodology}
 
+The complete analysis pipeline is summarised in Figure~\ref{fig:pipeline_overview}. Starting from nuScenes pedestrian trajectories, the main path adapts Trajectron++ evaluation to retain per-trajectory errors, joins those errors with engineered trajectory and scene features, fits interpretable meta-models, and uses the resulting feature effects for both global interpretation and success/failure regime analysis. A separate mini-split branch reuses the same preparation and modelling logic to analyse controlled changes in Trajectron++ model settings.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{figures/pipeline.png}
+  \caption{Overview of the analysis pipeline used in this report. The upper path supports the fixed-configuration feature-effect and regime analyses, while the lower branch analyses model-setting effects on the nuScenes mini split.}
+  \label{fig:pipeline_overview}
+\end{figure}
+
 \subsection{Trajectron++ Adaptation for Per-Trajectory Evaluation}
 \label{sec:trajectron_adaptation}
 
