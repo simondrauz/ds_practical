@@ -17,7 +17,9 @@ bindingoffset = 0mm]{geometry}
 \usepackage[round, comma]{natbib}
 \usepackage{fancyhdr}
 \usepackage{booktabs}
+\usepackage{array}
 \usepackage{float}
+\usepackage{pdflscape}
 \makeatletter
 \newcommand{\captionof}[2]{\def\@captype{#1}\caption{#2}}
 \makeatother
@@ -644,7 +646,40 @@ The scene-context comparison is weaker. \texttt{scene\_density\_VEHICLE} has onl
 
 Using the performance grouping and feature-effect clustering defined in Section~\ref{sec:cluster_methodology}, we interpret the selected clusters as explanation patterns for RQ2 rather than as clusters of raw trajectory coordinates.
 
-The feature effects resolve into coherent behavioural regimes. The model succeeds on two broad classes of trajectory: slow turners, where low speed bounds the impact of turning, and straight walkers, where stable heading bounds the impact of speed. Conversely, the failure mode is erratic motion in which speed variability and turning occur together. Crucially, raw speed alone is not a failure driver; high speed becomes problematic only when paired with turning. The hardest cases for Trajectron++ are thus those that combine the two dominant difficulty factors simultaneously.
+Table~\ref{tab:rq2_regime_summary} summarises the selected XGBoost--OPTICS regime structure. The easy and medium groups have usable density structure, with DBCV values around $0.40$, while the hard group is much noisier: its selected clustering has DBCV $0.09$ and assigns $75\%$ of hard trajectories to noise. The hard result is therefore interpreted more cautiously than the easy and medium regimes.
+
+\begin{table}[H]
+  \centering
+  \caption{Compact summary of the selected XGBoost--OPTICS success and failure regimes. Percentages are within each performance group, \texttt{ml\_ade} medians are reported on the original metre scale, and interpretations pair trajectory signatures with their signed feature-effect explanations.}
+  \label{tab:rq2_regime_summary}
+  \small
+  \renewcommand{\arraystretch}{1.16}
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.13\textwidth}>{\raggedright\arraybackslash}p{0.27\textwidth}>{\raggedright\arraybackslash}p{0.50\textwidth}@{}}
+    \toprule
+    \textbf{Group} & \textbf{Selected effect-space structure} & \textbf{Trajectory signature and effect explanation} \\
+    \midrule
+    Easy &
+    DBCV $0.41$ in signed-effect space; two clusters; group median \texttt{ml\_ade} $0.17$ m. Slow turners cover $34\%$ of easy trajectories with median \texttt{ml\_ade} $0.08$ m; straight walkers cover $36\%$ with median $0.20$ m. &
+    The two non-noise success modes cover $70\%$ of easy trajectories. Slow turners combine high turning with very low maximum speed and speed variation; the low-speed effects dominate the positive turning effect. Straight walkers have ordinary speed but stable heading; the negative heading-change effect keeps predicted error low. \\
+    \addlinespace
+    Medium &
+    DBCV $0.40$ in signed-effect space; two clusters; group median \texttt{ml\_ade} $0.60$ m. The ordinary-medium cluster covers $60\%$ of medium trajectories with median \texttt{ml\_ade} $0.55$ m; the second non-noise cluster has only $19$ rows. &
+    Medium is a transition zone rather than a strong multi-mode regime. The main cluster has near-neutral total effect: maximum speed contributes positive pressure, while speed variation and heading effects remain modest. Higher-error medium cases are mostly noise, where speed variation and turning rise together and the signed effects move toward the hard-regime failure axes. \\
+    \addlinespace
+    Hard &
+    DBCV $0.09$ in signed-effect space; four clusters; group median \texttt{ml\_ade} $1.78$ m; $99.5\%$ of rows have positive total feature effect. Clusters 0--2 together cover $8\%$ of hard trajectories, while cluster 3 covers $17\%$. &
+    The four clusters are best read as two failure modes. Clusters 0--2 are erratic turners: all combine speed variation with heading change, and both effects push error upward at different magnitudes. Cluster 3 is fast and turning: maximum-speed and heading-change effects are jointly positive. Most hard trajectories remain in noise, where the same positive speed-variation and turning effects are even stronger. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The easy regime provides the clearest success modes. The selected clustering separates slow turners from straight walkers, and both modes are large enough to be useful explanations rather than isolated edge cases. Appendix Table~\ref{tab:rq2_cluster_evidence} reports the supporting cluster values. In the slow-turner mode, the median maximum speed is only $0.12$ and the median speed variation is $0.037$, while the heading-change rate is high at $45.7$ degrees per second. Turning therefore increases the feature-effect contribution ($+0.041$), but the extremely low speed and low speed variation dominate the net effect through strongly negative \texttt{max\_speed} ($-0.223$) and \texttt{std\_speed} ($-0.128$) effects. In the straight-walker mode, median maximum speed is much more ordinary at $1.41$, but the median heading-change rate is only $1.93$ degrees per second. This second mode is easy because stable heading drives the predicted error down, with a heading-change effect of $-0.121$.
+
+The medium regime is less a distinct behavioural type than a boundary between the two extremes. Its whole-group median \texttt{ml\_ade} is $0.60$ m and its median total feature effect is only mildly positive. The main non-noise cluster covers $60\%$ of the group and has near-neutral total effect ($+0.008$): maximum speed contributes positive error pressure ($+0.072$), but speed variation and heading effects remain modest. The higher-error medium cases are mainly the noise component, whose median \texttt{ml\_ade} rises to $0.73$ m and whose median speed variation and heading-change rate rise to $0.224$ and $10.5$ degrees per second. Its total effect is clearly positive ($+0.187$), led by \texttt{std\_speed} ($+0.109$). This is the gradient toward hard cases: the medium-boundary trajectories move along the same axes, speed variation and turning, that later define the hard-regime failure modes, but with lower magnitude and without a stable second cluster boundary.
+
+The hard regime is the failure case, but its internal cluster structure is weaker than the easy and medium structures. The whole hard group has a median \texttt{ml\_ade} of $1.78$ m, a median total feature effect of $+0.525$, and almost all rows have positive total feature effects. The dominant axes are speed variation and heading change: hard trajectories have median speed variation $0.333$ and median heading-change rate $14.9$ degrees per second, while the hard-noise component rises further to $0.382$ and $18.8$. Following the two-mode interpretation in Table~\ref{tab:rq2_regime_summary}, the smaller erratic-turner clusters show combinations of speed variation and turning at different magnitudes, with combined effects of $+0.316$ for \texttt{std\_speed} and $+0.136$ for heading change. The larger fast-and-turning cluster instead splits its positive contribution between \texttt{max\_speed} ($+0.136$) and heading change ($+0.146$), showing that raw speed is not sufficient on its own. Fast motion becomes a failure mode when paired with heading change; otherwise, the stronger and more general failure mechanism is erratic motion. The very large hard-noise component reinforces this reading, with total effect $+0.601$ and a dominant \texttt{std\_speed} effect of $+0.361$, but it also confirms that the available feature set does not separate the high-error tail into clean clusters.
+
+Taken together, the regime analysis answers RQ2 as follows: Trajectron++ succeeds when either low speed or stable heading removes one of the main sources of future-path uncertainty, and it fails when speed variation and turning occur together. The medium regime connects these endpoints through a gradual increase in the same motion characteristics, while the hard regime should be described with explicit uncertainty because the selected density structure is noisy and most hard trajectories lie outside the named clusters. This limitation is consistent with the high-error underprediction problem discussed again in Section~\ref{sec:conclusion}: the current features explain the main axes of difficulty, but not enough of the high-error tail to produce crisp hard subtypes.
 
 \newpage
 \subsection{Feature Importance of Model Settings}
@@ -878,6 +913,48 @@ Table~\ref{tab:appendix_cluster_candidates} expands the main XGBoost selection t
     \bottomrule
   \end{tabular}
 \end{table}
+
+Table~\ref{tab:rq2_cluster_evidence} reports the cluster-level trajectory characteristics and signed XGBoost effects used for the main-text regime interpretation. It includes all eight non-noise clusters from the selected XGBoost--OPTICS solution and the three corresponding noise groups, because the noise groups explain much of the continuous boundary structure.
+
+\clearpage
+\begin{landscape}
+\begin{table}[H]
+  \centering
+  \caption{Complete XGBoost--OPTICS cluster evidence behind the regime interpretations. Each feature cell reports \emph{raw}, the median trajectory-characteristic value, and \emph{eff.}, the mean signed XGBoost SHAP effect on the \texttt{ml\_ade\_log} target. The total-effect column reports the median summed signed effect, and heading change is measured in degrees per second.}
+  \label{tab:rq2_cluster_evidence}
+  \scriptsize
+  \renewcommand{\arraystretch}{1.20}
+  \newcommand{\rawEffectCell}[2]{\begin{tabular}[c]{@{}r@{}}raw $#1$\\eff. $#2$\end{tabular}}
+  {\setlength{\tabcolsep}{1.4pt}
+  \begin{tabular}{@{}p{0.055\linewidth}p{0.155\linewidth}p{0.100\linewidth}p{0.075\linewidth}p{0.075\linewidth}p{0.115\linewidth}p{0.115\linewidth}p{0.115\linewidth}p{0.115\linewidth}@{}}
+    \toprule
+    \textbf{Cluster} & \textbf{Semantic label} & \textbf{Size} & \begin{tabular}[c]{@{}l@{}}\textbf{Median}\\\textbf{\texttt{ml\_ade}}\end{tabular} & \begin{tabular}[c]{@{}l@{}}\textbf{Total}\\\textbf{effect}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\texttt{std\_speed}\\raw/eff.\end{tabular} & \begin{tabular}[c]{@{}c@{}}\texttt{max\_speed}\\raw/eff.\end{tabular} & \begin{tabular}[c]{@{}c@{}}\texttt{heading\_change}\\\texttt{\_per\_sec}\\raw/eff.\end{tabular} & \begin{tabular}[c]{@{}c@{}}\texttt{mean}\\\texttt{\_acceleration}\\raw/eff.\end{tabular} \\
+    \midrule
+    \multicolumn{9}{@{}l}{\textbf{Easy}} \\
+    \midrule
+    C0 & Slow turners & $5{,}323$ ($33.6\%$) & $0.083$ & $-0.282$ & \rawEffectCell{0.037}{-0.128} & \rawEffectCell{0.124}{-0.223} & \rawEffectCell{45.714}{+0.041} & \rawEffectCell{0.000}{+0.023} \\
+    C1 & Straight walkers & $5{,}754$ ($36.4\%$) & $0.199$ & $-0.156$ & \rawEffectCell{0.066}{-0.081} & \rawEffectCell{1.412}{+0.042} & \rawEffectCell{1.934}{-0.121} & \rawEffectCell{-0.003}{-0.000} \\
+    Noise & Easy residual & $4{,}746$ ($30.0\%$) & $0.238$ & $-0.090$ & \rawEffectCell{0.128}{-0.035} & \rawEffectCell{1.349}{-0.005} & \rawEffectCell{7.047}{-0.036} & \rawEffectCell{-0.002}{-0.014} \\
+    \addlinespace
+    \multicolumn{9}{@{}l}{\textbf{Medium}} \\
+    \midrule
+    C0 & Ordinary medium & $4{,}975$ ($59.8\%$) & $0.551$ & $+0.008$ & \rawEffectCell{0.122}{-0.033} & \rawEffectCell{1.525}{+0.072} & \rawEffectCell{4.641}{-0.028} & \rawEffectCell{-0.002}{+0.007} \\
+    C1 & Small slow-turner edge & $19$ ($0.2\%$) & $0.424$ & $-0.207$ & \rawEffectCell{0.067}{-0.125} & \rawEffectCell{0.190}{-0.226} & \rawEffectCell{48.589}{+0.107} & \rawEffectCell{0.005}{+0.037} \\
+    Noise & Boundary cases & $3{,}326$ ($40.0\%$) & $0.726$ & $+0.187$ & \rawEffectCell{0.224}{+0.109} & \rawEffectCell{1.491}{+0.054} & \rawEffectCell{10.542}{+0.036} & \rawEffectCell{0.003}{-0.017} \\
+    \addlinespace
+    \multicolumn{9}{@{}l}{\textbf{Hard}} \\
+    \midrule
+    C0 & Erratic turners & $31$ ($1.1\%$) & $1.942$ & $+0.675$ & \rawEffectCell{0.452}{+0.488} & \rawEffectCell{1.244}{+0.070} & \rawEffectCell{12.310}{+0.126} & \rawEffectCell{-0.112}{-0.019} \\
+    C1 & Erratic turners & $68$ ($2.5\%$) & $1.584$ & $+0.507$ & \rawEffectCell{0.389}{+0.381} & \rawEffectCell{1.194}{+0.075} & \rawEffectCell{27.163}{+0.149} & \rawEffectCell{-0.121}{-0.077} \\
+    C2 & Erratic turners & $118$ ($4.3\%$) & $1.607$ & $+0.450$ & \rawEffectCell{0.288}{+0.233} & \rawEffectCell{1.074}{+0.066} & \rawEffectCell{19.527}{+0.130} & \rawEffectCell{-0.029}{+0.012} \\
+    C3 & Fast and turning & $473$ ($17.2\%$) & $1.500$ & $+0.325$ & \rawEffectCell{0.127}{+0.009} & \rawEffectCell{1.551}{+0.136} & \rawEffectCell{10.526}{+0.146} & \rawEffectCell{-0.004}{+0.031} \\
+    Noise & High-error residual & $2{,}053$ ($74.8\%$) & $1.934$ & $+0.601$ & \rawEffectCell{0.382}{+0.361} & \rawEffectCell{1.539}{+0.131} & \rawEffectCell{18.805}{+0.123} & \rawEffectCell{0.017}{-0.004} \\
+    \bottomrule
+  \end{tabular}
+  }
+\end{table}
+\end{landscape}
+\clearpage
 
 Figure~\ref{fig:xgboost_optics_umaps} gives the primary XGBoost--OPTICS diagnostic in the main text. Figures~\ref{fig:appendix_xgboost_hdbscan_umaps}--\ref{fig:appendix_gam_hdbscan_umaps} show the remaining rank-1 algorithm--model combinations. In each appendix figure, the left column includes noise points and the right column removes them, with easy, medium, and hard performance groups arranged from top to bottom. These are diagnostic projections of the four-dimensional effect vectors from Equation~\ref{eq:cluster_effect_vectors}; they were not used as clustering input.
 
