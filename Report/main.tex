@@ -94,12 +94,24 @@ Supervised by \mysupervisor
 
 \begin{abstract}
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor 
-incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis 
-nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
-Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu 
-fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in 
-culpa qui officia deserunt mollit anim id est laborum.
+Trajectory prediction models are usually evaluated with aggregate displacement
+metrics, which hide why individual forecasts succeed or fail. This project
+develops an interpretable analysis pipeline for Trajectron++ on pedestrian
+trajectories from nuScenes. We modify the evaluation loop to retain
+per-trajectory prediction errors, join these errors with engineered trajectory
+and scene characteristics, and fit GAM and XGBoost meta-models to explain the
+resulting variation in most-likely ADE. Nested resampling and out-of-fold
+diagnostics are used to validate the meta-models, while SHAP values, partial
+dependence plots, and effect-space clustering are used to identify global
+drivers and success or failure regimes. A separate sweep over prediction
+horizon, history window, and attention radius studies how Trajectron++ settings
+affect performance. The results show that the focal agent's motion, especially
+speed variability, heading change, and maximum speed, explains most of the
+trajectory-level error, whereas the engineered scene and social features are
+secondary. Trajectron++ performs best for slow or heading-stable pedestrians and
+fails most clearly when speed variation and turning occur together. Among model
+settings, prediction horizon has the largest effect, attention radius is second,
+and history-window length is comparatively weak within the tested range.
 
 \end{abstract}
 
@@ -156,6 +168,7 @@ More recent work has embraced graph-based and attention-based architectures to b
 Transformer-based models such as AgentFormer \citep{yuan2021agentformer} have further advanced the field by jointly modelling spatial and temporal dependencies across agents using self-attention, avoiding the sequential bottleneck of recurrent networks. Diffusion-based approaches such as MID \citep{gu2022mid} have also been explored, applying denoising diffusion probabilistic models to generate diverse and accurate multimodal futures.
  
 \subsection{The nuScenes Dataset}
+\label{sec:dataset}
  
 nuScenes \citep{caesar2020nuscenes} is a large-scale, multimodal autonomous driving dataset collected in Boston and Singapore. It provides 1000 driving scenes, each 20 seconds long, with 3D bounding box annotations for 23 object categories at 2 Hz. The dataset includes data from six cameras, a 32-beam LiDAR, and five radars, enabling rich multi-sensor perception. Each annotated object is assigned a semantic category such as car, pedestrian, or bicycle, as well as an attribute such as moving, stopped, or parked.
  
@@ -904,6 +917,23 @@ Table~\ref{tab:appendix_gam_configs} reports the full-data retuned GAM configura
     \bottomrule
   \end{tabular}
 \end{table}
+
+\subsection{Additional Out-of-Fold Diagnostics}
+\label{app:oof_diagnostics}
+
+The main text reports the out-of-fold diagnostics for the selected MI\,+\,VIF feature set in Figure~\ref{fig:oof_diagnostics}. For completeness, Figure~\ref{fig:appendix_oof_vif_only} shows the same diagnostic view for the VIF-only robustness feature set. These diagnostics add scene and social variables, but the residual pattern remains qualitatively similar to the main MI\,+\,VIF analysis.
+
+\begin{figure}[H]
+  \centering
+  \textbf{XGBoost}\\[0.2em]
+  \includegraphics[width=\textwidth]{figures/oof_diagnostics_xgb_vif_only.png}
+  \vspace{0.6em}
+
+  \textbf{GAM}\\[0.2em]
+  \includegraphics[width=\textwidth]{figures/oof_diagnostics_gam_vif_only.png}
+  \caption{Out-of-fold diagnostics for the VIF-only robustness feature set.}
+  \label{fig:appendix_oof_vif_only}
+\end{figure}
 
 \subsection{Cluster UMAP Diagnostics}
 \label{app:cluster_umaps}
