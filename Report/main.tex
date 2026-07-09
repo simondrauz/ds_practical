@@ -711,19 +711,29 @@ The most striking observation is that the two highest-ranked features are model 
 
 All eight features in the pooled model are also statistically significant in the GAM ($p \ll 0.01$), confirming that the effects are not specific to the tree-based model. The two meta-models do, however, differ markedly in fit quality: XGBoost achieves $R^2 = 0.90$ with an RMSE of $0.13$, substantially better than the GAM's $R^2 = 0.65$ and RMSE of $0.24$. This gap is itself informative. Because the GAM is purely additive while XGBoost can represent interactions, the superior fit of the latter indicates that meaningful interaction effects exist between the model settings and the trajectory features, effects that an additive model cannot capture.
 
-We now examine each setting in turn through its partial dependence plot (PDP), which shows the average direction and shape of its effect on the log-scale prediction error.
+We now examine each setting in turn through its partial dependence plot (PDP), which shows the average direction and shape of its effect on the log-scale prediction error. Figure~\ref{fig:settings_pdps} provides the corresponding discrete PDP evidence for the three swept settings. The vertical axis shows how much the XGBoost meta-model's predicted log error differs from its average prediction; values above zero indicate higher predicted error and values below zero indicate lower predicted error.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.48\textwidth]{figures/prediction_sec_pdp.png}
+  \hfill
+  \includegraphics[width=0.48\textwidth]{figures/attention_radius_m_pdp.png}\\[0.8em]
+  \includegraphics[width=0.48\textwidth]{figures/history_sec_pdp.png}
+  \caption{XGBoost partial dependence plots for the three Trajectron++ settings in the pooled settings-sweep meta-model: prediction horizon (top left), attention radius (top right), and history window (bottom).}
+  \label{fig:settings_pdps}
+\end{figure}
 
 \subsection{Prediction Horizon}
 
-The prediction horizon exhibits the largest effect of any feature. Its partial dependence plot rises monotonically: as the horizon lengthens, the prediction error grows. This is intuitively unsurprising, since forecasting further into the future is inherently harder and accumulated uncertainty compounds over time. The value of the analysis lies in quantifying this effect and establishing that, within our experimental range, the horizon setting exerts a stronger influence on prediction quality than any intrinsic trajectory characteristic.
+The prediction horizon exhibits the largest effect of any feature. Its PDP in Figure~\ref{fig:settings_pdps} is strongly negative at the shortest two-second horizon and positive for the longer horizons, showing that longer forecasts raise predicted error within the swept range. This is intuitively unsurprising, since forecasting further into the future is inherently harder and accumulated uncertainty compounds over time. The value of the analysis lies in quantifying this effect and establishing that, within our experimental range, the horizon setting exerts a stronger influence on prediction quality than any intrinsic trajectory characteristic.
 
 \subsection{Attention Radius}
 
-The attention radius is the second most influential feature, and its effect is more nuanced than that of the horizon. A larger radius admits more neighbouring agents into the focal agent's interaction graph, supplying additional context. One might expect more context to be uniformly beneficial, but the partial dependence plot reveals a non-linear relationship. At very small radii, performance is poor because the model omits genuinely relevant neighbours. Beyond a certain point, however, enlarging the radius begins to introduce distant, irrelevant agents whose inclusion adds noise rather than signal. The plot indicates that a comparatively short attention radius is beneficial in this dataset, with performance degrading as the radius becomes large. This points to the existence of an intermediate optimal range rather than a ``larger-is-better'' rule.
+The attention radius is the second most influential feature, and its effect is more nuanced than that of the horizon. A larger radius admits more neighbouring agents into the focal agent's interaction graph, supplying additional context. One might expect more context to be uniformly beneficial, but the PDP shows a non-linear pattern instead: the smallest tested radius is associated with lower predicted error, while the larger radii sit above the sweep average. This suggests that additional context can become noisy once the neighbourhood grows, so the setting should be treated as an empirical optimum problem rather than a ``larger-is-better'' rule.
 
 \subsection{History Window}
 
-The history window has the smallest effect of the three settings. Its partial dependence plot is comparatively flat across the swept range, indicating that the model is robust to the amount of past motion it observes, at least within the values we tested. From a practical standpoint, this is a reassuring finding: it suggests that Trajectron++ does not depend critically on a long observation window to produce reasonable predictions, and that the history length can be chosen with relatively little concern for its impact on accuracy within this regime.
+The history window has the smallest effect of the three settings. Its PDP is close to zero for one to three seconds and increases only at the longest four-second history window, while its global SHAP value remains much smaller than those of \texttt{prediction\_sec} and \texttt{attention\_radius\_m}. From a practical standpoint, this is a reassuring finding: it suggests that Trajectron++ does not depend critically on a long observation window to produce reasonable predictions, and that the history length can be chosen with relatively little concern for its impact on accuracy within this regime.
 
 \section{Conclusion and Discussion}
 \label{sec:conclusion}
