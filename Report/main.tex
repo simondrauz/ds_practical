@@ -215,13 +215,13 @@ The complete analysis pipeline is summarised in Figure~\ref{fig:pipeline_overvie
 
 Answering the research questions posed in Section~\ref{sec:introduction} requires prediction errors at the granularity of individual trajectories. The standard Trajectron++ evaluation procedure does not expose this information, and overcoming this limitation is the first methodological contribution of our pipeline.
 
-\subsection{Limitations of the Standard Evaluation Loop}
+\subsubsection{Limitations of the Standard Evaluation Loop}
 
 In its original form, the Trajectron++ evaluation loop reports batch-averaged ADE and FDE values. Predictions are generated for each batch of agents, the displacement errors are computed, and these errors are immediately aggregated into summary statistics. The intermediate, per-agent errors are not retained, and crucially there is no mechanism to associate a given error value with the specific trajectory that produced it.
 
 This design is entirely adequate for the model's original purpose, namely benchmarking aggregate accuracy against competing approaches. However, it is incompatible with our analysis. Because the per-trajectory errors are discarded and never linked to an identifier, it is impossible to study what makes a particular trajectory hard or easy: there is no way to relate the prediction error of a trajectory to its kinematic properties or to the characteristics of the scene in which it occurred.
 
-\subsection{Recovering Individual Trajectory Errors}
+\subsubsection{Recovering Individual Trajectory Errors}
 
 To enable per-trajectory analysis, we modified the Trajectron++ evaluation loop so that it preserves the individual prediction loss for every trajectory rather than only the batch average. Concretely, instead of reducing the displacement errors to a mean within each batch, we retain the full vector of per-trajectory errors together with the metadata required to identify each trajectory.
 
@@ -229,7 +229,7 @@ The central enabling component of this modification is the use of a stable traje
 
 Without this stable join key, the two halves of the analysis, the prediction errors on one side and the interpretable features on the other, could not be reliably aligned, and the entire downstream meta-modelling effort would be impossible. The modification is conceptually simple but is the linchpin that converts Trajectron++ from a black-box benchmark into a source of structured, per-trajectory observations suitable for interpretable analysis.
 
-\subsection{Scope of the Prediction Task}
+\subsubsection{Scope of the Prediction Task}
 
 Consistent with the dataset scope described in Section~\ref{sec:dataset}, we focus the prediction and evaluation on pedestrian trajectories, while all other agent types remain present in each scene and contribute to the model's interaction reasoning as context. The per-trajectory errors recovered through the modified evaluation loop therefore correspond to pedestrian targets, and it is these errors that serve as the response variable for the interpretable models in the subsequent sections.
 
@@ -247,7 +247,7 @@ Evaluation was then run through the modified loop described above, so the aggreg
 
 With per-trajectory prediction errors available, the next stage of the pipeline constructs the set of interpretable features that will be related to those errors. A key point is that Trajectron++ itself outputs only sequences of $(x, y)$ positions together with their associated time stamps; it does not expose any higher-level descriptors of motion or scene structure. Every feature described below is therefore computed by us directly from the raw trajectory coordinates and the scene context, not taken from the model.
 
-\subsection{Trajectory and Scene Characteristics}
+\subsubsection{Trajectory and Scene Characteristics}
 
 We organise the engineered features into two groups: agent motion features, which describe the kinematics of the focal trajectory, and scene context features, which describe the environment in which the trajectory unfolds.
 
@@ -264,13 +264,13 @@ We organise the engineered features into two groups: agent motion features, whic
 
 Taken together, these two groups yield $18$ candidate features. Each feature vector is associated with its corresponding Trajectron++ prediction error through the \texttt{data\_idx} join key introduced in Section~\ref{sec:trajectron_adaptation}, producing the unified per-trajectory dataset on which all subsequent modelling is performed.
 
-\subsection{Target Distribution and Log Transformation}
+\subsubsection{Target Distribution and Log Transformation}
 
 The response variable for the interpretable models is the per-trajectory most-likely ADE, \texttt{ml\_ade}, defined above. Before fitting any model, we examined the distribution of this target. The raw \texttt{ml\_ade} distribution is strongly right-skewed, with a skewness of approximately $2.59$: the majority of trajectories incur low prediction error, but a long tail of high-error cases extends far to the right.
 
 Such pronounced skewness is problematic for regression models that assume approximately symmetric, homoscedastic residuals, as is the case for the additive model discussed in Section~\ref{sec:interpretable_models}. To address this, we considered a $\log(1+x)$ (\texttt{log1p}) transformation of the target, which compresses the long upper tail and yields a substantially more symmetric distribution. Whether to model the error on the original scale or the log scale was treated as an explicit modelling choice that we evaluated in the subsequent stage rather than fixing a priori, so that the decision could be made on the basis of model fit and diagnostic behaviour.
 
-\subsection{Feature Selection}
+\subsubsection{Feature Selection}
 \label{sec:feature_selection}
 
 With $18$ candidate features, many of which are correlated by construction (for example, the various speed statistics), an unfiltered feature set would introduce substantial multicollinearity. Multicollinearity is especially damaging for interpretability: when features are highly correlated, the estimated effect of any one of them becomes unstable and difficult to attribute, undermining the very goal of the analysis. We therefore performed feature selection, and to ensure that our conclusions were not an artefact of a single selection strategy, we implemented and compared two complementary approaches.
@@ -286,7 +286,7 @@ Comparing the two feature sets serves as a robustness check. The MI-elbow-plus-V
 
 The target transformation and model family were treated as empirical choices rather than fixed assumptions. We compared five meta-model variants: LinearGAM on the raw \texttt{ml\_ade} target, LinearGAM on the \texttt{log1p}-transformed target, GammaGAM with a log link on the raw positive target, XGBoost on the raw target, and XGBoost on the \texttt{log1p}-transformed target. Each model was tuned on the target scale on which it was trained, but all variants were compared using out-of-fold metrics transformed back to the original \texttt{ml\_ade} scale.
 
-Hyperparameters were tuned with Bayesian optimization \citep{snoek2012bayesian} using Optuna's TPE sampler \citep{akiba2019optuna,bergstra2011algorithms}. We used nested resampling \citep{bischl2023hpo,cawley2010overfitting} because ordinary, non-nested cross-validation would use the same validation structure both to choose hyperparameters and to report model performance. This risks overfitting the model-selection procedure itself to a favourable split and can produce overly optimistic diagnostics. In the nested design, hyperparameter tuning is confined to the inner folds, while the outer folds evaluate the complete tuning procedure on data that were not used for either fitting or tuning.
+Hyperparameters were tuned with Bayesian optimisation \citep{snoek2012bayesian} using Optuna's TPE sampler \citep{akiba2019optuna,bergstra2011algorithms}. We used nested resampling \citep{bischl2023hpo,cawley2010overfitting} because ordinary, non-nested cross-validation would use the same validation structure both to choose hyperparameters and to report model performance. This risks overfitting the model-selection procedure itself to a favourable split and can produce overly optimistic diagnostics. In the nested design, hyperparameter tuning is confined to the inner folds, while the outer folds evaluate the complete tuning procedure on data that were not used for either fitting or tuning.
 
 Concretely, we used $3$ outer folds and $3$ inner folds. For each outer fold, hyperparameters were selected by inner cross-validation on the corresponding training portion using $15$ trials per study; the fitted model was then evaluated on the held-out outer fold. Because every row serves as an outer-fold holdout exactly once, the resulting out-of-fold predictions cover the full analysis dataset without relying on in-sample predictions. Table~\ref{tab:hyperparameter_search_space} reports the search space. After model selection, tuning was rerun on all rows for the final refit.
 
@@ -353,11 +353,11 @@ The selected variants were therefore LinearGAM with a log-transformed target and
 
 The per-trajectory \texttt{ml\_ade} values, together with the selected features, allow us to ask not merely \emph{how large} the prediction error is for a given trajectory, but \emph{why} it is large or small. The error value alone is uninformative in this respect: it tells us that variation exists but not what drives it. To uncover the drivers, we fit a second-stage, interpretable model, a \emph{meta-model}, that takes the engineered trajectory and scene features as inputs and predicts the Trajectron++ prediction error as output. If this meta-model is itself interpretable, then its learned structure can be read as an explanation of the conditions under which Trajectron++ performs well or poorly.
 
-We adopt two complementary meta-models: a Generalized Additive Model (GAM), which is inherently interpretable, and XGBoost, a gradient-boosted tree ensemble that is more flexible but must be interpreted post-hoc. Using both in tandem provides a valuable cross-check: where the transparent additive model and the flexible ensemble agree on which features matter and in what direction, we can place substantially greater confidence in the conclusion.
+We adopt two complementary meta-models: a Generalised Additive Model (GAM), which is inherently interpretable, and XGBoost, a gradient-boosted tree ensemble that is more flexible but must be interpreted post-hoc. Using both in tandem provides a valuable cross-check: where the transparent additive model and the flexible ensemble agree on which features matter and in what direction, we can place substantially greater confidence in the conclusion.
 
-\subsection{Generalized Additive Model}
+\subsubsection{Generalised Additive Model}
 
-A Generalized Additive Model expresses the target as a sum of smooth, univariate functions of the individual features:
+A Generalised Additive Model expresses the target as a sum of smooth, univariate functions of the individual features:
 \begin{equation}
   f(x) = \sum_{j} s_j(x_j),
   \label{eq:gam}
@@ -366,7 +366,7 @@ where each $s_j$ is a smooth spline learned from the data. The defining property
 
 This additive structure makes the GAM inherently interpretable. Each $s_j$ can be plotted directly to reveal the marginal effect of feature $x_j$ on the predicted error, showing immediately whether the relationship is increasing, decreasing, linear, or non-linear. Moreover, the GAM framework provides $p$-values for each smooth term, enabling formal significance testing of whether a feature has a statistically detectable effect on prediction error. The interpretability of the GAM is thus structural: the explanation is the model, requiring no additional attribution machinery.
 
-\subsection{XGBoost}
+\subsubsection{XGBoost}
 
 XGBoost~\citep{chen2016xgboost} is an ensemble method based on gradient-boosted decision trees. Rather than fitting a single model, it constructs a sequence of decision trees in which each new tree is trained to correct the residual errors of the trees already in the ensemble. The prediction for an input $x$ after $T$ boosting rounds is the sum of the outputs of all the individual trees:
 \begin{equation}
@@ -382,7 +382,7 @@ The cost of this flexibility is that the fitted ensemble, typically comprising m
 \end{equation}
 where $\phi_0$ is the baseline (the mean model prediction) and each $\phi_j(x)$ quantifies how much feature $j$ pushes the prediction for this specific input above or below that baseline. Aggregating the magnitude of these contributions across the dataset yields a global measure of feature importance, while partial dependence plots visualise the average effect of a feature across its range, analogous in spirit to the smooth terms of the GAM but recovered from a black-box model.
 
-\subsection{Rationale for Using Both Models}
+\subsubsection{Rationale for Using Both Models}
 
 The two meta-models occupy complementary positions on the interpretability–flexibility spectrum. The GAM is fully transparent and provides significance tests, but its additive assumption blinds it to interactions. XGBoost can capture those interactions and typically attains a better fit, but requires post-hoc tools to be interpreted and offers no native significance testing. Reading the two together mitigates the weaknesses of each: agreement between a transparent additive model and a flexible interaction-aware ensemble is strong evidence that an identified effect is real rather than an artefact of one model's assumptions. This dual-model strategy underpins the feature-importance and feature-effect analyses that answer RQ1 and RQ2.
 
@@ -478,7 +478,7 @@ Overall, the primary regime analysis uses OPTICS on XGBoost SHAP effect vectors.
 
 The analysis described so far holds the Trajectron++ configuration fixed and studies how trajectory and scene characteristics relate to prediction error. RQ3 turns to a complementary question: how does the model's own configuration affect prediction quality? To answer this, we conducted a controlled sweep over three of Trajectron++'s key settings \citep{salzmann2020trajectron+} and analysed their effect using the same interpretable meta-modelling framework developed in Section~\ref{sec:interpretable_models}.
 
-\subsection{Sweep Design}
+\subsubsection{Sweep Design}
 
 We swept over three model settings:
 \begin{itemize}
@@ -489,7 +489,7 @@ We swept over three model settings:
 
 We performed a Cartesian sweep over these three parameters, evaluating the model at every combination of the swept values. The sweep was carried out on the nuScenes mini split rather than the full dataset, because the repeated retraining and evaluation required by a full Cartesian sweep is computationally prohibitive on the complete dataset. The mini split nonetheless provides sufficient data to detect the principal effects of each setting.
 
-\subsection{Pooled Model and Confound Control}
+\subsubsection{Pooled Model and Confound Control}
 
 To isolate the effect of the model settings from the intrinsic difficulty of individual trajectories, we fit a single \emph{pooled} meta-model that includes both the model-setting variables and the trajectory and scene features as predictors. The trajectory and scene features act as control variables: by accounting for the fact that different trajectories are inherently more or less difficult, the pooled model attributes the residual variation in error to the settings themselves. This design allows the effect of, say, the prediction horizon to be estimated while holding trajectory difficulty constant.
 
@@ -745,15 +745,15 @@ We now examine each setting in turn through its partial dependence plot (PDP), w
   \label{fig:settings_pdps}
 \end{figure}
 
-\subsection{Prediction Horizon}
+\subsubsection{Prediction Horizon}
 
 The prediction horizon exhibits the largest effect of any feature. Its PDP in Figure~\ref{fig:settings_pdps} is strongly negative at the shortest two-second horizon and positive for the longer horizons, showing that longer forecasts raise predicted error within the swept range. This is intuitively unsurprising, since forecasting further into the future is inherently harder and accumulated uncertainty compounds over time. The value of the analysis lies in quantifying this effect and establishing that, within our experimental range, the horizon setting exerts a stronger influence on prediction quality than any intrinsic trajectory characteristic.
 
-\subsection{Attention Radius}
+\subsubsection{Attention Radius}
 
 The attention radius is the second most influential feature, and its effect is more nuanced than that of the horizon. A larger radius admits more neighbouring agents into the focal agent's interaction graph, supplying additional context. One might expect more context to be uniformly beneficial, but the PDP shows a non-linear pattern instead: the smallest tested radius is associated with lower predicted error, while the larger radii sit above the sweep average. This suggests that additional context can become noisy once the neighbourhood grows, so the setting should be treated as an empirical optimum problem rather than a ``larger-is-better'' rule.
 
-\subsection{History Window}
+\subsubsection{History Window}
 
 The history window has the smallest effect of the three settings. Its PDP is close to zero for one to three seconds and increases only at the longest four-second history window, while its global SHAP value remains much smaller than those of \texttt{prediction\_sec} and \texttt{attention\_radius\_m}. From a practical standpoint, this is a reassuring finding: it suggests that Trajectron++ does not depend critically on a long observation window to produce reasonable predictions, and that the history length can be chosen with relatively little concern for its impact on accuracy within this regime.
 
@@ -820,7 +820,7 @@ Table~\ref{tab:appendix_xgboost_target_scale} reports the XGBoost target-scale c
   \end{tabular}
 \end{table}
 
-Table~\ref{tab:appendix_gam_variant_contexts} gives the corresponding GAM variant comparison. Unlike XGBoost, this is not only a raw-versus-log target comparison: the GammaGAM also changes the response distribution and link function. All rows are nevertheless evaluated out of fold on the original \texttt{ml\_ade} scale, making the metrics comparable within each context.
+Table~\ref{tab:appendix_gam_variant_contexts} gives the corresponding GAM variant comparison. Unlike XGBoost, this is not only a raw-versus-log target comparison: the GammaGAM also changes the response distribution and link function. All rows are nevertheless evaluated out-of-fold on the original \texttt{ml\_ade} scale, making the metrics comparable within each context.
 
 \begin{table}[H]
   \centering
