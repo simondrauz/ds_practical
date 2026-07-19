@@ -146,3 +146,13 @@ results/interpretable_model/xgboost/conditional_pdp_hypotheses/
 results/interpretable_model/xgboost/conditional_pdp_hypotheses/**
 
 # Data (heavy files tracked separately in data/.gitignore)
+
+# Internal working notes (not part of the submission)
+Report/REPORT_PACKAGE_IMPLEMENTATION_PROMPT.md
+Report/missing_presentation_packages.md
+Report/report_enhancement_findings.md
+Report/report_presentation_mismatches.md
+
+# LaTeX list-of-figures/tables build artifacts
+Report/*.lof
+Report/*.lot
