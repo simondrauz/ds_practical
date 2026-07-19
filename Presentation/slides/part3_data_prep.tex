@@ -41,7 +41,7 @@
       }
       \vspace{0.5em}
       \onslide<3->{
-      $\Rightarrow$ \textbf{18 candidate features} joined with
+      $\Rightarrow$ \textbf{17 candidate features} joined with
       Trajectron++ evaluation output via \texttt{data\_idx}
       }
     \end{column}
@@ -54,7 +54,7 @@
     \begin{column}{0.50\textwidth}
       \begin{itemize}[<+->]
         \item \texttt{ml\_ade} is strongly \emph{right-skewed}
-              (skewness $= 2.59$)
+              (skewness $= 3.01$)
         \item Log transformation (\texttt{log1p}) considered to stabilise
               variance — tested as a modeling choice in the next step
       \end{itemize}
@@ -74,8 +74,8 @@
       \onslide<1->{\textbf{Approach 1: MI elbow + VIF}}
       \begin{itemize}[<2->]
         \item Rank features by Mutual Information with target
-        \item Drop low-signal tail below the elbow: 18 $\to$ 10
-        \item Apply VIF filter (threshold $= 5$): 10 $\to$ \textbf{4 features}
+        \item Drop low-signal tail below the elbow: 17 $\to$ 9
+        \item Apply VIF filter (threshold $= 5$): 9 $\to$ \textbf{4 features}
       \end{itemize}
       \onslide<2->{
       \vspace{0.4em}
@@ -89,8 +89,8 @@
     \begin{column}{0.48\textwidth}
       \onslide<3->{\textbf{Approach 2: VIF only}}
       \begin{itemize}
-        \item<3-> Skip MI; apply VIF directly to all 18 candidates
-        \item<3-> VIF filter (threshold $= 5$): 18 $\to$ \textbf{6 features}
+        \item<3-> Skip MI; apply VIF directly to all 17 candidates
+        \item<3-> VIF filter (threshold $= 5$): 17 $\to$ \textbf{6 features}
       \end{itemize}
       \onslide<3->{
       \vspace{0.4em}
