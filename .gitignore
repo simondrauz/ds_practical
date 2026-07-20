@@ -152,6 +152,7 @@ Report/REPORT_PACKAGE_IMPLEMENTATION_PROMPT.md
 Report/missing_presentation_packages.md
 Report/report_enhancement_findings.md
 Report/report_presentation_mismatches.md
+Report/report_consistency_review.md
 
 # LaTeX list-of-figures/tables build artifacts
 Report/*.lof
