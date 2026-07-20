@@ -295,6 +295,45 @@ With $17$ candidate features, many of which are correlated by construction (for 
 
 Comparing the two feature sets serves as a robustness check. The MI-elbow-plus-VIF set is more parsimonious and motion-focused, whereas the VIF-only set deliberately preserves scene-context information that the MI filter would otherwise remove. Carrying both forward allows us to assess whether the inclusion of scene features materially changes the conclusions of the interpretable analysis, an assessment we return to in the results.
 
+\subsection{Interpretable Models: GAM and XGBoost}
+\label{sec:interpretable_models}
+
+The per-trajectory \texttt{ml\_ade} values, together with the selected features, allow us to ask not merely \emph{how large} the prediction error is for a given trajectory, but \emph{why} it is large or small. The error value alone is uninformative in this respect: it tells us that variation exists but not what drives it. To uncover the drivers, we fit a second-stage, interpretable model, a \emph{meta-model}, that takes the engineered trajectory and scene features as inputs and predicts the Trajectron++ prediction error as output. If this meta-model is itself interpretable, then its learned structure can be read as an explanation of the conditions under which Trajectron++ performs well or poorly.
+
+We adopt two complementary meta-models: a Generalised Additive Model (GAM), which is inherently interpretable, and XGBoost, a gradient-boosted tree ensemble that is more flexible but must be interpreted post-hoc.
+
+\subsubsection{Generalised Additive Model}
+
+A Generalised Additive Model expresses the target as a sum of smooth, univariate functions of the individual features:
+\begin{equation}
+  f(x) = \sum_{j} s_j(x_j),
+  \label{eq:gam}
+\end{equation}
+where each $s_j$ is a smooth spline learned from the data. The defining property of this formulation is that the contribution of each feature is captured by its own dedicated function and these contributions are simply added together. There are no interaction terms: the model assumes that the effect of one feature does not depend on the value of another.
+
+This additive structure makes the GAM inherently interpretable. Each $s_j$ can be plotted directly to reveal the marginal effect of feature $x_j$ on the predicted error, showing immediately whether the relationship is increasing, decreasing, linear, or non-linear. Moreover, the GAM framework provides $p$-values for each smooth term, enabling formal significance testing of whether a feature has a statistically detectable effect on prediction error. The interpretability of the GAM is thus structural: the explanation is the model, requiring no additional attribution machinery. We fit all GAM variants with the pyGAM library \citep{serven2018pygam}.
+
+\subsubsection{XGBoost}
+
+XGBoost~\citep{chen2016xgboost} is an ensemble method based on gradient-boosted decision trees. Rather than fitting a single model, it constructs a sequence of decision trees in which each new tree is trained to correct the residual errors of the trees already in the ensemble. The prediction for an input $x$ after $T$ boosting rounds is the sum of the outputs of all the individual trees:
+\begin{equation}
+  \hat{y}(x) = \sum_{t=1}^{T} f_t(x),
+  \label{eq:xgboost}
+\end{equation}
+where each $f_t$ is a regression tree. Each tree partitions the feature space through a sequence of threshold rules and assigns a constant correction to each resulting region; because a single tree can split on several features in succession, the ensemble naturally captures non-linearities and interactions between features. This flexibility is precisely what the additive GAM lacks, and it allows XGBoost to represent effects in which the impact of one feature depends on the level of another, for example a speed-variability effect that is amplified when it coincides with turning. The empirically estimated interaction structure is examined in Appendix~\ref{app:feature_effect_evidence}.
+
+The cost of this flexibility is that the fitted ensemble, typically comprising many trees, is not directly human-readable. We therefore interpret it post-hoc using two standard techniques: SHAP values \citep{lundberg2017shap} and partial dependence plots \citep{friedman2001gbm}. SHAP values decompose each individual prediction into additive, signed contributions from each feature on top of a baseline value:
+\begin{equation}
+  f(x) = \phi_0 + \sum_{j} \phi_j(x),
+  \label{eq:shap}
+\end{equation}
+where $\phi_0$ is the baseline (the mean model prediction) and each $\phi_j(x)$ quantifies how much feature $j$ pushes the prediction for this specific input above or below that baseline. Aggregating the magnitude of these contributions across the dataset yields a global measure of feature importance, while partial dependence plots visualise the average effect of a feature across its range, analogous in spirit to the smooth terms of the GAM but recovered from a black-box model.
+
+\subsubsection{Rationale for Using Both Models}
+
+The two meta-models occupy complementary positions on the interpretability–flexibility spectrum. The GAM is fully transparent and provides significance tests, but its additive assumption rules out interactions. XGBoost can capture those interactions and typically attains a better fit, but requires post-hoc tools to be interpreted and offers no native significance testing. Reading the two together mitigates the weaknesses of each: agreement between a transparent additive model and a flexible interaction-aware ensemble is strong evidence that an identified effect is real rather than an artefact of one model's assumptions. This dual-model strategy underpins the feature-importance and feature-effect analyses that answer RQ1 and RQ2.
+
+\newpage
 \subsection{Model Selection and Validation Protocol}
 \label{sec:model_selection_validation}
 
@@ -360,47 +399,8 @@ The out-of-fold predictions also make it possible to inspect diagnostic plots fo
   \end{tabular}
 \end{table}
 
-The selected variants were therefore LinearGAM with a log-transformed target and XGBoost with a log-transformed target. The XGBoost log model achieved the best out-of-fold performance overall, with RMSE $0.388$, $R^2 = 0.619$, and MAE $0.214$ on the original \texttt{ml\_ade} scale, while the log-GAM retained the transparent additive structure needed for direct effect interpretation. Rank preservation matters here in addition to squared-error fit, because the downstream regime analysis clusters trajectory-level effect vectors: the Spearman column shows that the selected XGBoost variant also preserves the ordering of trajectories by prediction error best ($\rho = 0.835$). The outer-fold dispersion of these metrics is small for both selected variants (Appendix Table~\ref{tab:appendix_nested_cv_stability}), indicating that the tuning procedure generalises stably across folds and that the final refit on all rows is justified. Both models were carried forward so that feature-effect conclusions could be checked across an interpretable additive model and a more flexible interaction-capable model. Appendix~\ref{app:tuning_details} reports the corresponding target-scale comparison and the full-data tuned configurations used for the exported meta-models.
+The selected variants were therefore LinearGAM with a log-transformed target and XGBoost with a log-transformed target. The XGBoost log model achieved the best out-of-fold performance overall, with RMSE $0.388$, $R^2 = 0.619$, and MAE $0.214$ on the original \texttt{ml\_ade} scale, while the log-GAM retained the transparent additive structure needed for direct effect interpretation. Rank preservation matters here in addition to squared-error fit, because the downstream regime analysis clusters trajectory-level effect vectors: the Spearman column shows that the selected XGBoost variant also preserves the ordering of trajectories by prediction error best ($\rho = 0.835$). The outer-fold dispersion of these metrics is small for all variants (Appendix Table~\ref{tab:appendix_nested_cv_stability}); standard deviations over only three outer folds are coarse estimates and should not be over-interpreted, but the consistently small fold-to-fold variation gives no indication of unstable tuning and supports the final refit on all rows. Both models were carried forward so that feature-effect conclusions could be checked across an interpretable additive model and a more flexible interaction-capable model. Appendix~\ref{app:tuning_details} reports the corresponding target-scale comparison and the full-data tuned configurations used for the exported meta-models.
 
-\subsection{Interpretable Models: GAM and XGBoost}
-\label{sec:interpretable_models}
-
-The per-trajectory \texttt{ml\_ade} values, together with the selected features, allow us to ask not merely \emph{how large} the prediction error is for a given trajectory, but \emph{why} it is large or small. The error value alone is uninformative in this respect: it tells us that variation exists but not what drives it. To uncover the drivers, we fit a second-stage, interpretable model, a \emph{meta-model}, that takes the engineered trajectory and scene features as inputs and predicts the Trajectron++ prediction error as output. If this meta-model is itself interpretable, then its learned structure can be read as an explanation of the conditions under which Trajectron++ performs well or poorly.
-
-We adopt two complementary meta-models: a Generalised Additive Model (GAM), which is inherently interpretable, and XGBoost, a gradient-boosted tree ensemble that is more flexible but must be interpreted post-hoc.
-
-\subsubsection{Generalised Additive Model}
-
-A Generalised Additive Model expresses the target as a sum of smooth, univariate functions of the individual features:
-\begin{equation}
-  f(x) = \sum_{j} s_j(x_j),
-  \label{eq:gam}
-\end{equation}
-where each $s_j$ is a smooth spline learned from the data. The defining property of this formulation is that the contribution of each feature is captured by its own dedicated function and these contributions are simply added together. There are no interaction terms: the model assumes that the effect of one feature does not depend on the value of another.
-
-This additive structure makes the GAM inherently interpretable. Each $s_j$ can be plotted directly to reveal the marginal effect of feature $x_j$ on the predicted error, showing immediately whether the relationship is increasing, decreasing, linear, or non-linear. Moreover, the GAM framework provides $p$-values for each smooth term, enabling formal significance testing of whether a feature has a statistically detectable effect on prediction error. The interpretability of the GAM is thus structural: the explanation is the model, requiring no additional attribution machinery. We fit all GAM variants with the pyGAM library \citep{serven2018pygam}.
-
-\subsubsection{XGBoost}
-
-XGBoost~\citep{chen2016xgboost} is an ensemble method based on gradient-boosted decision trees. Rather than fitting a single model, it constructs a sequence of decision trees in which each new tree is trained to correct the residual errors of the trees already in the ensemble. The prediction for an input $x$ after $T$ boosting rounds is the sum of the outputs of all the individual trees:
-\begin{equation}
-  \hat{y}(x) = \sum_{t=1}^{T} f_t(x),
-  \label{eq:xgboost}
-\end{equation}
-where each $f_t$ is a regression tree. Each tree partitions the feature space through a sequence of threshold rules and assigns a constant correction to each resulting region; because a single tree can split on several features in succession, the ensemble naturally captures non-linearities and interactions between features. This flexibility is precisely what the additive GAM lacks, and it allows XGBoost to represent effects such as ``high speed variability only increases error when it is accompanied by sharp turning'', an interaction pattern we examine empirically in Appendix~\ref{app:feature_effect_evidence}.
-
-The cost of this flexibility is that the fitted ensemble, typically comprising many trees, is not directly human-readable. We therefore interpret it post-hoc using two standard techniques: SHAP values \citep{lundberg2017shap} and partial dependence plots \citep{friedman2001gbm}. SHAP values decompose each individual prediction into additive, signed contributions from each feature on top of a baseline value:
-\begin{equation}
-  f(x) = \phi_0 + \sum_{j} \phi_j(x),
-  \label{eq:shap}
-\end{equation}
-where $\phi_0$ is the baseline (the mean model prediction) and each $\phi_j(x)$ quantifies how much feature $j$ pushes the prediction for this specific input above or below that baseline. Aggregating the magnitude of these contributions across the dataset yields a global measure of feature importance, while partial dependence plots visualise the average effect of a feature across its range, analogous in spirit to the smooth terms of the GAM but recovered from a black-box model.
-
-\subsubsection{Rationale for Using Both Models}
-
-The two meta-models occupy complementary positions on the interpretability–flexibility spectrum. The GAM is fully transparent and provides significance tests, but its additive assumption rules out interactions. XGBoost can capture those interactions and typically attains a better fit, but requires post-hoc tools to be interpreted and offers no native significance testing. Reading the two together mitigates the weaknesses of each: agreement between a transparent additive model and a flexible interaction-aware ensemble is strong evidence that an identified effect is real rather than an artefact of one model's assumptions. This dual-model strategy underpins the feature-importance and feature-effect analyses that answer RQ1 and RQ2.
-
-\newpage
 \subsection{Cluster Analysis for Success and Failure Modes}
 \label{sec:cluster_methodology}
 
@@ -818,7 +818,7 @@ A natural next step is to enrich the input space with map and lane geometry, loc
 \subsection{Feature Selection Diagnostics}
 \label{app:feature_selection_diagnostics}
 
-Figure~\ref{fig:appendix_correlation_clustermap} shows the pairwise Spearman correlation structure of the $17$ candidate features that motivates the collinearity pruning in Section~\ref{sec:feature_selection}. The hierarchical dendrogram groups redundant features: the acceleration and jerk statistics form a tightly correlated block with \texttt{std\_speed} ($\rho \geq 0.88$), \texttt{mean\_speed} and \texttt{max\_speed} are strongly coupled ($\rho = 0.90$), and \texttt{path\_efficiency} is almost perfectly anti-correlated with \texttt{heading\_change\_per\_sec} ($\rho = -0.91$). The VIF filter resolves exactly these blocks, retaining one representative per group.
+Figure~\ref{fig:appendix_correlation_clustermap} shows the pairwise Spearman correlation structure of the $17$ candidate features that motivates the collinearity pruning in Section~\ref{sec:feature_selection}. The dendrograms on the margins are obtained by agglomerative hierarchical clustering of the features, using average linkage on the Euclidean distances between the features' rows of the correlation matrix (the defaults of seaborn's \texttt{clustermap}); features with similar correlation profiles are thereby placed next to each other. The hierarchical dendrogram groups redundant features: the acceleration and jerk statistics form a tightly correlated block with \texttt{std\_speed} ($\rho \geq 0.88$), \texttt{mean\_speed} and \texttt{max\_speed} are strongly coupled ($\rho = 0.90$), and \texttt{path\_efficiency} is almost perfectly anti-correlated with \texttt{heading\_change\_per\_sec} ($\rho = -0.91$). The VIF filter resolves exactly these blocks, retaining one representative per group.
 
 \begin{figure}[H]
   \centering
@@ -950,11 +950,11 @@ Table~\ref{tab:appendix_gam_configs} reports the full-data retuned GAM configura
   \end{tabular}
 \end{table}
 
-Finally, Table~\ref{tab:appendix_nested_cv_stability} reports the stability of the nested resampling: the mean and standard deviation of the outer-fold metrics across the three outer folds for the selected model variants. The dispersion is small relative to the differences between model families, supporting the conclusion in Section~\ref{sec:model_selection_validation} that the tuning procedure generalises stably and that the final refit on all rows is justified.
+Finally, Table~\ref{tab:appendix_nested_cv_stability} reports the stability of the nested resampling: the mean and standard deviation of the outer-fold metrics across the three outer folds, for all model variants on both full-trainval feature sets. With only three outer folds, the standard deviations are coarse, indicative estimates rather than precise uncertainty quantifications. Their consistently small magnitude relative to the differences between model families nevertheless supports the conclusion in Section~\ref{sec:model_selection_validation} that the tuning procedure shows no sign of fold-to-fold instability and that the final refit on all rows is justified.
 
 \begin{table}[H]
   \centering
-  \caption{Outer-fold stability of the nested-CV metrics (mean $\pm$ standard deviation across the three outer folds), evaluated on the original \texttt{ml\_ade} scale.}
+  \caption{Outer-fold stability of the nested-CV metrics (mean $\pm$ standard deviation across the three outer folds), evaluated on the original \texttt{ml\_ade} scale. Bold rows mark the variants carried forward in each context. Fold means can differ marginally from the pooled out-of-fold metrics of Tables~\ref{tab:appendix_xgboost_target_scale} and~\ref{tab:appendix_gam_variant_contexts}.}
   \label{tab:appendix_nested_cv_stability}
   \small
   \renewcommand{\arraystretch}{1.12}
@@ -962,10 +962,17 @@ Finally, Table~\ref{tab:appendix_nested_cv_stability} reports the stability of t
     \toprule
     \textbf{Feature set} & \textbf{Model} & \textbf{RMSE} & \textbf{MAE} & \textbf{R$^2$} \\
     \midrule
-    MI\,+\,VIF (main) & XGBoost (log)   & $0.388 \pm 0.010$ & $0.214 \pm 0.005$ & $0.619 \pm 0.008$ \\
-    MI\,+\,VIF (main) & LinearGAM (log) & $0.445 \pm 0.017$ & $0.250 \pm 0.004$ & $0.498 \pm 0.035$ \\
-    VIF only          & XGBoost (log)   & $0.387 \pm 0.008$ & $0.213 \pm 0.002$ & $0.624 \pm 0.007$ \\
-    VIF only          & LinearGAM (raw) & $0.440 \pm 0.011$ & $0.268 \pm 0.002$ & $0.515 \pm 0.010$ \\
+    MI\,+\,VIF (main) & LinearGAM (raw)  & $0.448 \pm 0.022$ & $0.263 \pm 0.003$ & $0.491 \pm 0.052$ \\
+    MI\,+\,VIF (main) & \textbf{LinearGAM (log)} & $0.445 \pm 0.017$ & $0.250 \pm 0.004$ & $0.498 \pm 0.035$ \\
+    MI\,+\,VIF (main) & GammaGAM         & $0.445 \pm 0.010$ & $0.253 \pm 0.002$ & $0.498 \pm 0.007$ \\
+    MI\,+\,VIF (main) & XGBoost (raw)    & $0.389 \pm 0.009$ & $0.223 \pm 0.004$ & $0.617 \pm 0.006$ \\
+    MI\,+\,VIF (main) & \textbf{XGBoost (log)} & $0.388 \pm 0.010$ & $0.214 \pm 0.005$ & $0.619 \pm 0.008$ \\
+    \midrule
+    VIF only          & \textbf{LinearGAM (raw)} & $0.440 \pm 0.011$ & $0.268 \pm 0.002$ & $0.515 \pm 0.010$ \\
+    VIF only          & LinearGAM (log)  & $0.444 \pm 0.009$ & $0.255 \pm 0.003$ & $0.506 \pm 0.007$ \\
+    VIF only          & GammaGAM         & $0.475 \pm 0.013$ & $0.277 \pm 0.004$ & $0.434 \pm 0.019$ \\
+    VIF only          & XGBoost (raw)    & $0.386 \pm 0.008$ & $0.220 \pm 0.003$ & $0.626 \pm 0.011$ \\
+    VIF only          & \textbf{XGBoost (log)} & $0.387 \pm 0.008$ & $0.213 \pm 0.002$ & $0.624 \pm 0.007$ \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -987,26 +994,26 @@ The main text reports the out-of-fold diagnostics for the selected MI\,+\,VIF fe
   \label{fig:appendix_oof_vif_only}
 \end{figure}
 
-Table~\ref{tab:appendix_regime_errors} quantifies the tail under-prediction visible in these diagnostics by stratifying the out-of-fold errors of the selected MI\,+\,VIF models over the easy, medium, and hard performance groups of Section~\ref{sec:cluster_methodology}. Both meta-models show the regression-to-the-mean pattern expected for a noisy, long-tailed target: easy trajectories are slightly over-predicted, while hard trajectories are strongly under-predicted, by $0.645$\,m on average for XGBoost and $0.818$\,m for the GAM. The compression is consistently weaker for XGBoost, and within-group rank correlations remain moderate, so the exported feature effects stay usable for pattern discovery; nevertheless, effects in the hard group should be read as explaining a compressed prediction of poor performance rather than its full observed magnitude.
+Table~\ref{tab:appendix_regime_errors} quantifies the tail under-prediction visible in these diagnostics by stratifying the out-of-fold errors of the selected MI\,+\,VIF models over the easy, medium, and hard performance groups of Section~\ref{sec:cluster_methodology}. Both meta-models show the regression-to-the-mean pattern expected for a noisy, long-tailed target: easy trajectories are slightly over-predicted, while hard trajectories are strongly under-predicted, by $0.645$\,m on average for XGBoost and $0.818$\,m for the GAM. The compression is consistently weaker for XGBoost. Nevertheless, effects in the hard group should be read as explaining a compressed prediction of poor performance rather than its full observed magnitude.
 
 \begin{table}[H]
   \centering
-  \caption{Out-of-fold errors of the selected MI\,+\,VIF meta-models stratified by performance group, on the original \texttt{ml\_ade} scale (in metres). Bias is the mean of predicted minus actual \texttt{ml\_ade}; Spearman $\rho$ is the within-group rank correlation.}
+  \caption{Out-of-fold errors of the selected MI\,+\,VIF meta-models stratified by performance group, on the original \texttt{ml\_ade} scale (in metres). Bias is the mean of predicted minus actual \texttt{ml\_ade}.}
   \label{tab:appendix_regime_errors}
   \small
   \renewcommand{\arraystretch}{1.12}
-  \begin{tabular}{llcccccc}
+  \begin{tabular}{llccccc}
     \toprule
-    \textbf{Model} & \textbf{Group} & \textbf{Actual} & \textbf{Predicted} & \textbf{MAE} & \textbf{RMSE} & \textbf{Bias} & \textbf{Spearman} $\boldsymbol{\rho}$ \\
-    & & \textbf{mean} & \textbf{mean} & & & & \\
+    \textbf{Model} & \textbf{Group} & \textbf{Actual} & \textbf{Predicted} & \textbf{MAE} & \textbf{RMSE} & \textbf{Bias} \\
+    & & \textbf{mean} & \textbf{mean} & & & \\
     \midrule
-    XGBoost (log) & easy   & 0.177 & 0.258 & 0.109 & 0.177 & $+0.081$ & 0.698 \\
-    XGBoost (log) & medium & 0.658 & 0.622 & 0.231 & 0.319 & $-0.036$ & 0.455 \\
-    XGBoost (log) & hard   & 2.028 & 1.383 & 0.773 & 0.993 & $-0.645$ & 0.480 \\
+    XGBoost (log) & easy   & 0.177 & 0.258 & 0.109 & 0.177 & $+0.081$ \\
+    XGBoost (log) & medium & 0.658 & 0.622 & 0.231 & 0.319 & $-0.036$ \\
+    XGBoost (log) & hard   & 2.028 & 1.383 & 0.773 & 0.993 & $-0.645$ \\
     \midrule
-    LinearGAM (log) & easy   & 0.177 & 0.280 & 0.138 & 0.199 & $+0.103$ & 0.626 \\
-    LinearGAM (log) & medium & 0.658 & 0.611 & 0.241 & 0.360 & $-0.048$ & 0.383 \\
-    LinearGAM (log) & hard   & 2.028 & 1.210 & 0.915 & 1.149 & $-0.818$ & 0.417 \\
+    LinearGAM (log) & easy   & 0.177 & 0.280 & 0.138 & 0.199 & $+0.103$ \\
+    LinearGAM (log) & medium & 0.658 & 0.611 & 0.241 & 0.360 & $-0.048$ \\
+    LinearGAM (log) & hard   & 2.028 & 1.210 & 0.915 & 1.149 & $-0.818$ \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -1023,13 +1030,31 @@ Figure~\ref{fig:appendix_shap_beeswarm} shows the distribution of signed per-tra
   \label{fig:appendix_shap_beeswarm}
 \end{figure}
 
-Figure~\ref{fig:appendix_pdp_interactions} examines the pairwise interaction structure that the additive GAM cannot represent, using two-dimensional centred partial dependence surfaces for the XGBoost model. Two patterns support the interaction reading of the main text. First, the \texttt{std\_speed}$\times$\texttt{heading\_change\_per\_sec} surface shows that high speed variability raises the predicted error only when accompanied by non-trivial turning: along the bottom edge of the panel, where the turning rate is near zero, even the highest \texttt{std\_speed} values leave the centred effect neutral. Second, the \texttt{max\_speed}$\times$\texttt{heading\_change\_per\_sec} surface shows that raw speed alone is likewise not sufficient: the strongest joint effect appears where elevated maximum speed coincides with moderate-to-high turning rates, consistent with the hard-regime interpretation in Section~\ref{sec:rq2_results} that fast motion matters when paired with turning.
+Figure~\ref{fig:appendix_shap_beeswarm_vif_only} shows the corresponding beeswarm for the VIF-only robustness feature set. The dominant pattern carries over: \texttt{std\_speed} retains the top rank with the same long positive tail, and \texttt{mean\_acceleration} remains small and mixed in sign. The contributions of the scene and social features (\texttt{min\_neighbor\_distance}, \texttt{scene\_density\_VEHICLE}, \texttt{scene\_num\_VEHICLE}) are tightly concentrated around zero, visually confirming their small aggregate magnitudes in Table~\ref{tab:feature_effect_importance}. The \texttt{heading\_change\_per\_sec} contributions again display the non-monotone pattern discussed in Section~\ref{sec:rq1_results}: the highest turning rates (red) pull the predicted error down, consistent with the slow-turner success mode of Section~\ref{sec:rq2_results}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/shap_beeswarm_vif_only.png}
+  \caption{SHAP beeswarm for the XGBoost model on the VIF-only robustness feature set (log-target scale), analogous to Figure~\ref{fig:appendix_shap_beeswarm}.}
+  \label{fig:appendix_shap_beeswarm_vif_only}
+\end{figure}
+
+Figure~\ref{fig:appendix_pdp_interactions} examines the pairwise interaction structure that the additive GAM cannot represent, using two-dimensional centred partial dependence surfaces for the XGBoost model on the main MI\,+\,VIF feature set. The cleanest synergy is the \texttt{max\_speed}$\times$\texttt{heading\_change\_per\_sec} surface: raw speed alone leaves the centred effect close to neutral along the low-turning edge, and the strongest joint effect appears where elevated maximum speed coincides with moderate-to-high turning rates, consistent with the hard-regime interpretation in Section~\ref{sec:rq2_results} that fast motion matters when paired with turning. The \texttt{std\_speed}$\times$\texttt{heading\_change\_per\_sec} surface shows a more partial amplification pattern. In the moderate range of speed variability (\texttt{std\_speed} roughly $0.25$--$0.35$), the positive effect emerges mainly when it is paired with non-trivial turning, and at near-zero turning rates even elevated speed variability leaves the centred effect neutral. At the highest speed-variability values, however, the effect is strongly positive across essentially the whole turning range: extreme speed variability raises the predicted error largely irrespective of turning. The interaction is therefore real but confined to the moderate range; it amplifies the \texttt{std\_speed} effect rather than gating it, and the additive main effect of speed variability remains dominant at the extremes.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{figures/pdp_interactions_mi_vif.png}
   \caption{Two-dimensional centred partial dependence surfaces for all feature pairs of the main MI\,+\,VIF feature set (XGBoost, log-target scale). Red regions indicate above-average predicted error, blue regions below-average.}
   \label{fig:appendix_pdp_interactions}
+\end{figure}
+
+Figure~\ref{fig:appendix_pdp_interactions_vif_only} repeats the interaction analysis for the VIF-only robustness feature set. The \texttt{std\_speed}$\times$\texttt{heading\_change\_per\_sec} surface reproduces the main-set pattern described above. The panels pairing motion features with the scene and social features show largely parallel, vertical contour lines: the motion effects neither shift nor change shape across neighbour distance, vehicle density, or vehicle count. This absence of notable motion--scene interactions reinforces the conclusion of Section~\ref{sec:rq1_results} that the engineered scene context plays a secondary role.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[height=0.82\textheight,keepaspectratio]{figures/pdp_interactions_vif_only.png}
+  \caption{Two-dimensional centred partial dependence surfaces for all feature pairs of the VIF-only robustness feature set (XGBoost, log-target scale). The near-vertical contours in the panels pairing \texttt{std\_speed} with scene and social features indicate the absence of notable motion--scene interactions.}
+  \label{fig:appendix_pdp_interactions_vif_only}
 \end{figure}
 
 \subsection{Cluster UMAP Diagnostics}
