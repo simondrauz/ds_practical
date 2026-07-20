@@ -341,10 +341,11 @@ Skipper Seabold and Josef Perktold.
 \newblock \doi{10.25080/Majora-92bf1922-011}.
 \newblock URL \url{https://doi.org/10.25080/Majora-92bf1922-011}.
 
-\bibitem[Serv{\'e}n and Brummitt(2018)]{serven2018pygam}
-Daniel Serv{\'e}n and Charlie Brummitt.
-\newblock pygam: Generalized additive models in python, 2018.
-\newblock URL \url{https://doi.org/10.5281/zenodo.1208723}.
+\bibitem[Serv{\'e}n et~al.(2025)Serv{\'e}n, Brummitt, Kir{\'a}ly,
+  et~al.]{serven2025pygam}
+Daniel Serv{\'e}n, Charlie Brummitt, Franz Kir{\'a}ly, et~al.
+\newblock pygam: Generalized additive models in python, 2025.
+\newblock URL \url{https://doi.org/10.5281/zenodo.17981758}.
 
 \bibitem[Snoek et~al.(2012)Snoek, Larochelle, and Adams]{snoek2012bayesian}
 Jasper Snoek, Hugo Larochelle, and Ryan Adams.
