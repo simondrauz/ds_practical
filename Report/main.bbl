@@ -1,0 +1,375 @@
+\begin{thebibliography}{44}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Akiba et~al.(2019)Akiba, Sano, Yanase, Ohta, and
+  Koyama]{akiba2019optuna}
+Takuya Akiba, Shotaro Sano, Toshihiko Yanase, Takeru Ohta, and Masanori Koyama.
+\newblock Optuna: A next-generation hyperparameter optimization framework.
+\newblock In \emph{Proceedings of the 25th ACM SIGKDD International Conference
+  on Knowledge Discovery \& Data Mining}, KDD '19, page 2623–2631, New York,
+  NY, USA, 2019. Association for Computing Machinery.
+\newblock ISBN 9781450362016.
+\newblock \doi{10.1145/3292500.3330701}.
+\newblock URL \url{https://doi.org/10.1145/3292500.3330701}.
+
+\bibitem[Alahi et~al.(2016)Alahi, Goel, Ramanathan, Robicquet, Fei-Fei, and
+  Savarese]{alahi2016social}
+Alexandre Alahi, Kratarth Goel, Vignesh Ramanathan, Alexandre Robicquet,
+  Li~Fei-Fei, and Silvio Savarese.
+\newblock Social {LSTM}: Human trajectory prediction in crowded spaces.
+\newblock In \emph{Proceedings of the IEEE conference on computer vision and
+  pattern recognition}, pages 961--971, 2016.
+
+\bibitem[Ankerst et~al.(1999)Ankerst, Breunig, Kriegel, and
+  Sander]{ankerst1999optics}
+Mihael Ankerst, Markus~M. Breunig, Hans-Peter Kriegel, and J\"{o}rg Sander.
+\newblock {OPTICS}: ordering points to identify the clustering structure.
+\newblock In \emph{Proceedings of the 1999 ACM SIGMOD International Conference
+  on Management of Data}, SIGMOD '99, page 49–60, New York, NY, USA, 1999.
+  Association for Computing Machinery.
+\newblock ISBN 1581130848.
+\newblock \doi{10.1145/304182.304187}.
+\newblock URL \url{https://doi.org/10.1145/304182.304187}.
+
+\bibitem[Arivazhagan et~al.(2019)Arivazhagan, Aggarwal, Singh, and
+  Choudhary]{arivazhagan2019fedper}
+Manoj~Ghuhan Arivazhagan, Vinay Aggarwal, Arjun~Kumar Singh, and Sunav
+  Choudhary.
+\newblock Federated learning with personalization layers.
+\newblock \emph{arXiv preprint arXiv:1912.00818}, 2019.
+
+\bibitem[Bergstra et~al.(2011)Bergstra, Bardenet, Bengio, and
+  K\'{e}gl]{bergstra2011algorithms}
+James Bergstra, R\'{e}mi Bardenet, Yoshua Bengio, and Bal\'{a}zs K\'{e}gl.
+\newblock Algorithms for hyper-parameter optimization.
+\newblock In J.~Shawe-Taylor, R.~Zemel, P.~Bartlett, F.~Pereira, and
+  K.~Weinberger, editors, \emph{Advances in Neural Information Processing
+  Systems}, volume~24. Curran Associates, Inc., 2011.
+\newblock URL
+  \url{https://proceedings.neurips.cc/paper_files/paper/2011/file/86e8f7ab32cfd12577bc2619bc635690-Paper.pdf}.
+
+\bibitem[Bischl et~al.(2023)Bischl, Binder, Lang, Pielok, Richter, Coors,
+  Thomas, Ullmann, Becker, Boulesteix, Deng, and Lindauer]{bischl2023hpo}
+Bernd Bischl, Martin Binder, Michel Lang, Tobias Pielok, Jakob Richter, Stefan
+  Coors, Janek Thomas, Theresa Ullmann, Marc Becker, Anne-Laure Boulesteix,
+  Difan Deng, and Marius Lindauer.
+\newblock Hyperparameter optimization: Foundations, algorithms, best practices,
+  and open challenges.
+\newblock \emph{WIREs Data Mining and Knowledge Discovery}, 13\penalty0
+  (2):\penalty0 e1484, 2023.
+\newblock \doi{https://doi.org/10.1002/widm.1484}.
+\newblock URL
+  \url{https://wires.onlinelibrary.wiley.com/doi/abs/10.1002/widm.1484}.
+
+\bibitem[Caesar et~al.(2020)Caesar, Bankiti, Lang, Vora, Liong, Xu, Krishnan,
+  Pan, Baldan, and Beijbom]{caesar2020nuscenes}
+Holger Caesar, Varun Bankiti, Alex~H. Lang, Sourabh Vora, Venice~Erin Liong,
+  Qiang Xu, Anush Krishnan, Yu~Pan, Giancarlo Baldan, and Oscar Beijbom.
+\newblock {nuScenes}: A multimodal dataset for autonomous driving.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition (CVPR)}, pages 11621--11631, 2020.
+
+\bibitem[Campello et~al.(2015)Campello, Moulavi, Zimek, and
+  Sander]{campello2015hdbscan}
+Ricardo J. G.~B. Campello, Davoud Moulavi, Arthur Zimek, and J\"{o}rg Sander.
+\newblock Hierarchical density estimates for data clustering, visualization,
+  and outlier detection.
+\newblock \emph{ACM Trans. Knowl. Discov. Data}, 10\penalty0 (1), July 2015.
+\newblock ISSN 1556-4681.
+\newblock \doi{10.1145/2733381}.
+\newblock URL \url{https://doi.org/10.1145/2733381}.
+
+\bibitem[Cawley and Talbot(2010)]{cawley2010overfitting}
+Gavin~C. Cawley and Nicola L.~C. Talbot.
+\newblock On over-fitting in model selection and subsequent selection bias in
+  performance evaluation.
+\newblock \emph{Journal of Machine Learning Research}, 11\penalty0
+  (70):\penalty0 2079--2107, 2010.
+\newblock URL \url{http://jmlr.org/papers/v11/cawley10a.html}.
+
+\bibitem[Chen and Guestrin(2016)]{chen2016xgboost}
+Tianqi Chen and Carlos Guestrin.
+\newblock {XGBoost}: A scalable tree boosting system.
+\newblock In \emph{Proceedings of the 22nd ACM SIGKDD International Conference
+  on Knowledge Discovery and Data Mining}, pages 785--794, 2016.
+
+\bibitem[Collins et~al.(2021)Collins, Hassani, Mokhtari, and
+  Shakkottai]{collins2021fedRep}
+Liam Collins, Hamed Hassani, Aryan Mokhtari, and Sanjay Shakkottai.
+\newblock Exploiting shared representations for personalized federated
+  learning.
+\newblock \emph{arXiv preprint arXiv:2102.07078}, 2021.
+
+\bibitem[Dinh et~al.(2020)Dinh, Tran, and Nguyen]{dinh2020pfedme}
+Canh~T. Dinh, Nguyen~H. Tran, and Tuan~Dung Nguyen.
+\newblock Personalized federated learning with {Moreau} envelopes.
+\newblock In \emph{Advances in Neural Information Processing Systems
+  (NeurIPS)}, volume~33, pages 21394--21405, 2020.
+
+\bibitem[Fallah et~al.(2020)Fallah, Mokhtari, and
+  Ozdaglar]{fallah2020perfedavg}
+Alireza Fallah, Aryan Mokhtari, and Asuman Ozdaglar.
+\newblock Personalized federated learning: A meta-learning approach.
+\newblock In \emph{Advances in Neural Information Processing Systems
+  (NeurIPS)}, volume~33, pages 3557--3568, 2020.
+
+\bibitem[Friedman(2001)]{friedman2001gbm}
+Jerome~H. Friedman.
+\newblock Greedy function approximation: A gradient boosting machine.
+\newblock \emph{Annals of Statistics}, 29\penalty0 (5):\penalty0 1189--1232,
+  2001.
+
+\bibitem[Gu et~al.(2022)Gu, Yang, and Zhang]{gu2022mid}
+Tianpei Gu, Jiabing Yang, and Cheng Zhang.
+\newblock Motion indeterminacy diffusion for trajectory forecasting.
+\newblock \emph{arXiv preprint arXiv:2203.13777}, 2022.
+
+\bibitem[Gupta et~al.(2018)Gupta, Johnson, Fei-Fei, Savarese, and
+  Alahi]{gupta2018social}
+Agrim Gupta, Justin Johnson, Li~Fei-Fei, Silvio Savarese, and Alexandre Alahi.
+\newblock Social {GAN}: Socially acceptable trajectories with generative
+  adversarial networks.
+\newblock In \emph{Proceedings of the IEEE conference on computer vision and
+  pattern recognition}, pages 2255--2264, 2018.
+
+\bibitem[Harris et~al.(2020)Harris, Millman, van~der Walt, Gommers, Virtanen,
+  Cournapeau, Wieser, Taylor, Berg, Smith, Kern, Picus, Hoyer, van Kerkwijk,
+  Brett, Haldane, del R{\'{\i}}o, Wiebe, Peterson, G{\'{e}}rard{-}Marchant,
+  Sheppard, Reddy, Weckesser, Abbasi, Gohlke, and Oliphant]{harris2020numpy}
+Charles~R. Harris, K.~Jarrod Millman, St{\'{e}}fan van~der Walt, Ralf Gommers,
+  Pauli Virtanen, David Cournapeau, Eric Wieser, Julian Taylor, Sebastian Berg,
+  Nathaniel~J. Smith, Robert Kern, Matti Picus, Stephan Hoyer, Marten~H. van
+  Kerkwijk, Matthew Brett, Allan Haldane, Jaime~Fern{\'{a}}ndez del R{\'{\i}}o,
+  Mark Wiebe, Pearu Peterson, Pierre G{\'{e}}rard{-}Marchant, Kevin Sheppard,
+  Tyler Reddy, Warren Weckesser, Hameer Abbasi, Christoph Gohlke, and Travis~E.
+  Oliphant.
+\newblock Array programming with {NumPy}.
+\newblock \emph{Nature}, 585:\penalty0 357--362, 2020.
+\newblock \doi{10.1038/s41586-020-2649-2}.
+\newblock URL \url{https://doi.org/10.1038/s41586-020-2649-2}.
+
+\bibitem[Hastie and Tibshirani(1990)]{hastie1990gam}
+Trevor~J. Hastie and Robert~J. Tibshirani.
+\newblock \emph{Generalized Additive Models}.
+\newblock Chapman \& Hall, 1990.
+
+\bibitem[Helbing and Molnar(1995)]{helbing1995social}
+Dirk Helbing and Peter Molnar.
+\newblock Social force model for pedestrian dynamics.
+\newblock \emph{Physical review E}, 51\penalty0 (5):\penalty0 4282, 1995.
+
+\bibitem[Hunter(2007)]{hunter2007matplotlib}
+John~D. Hunter.
+\newblock Matplotlib: {A} {2D} graphics environment.
+\newblock \emph{Computing in Science \& Engineering}, 9\penalty0 (3):\penalty0
+  90--95, 2007.
+\newblock \doi{10.1109/MCSE.2007.55}.
+\newblock URL \url{https://doi.org/10.1109/MCSE.2007.55}.
+
+\bibitem[Ivanovic and Pavone(2019)]{ivanovic2019trajectron}
+Boris Ivanovic and Marco Pavone.
+\newblock The {Trajectron}: Probabilistic multi-agent trajectory modeling with
+  dynamic spatiotemporal graphs.
+\newblock In \emph{2019 {IEEE/CVF} International Conference on Computer Vision,
+  {ICCV} 2019, Seoul, Korea (South), October 27 - November 2, 2019}, pages
+  2375--2384. {IEEE}, 2019.
+\newblock \doi{10.1109/ICCV.2019.00246}.
+\newblock URL \url{https://doi.org/10.1109/ICCV.2019.00246}.
+
+\bibitem[Ivanovic et~al.(2023)Ivanovic, Song, Gilitschenski, and
+  Pavone]{ivanovic2023trajdata}
+Boris Ivanovic, Guanyu Song, Igor Gilitschenski, and Marco Pavone.
+\newblock {trajdata}: A unified interface to multiple human trajectory
+  datasets.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~36, pages 27582--27593. Curran Associates, Inc., 2023.
+\newblock URL
+  \url{https://proceedings.neurips.cc/paper_files/paper/2023/file/57bb67dbe17bfb660c8c63d089ea05b9-Paper-Datasets_and_Benchmarks.pdf}.
+
+\bibitem[Kraskov et~al.(2004)Kraskov, St\"ogbauer, and
+  Grassberger]{kraskov2004estimating}
+Alexander Kraskov, Harald St\"ogbauer, and Peter Grassberger.
+\newblock Estimating mutual information.
+\newblock \emph{Phys. Rev. E}, 69:\penalty0 066138, Jun 2004.
+\newblock \doi{10.1103/PhysRevE.69.066138}.
+\newblock URL \url{https://link.aps.org/doi/10.1103/PhysRevE.69.066138}.
+
+\bibitem[Kutner et~al.(2005)Kutner, Nachtsheim, Neter, and
+  Li]{kutner2005applied}
+MH~Kutner, CJ~Nachtsheim, J~Neter, and W~Li.
+\newblock Applied linear statistical models. mcgraw-hill.
+\newblock \emph{New York}, 7, 2005.
+
+\bibitem[Lee et~al.(2017)Lee, Choi, Vernaza, Choy, Torr, and
+  Chandraker]{lee2017desire}
+Namhoon Lee, Wongun Choi, Paul Vernaza, Christopher~B Choy, Philip~HS Torr, and
+  Manmohan Chandraker.
+\newblock {DESIRE}: Distant future prediction in dynamic scenes with
+  interacting agents.
+\newblock In \emph{Proceedings of the IEEE conference on computer vision and
+  pattern recognition}, pages 336--345, 2017.
+
+\bibitem[Li et~al.(2021)Li, Hu, Beirami, and Smith]{li2021ditto}
+Tian Li, Shengyuan Hu, Ahmad Beirami, and Virginia Smith.
+\newblock {Ditto}: Fair and robust federated learning through personalization.
+\newblock In \emph{Proceedings of the International Conference on Machine
+  Learning (ICML)}, pages 6357--6368, 2021.
+
+\bibitem[Lloyd(1982)]{lloyd1982kmeans}
+S.~Lloyd.
+\newblock Least squares quantization in {PCM}.
+\newblock \emph{IEEE Transactions on Information Theory}, 28\penalty0
+  (2):\penalty0 129--137, 1982.
+\newblock \doi{10.1109/TIT.1982.1056489}.
+
+\bibitem[Lou et~al.(2013)Lou, Caruana, Gehrke, and Hooker]{lou2013ebm}
+Yin Lou, Rich Caruana, Johannes Gehrke, and Giles Hooker.
+\newblock Accurate intelligible models with pairwise interactions.
+\newblock In \emph{Proceedings of the ACM SIGKDD International Conference on
+  Knowledge Discovery and Data Mining}, pages 623--631, 2013.
+
+\bibitem[Lundberg and Lee(2017)]{lundberg2017shap}
+Scott~M. Lundberg and Su-In Lee.
+\newblock A unified approach to interpreting model predictions.
+\newblock In \emph{Advances in Neural Information Processing Systems
+  (NeurIPS)}, volume~30, 2017.
+
+\bibitem[McInnes et~al.(2017)McInnes, Healy, and Astels]{mcinnes2017hdbscan}
+Leland McInnes, John Healy, and Steve Astels.
+\newblock hdbscan: Hierarchical density based clustering.
+\newblock \emph{Journal of Open Source Software}, 2\penalty0 (11):\penalty0
+  205, 2017.
+\newblock \doi{10.21105/joss.00205}.
+\newblock URL \url{https://doi.org/10.21105/joss.00205}.
+
+\bibitem[McInnes et~al.(2018)McInnes, Healy, Saul, and
+  Großberger]{mcinnes2018umap}
+Leland McInnes, John Healy, Nathaniel Saul, and Lukas Großberger.
+\newblock {UMAP}: Uniform manifold approximation and projection.
+\newblock \emph{Journal of Open Source Software}, 3\penalty0 (29):\penalty0
+  861, 2018.
+\newblock \doi{10.21105/joss.00861}.
+\newblock URL \url{https://doi.org/10.21105/joss.00861}.
+
+\bibitem[McKinney(2010)]{mckinney2010pandas}
+Wes McKinney.
+\newblock Data structures for statistical computing in {Python}.
+\newblock In St{\'{e}}fan van~der Walt and Jarrod Millman, editors,
+  \emph{Proceedings of the 9th Python in Science Conference, SciPy 2010,
+  Austin, Texas, USA, June 28 - July 3, 2010}, pages 56--61. scipy.org, 2010.
+\newblock \doi{10.25080/Majora-92bf1922-00a}.
+\newblock URL \url{https://doi.org/10.25080/Majora-92bf1922-00a}.
+
+\bibitem[McMahan et~al.(2017)McMahan, Moore, Ramage, Hampson, and Ag{\"u}era~y
+  Arcas]{mcmahan2017fedavg}
+H.~Brendan McMahan, Eider Moore, Daniel Ramage, Seth Hampson, and Blaise
+  Ag{\"u}era~y Arcas.
+\newblock Communication-efficient learning of deep networks from decentralized
+  data.
+\newblock In \emph{Proceedings of the International Conference on Artificial
+  Intelligence and Statistics (AISTATS)}, pages 1273--1282, 2017.
+
+\bibitem[Moulavi et~al.(2014)Moulavi, Jaskowiak, Campello, Zimek, and
+  Sander]{moulavi2014density}
+Davoud Moulavi, Pablo~A. Jaskowiak, Ricardo J. G.~B. Campello, Arthur Zimek,
+  and Jörg Sander.
+\newblock \emph{Density-Based Clustering Validation}, pages 839--847.
+\newblock 2014.
+\newblock \doi{10.1137/1.9781611973440.96}.
+\newblock URL \url{https://epubs.siam.org/doi/abs/10.1137/1.9781611973440.96}.
+
+\bibitem[Nori et~al.(2019)Nori, Jenkins, Koch, and Caruana]{nori2019ebm}
+Harsha Nori, Samuel Jenkins, Paul Koch, and Rich Caruana.
+\newblock {InterpretML}: A unified framework for machine learning
+  interpretability.
+\newblock 2019.
+
+\bibitem[O'Brien(2007)]{obrien2007vif}
+Robert O'Brien.
+\newblock A caution regarding rules of thumb for variance inflation factors.
+\newblock \emph{Quality \& Quantity}, 41:\penalty0 673--690, 10 2007.
+\newblock \doi{10.1007/s11135-006-9018-6}.
+
+\bibitem[Paszke et~al.(2019)Paszke, Gross, Massa, Lerer, Bradbury, Chanan,
+  Killeen, Lin, Gimelshein, Antiga, Desmaison, K{\"{o}}pf, Yang, DeVito,
+  Raison, Tejani, Chilamkurthy, Steiner, Fang, Bai, and
+  Chintala]{paszke2019pytorch}
+Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory
+  Chanan, Trevor Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, Alban
+  Desmaison, Andreas K{\"{o}}pf, Edward~Z. Yang, Zachary DeVito, Martin Raison,
+  Alykhan Tejani, Sasank Chilamkurthy, Benoit Steiner, Lu~Fang, Junjie Bai, and
+  Soumith Chintala.
+\newblock {PyTorch}: An imperative style, high-performance deep learning
+  library.
+\newblock In Hanna~M. Wallach, Hugo Larochelle, Alina Beygelzimer, Florence
+  d'Alch{\'{e}}{-}Buc, Emily~B. Fox, and Roman Garnett, editors, \emph{Advances
+  in Neural Information Processing Systems 32: Annual Conference on Neural
+  Information Processing Systems 2019, NeurIPS 2019, December 8-14, 2019,
+  Vancouver, BC, Canada}, pages 8024--8035, 2019.
+\newblock URL
+  \url{https://proceedings.neurips.cc/paper/2019/hash/bdbca288fee7f92f2bfa9f7012727740-Abstract.html}.
+
+\bibitem[Pedregosa et~al.(2011)Pedregosa, Varoquaux, Gramfort, Michel, Thirion,
+  Grisel, Blondel, Prettenhofer, Weiss, Dubourg, VanderPlas, Passos,
+  Cournapeau, Brucher, Perrot, and Duchesnay]{pedregosa2011sklearn}
+Fabian Pedregosa, Ga{\"{e}}l Varoquaux, Alexandre Gramfort, Vincent Michel,
+  Bertrand Thirion, Olivier Grisel, Mathieu Blondel, Peter Prettenhofer, Ron
+  Weiss, Vincent Dubourg, Jake VanderPlas, Alexandre Passos, David Cournapeau,
+  Matthieu Brucher, Matthieu Perrot, and Edouard Duchesnay.
+\newblock Scikit-learn: Machine learning in {Python}.
+\newblock \emph{Journal of Machine Learning Research}, 12:\penalty0 2825--2830,
+  2011.
+\newblock URL \url{https://dl.acm.org/doi/10.5555/1953048.2078195}.
+
+\bibitem[Salzmann et~al.(2020)Salzmann, Ivanovic, Chakravarty, and
+  Pavone]{salzmann2020trajectron+}
+Tim Salzmann, Boris Ivanovic, Punarjay Chakravarty, and Marco Pavone.
+\newblock Trajectron++: Dynamically-feasible trajectory forecasting with
+  heterogeneous data.
+\newblock In \emph{European conference on computer vision}, pages 683--700.
+  Springer, 2020.
+
+\bibitem[Seabold and Perktold(2010)]{seabold2010statsmodels}
+Skipper Seabold and Josef Perktold.
+\newblock Statsmodels: Econometric and statistical modeling with {Python}.
+\newblock In St{\'{e}}fan van~der Walt and Jarrod Millman, editors,
+  \emph{Proceedings of the 9th Python in Science Conference, SciPy 2010,
+  Austin, Texas, USA, June 28 - July 3, 2010}, page~92. scipy.org, 2010.
+\newblock \doi{10.25080/Majora-92bf1922-011}.
+\newblock URL \url{https://doi.org/10.25080/Majora-92bf1922-011}.
+
+\bibitem[Serv{\'e}n et~al.(2025)Serv{\'e}n, Brummitt, Kir{\'a}ly,
+  et~al.]{serven2025pygam}
+Daniel Serv{\'e}n, Charlie Brummitt, Franz Kir{\'a}ly, et~al.
+\newblock {pyGAM}: Generalized additive models in {Python}, 2025.
+\newblock URL \url{https://doi.org/10.5281/zenodo.17981758}.
+
+\bibitem[Snoek et~al.(2012)Snoek, Larochelle, and Adams]{snoek2012bayesian}
+Jasper Snoek, Hugo Larochelle, and Ryan Adams.
+\newblock Practical {Bayesian} optimization of machine learning algorithms.
+\newblock In F.~Pereira, C.J. Burges, L.~Bottou, and K.~Weinberger, editors,
+  \emph{Advances in Neural Information Processing Systems}, volume~25. Curran
+  Associates, Inc., 2012.
+\newblock URL
+  \url{https://proceedings.neurips.cc/paper_files/paper/2012/file/05311655a15b75fab86956663e1819cd-Paper.pdf}.
+
+\bibitem[Waskom(2021)]{waskom2021seaborn}
+Michael~L. Waskom.
+\newblock seaborn: statistical data visualization.
+\newblock \emph{Journal of Open Source Software}, 6\penalty0 (60):\penalty0
+  3021, 2021.
+\newblock \doi{10.21105/joss.03021}.
+\newblock URL \url{https://doi.org/10.21105/joss.03021}.
+
+\bibitem[Yuan et~al.(2021)Yuan, Weng, Ou, and Kitani]{yuan2021agentformer}
+Ye~Yuan, Xinshuo Weng, Yanglan Ou, and Kris Kitani.
+\newblock {AgentFormer}: Agent-aware transformers for socio-temporal
+  multi-agent forecasting.
+\newblock In \emph{Proceedings of the IEEE/CVF International Conference on
+  Computer Vision (ICCV)}, pages 9813--9823, 2021.
+
+\end{thebibliography}
