@@ -1,445 +1,196 @@
-# Trajectron++ nuScenes Interpretation Pipelines
+# Interpreting Trajectron++ Prediction Errors on nuScenes
 
-This repository contains an integrated pipeline for analysing trajectory-prediction error on nuScenes using Trajectron++. The pipeline recovers per-trajectory prediction losses, engineers interpretable features, and uses GAM and XGBoost to understand what drives model performance.
+This repository contains the code and evidence used to analyse why Trajectron++
+predicts some pedestrian trajectories more accurately than others. The pipeline
+recovers per-trajectory prediction errors, joins them with interpretable motion,
+scene, and social features, and analyses those errors with GAM and XGBoost
+meta-models.
 
-## Analysis Pipeline
+![Analysis pipeline](Report/figures/pipeline.png)
 
-![Pipeline Overview](Report/figures/pipeline.png)
+## Research questions
 
-## Repository Contents
+1. Which trajectory and scene characteristics are associated with prediction
+   performance?
+2. Which interpretable success and failure modes explain performance?
+3. How do observation history, prediction horizon, and attention radius affect
+   performance within the tested ranges?
 
-- `train_unified.py`: Trajectron++ training/evaluation entrypoint.
-- `run_sweep.py`: sequential model-settings sweep runner for nuScenes mini.
-- `scripts/validate_pipeline_paths.py`: capped integration validation for both
-  supported paths.
-- `src/trajectron/`: Trajectron++ model, evaluation, and utilities.
-- `src/data_preparation/join_characteristic_metrics.py`: joins trajectory and
-  scene characteristics onto `eval_epoch_*.csv`.
-- `src/data_preparation/combine_runs.py`: safely combines explicitly selected
-  joined runs.
-- `src/data_modelling/`: interpretable modelling helpers and notebooks.
-- `config/shared_config.yaml`: shared agent filtering, attention radius, and map
-  settings.
-- `config/nuScenes.json`: upstream-aligned Trajectron++ nuScenes base config.
-- `config/nuScenes_full_trainval.json`: full nuScenes trainval run overlay.
-- `config/nuScenes_mini.json`: nuScenes mini run overlay.
-- `config/sweep_config.yaml`: example model-settings sweep configuration. It
-  inherits the mini run overlay and should be copied only when your machine
-  needs local path overrides.
-- `results/trajectory_prediction/trajectory_metrics/`: per-epoch evaluation CSVs
-  from Trajectron++.
-- `results/trajectory_prediction/trajectory_metrics_joined/`: joined
-  evaluation/characteristic tables.
-- `results/interpretable_model/`: prepared data, model outputs, inference
-  outputs, clustering, and inspection artifacts.
-- `unified-av-data-loader/`: vendored `trajdata` source.
+The project evaluates an existing trajectory-prediction model; it does not
+propose a new prediction architecture. GAM and XGBoost are explanatory
+meta-models of Trajectron++ error, not trajectory predictors.
 
-## Environment
+## Repository map
 
-Use the conda environment `adaptive-py310` when available:
+| Path | Purpose |
+|---|---|
+| `train_unified.py` | Trajectron++ training and evaluation entry point. |
+| `run_sweep.py` | Sequential settings-sweep runner and joined-run combiner. |
+| `scripts/run_prediction_result_set.py` | Curates the named full-trainval and settings-sweep result sets. |
+| `scripts/run_seeded_experiments.py` | Shared training, joining, seed aggregation, and manifest logic used by the curated runner. |
+| `scripts/verify_report_tables.py` | Recomputes and checks report Tables 2, 13, and 14 from committed artifacts. |
+| `scripts/validate_pipeline_paths.py` | Capped integration validation before expensive runs. |
+| `src/trajectron/` | Adapted Trajectron++ model, evaluation, and utilities. |
+| `src/data_preparation/` | Per-trajectory/scene metrics, joining, and explicit run combination. |
+| `src/data_modelling/` | Preparation, GAM/XGBoost, inference, feature-effect, and mode-analysis workflows. |
+| `config/` | Model, runtime, analysis, sweep, and split-index configuration. |
+| `results/trajectory_prediction/trajectory_metrics_joined/` | Committed per-trajectory inputs for the submitted analyses. |
+| `results/interpretable_model/` | Prepared data and exported model/effect/mode evidence. |
+| `Report/` | Report source, cited figures, bibliography, and compiled PDF. |
+| `Presentation/` | Presentation source, slide inputs, figures, and compiled PDF. |
+| `unified-av-data-loader/` | Vendored `trajdata` dependency used by the training and join pipelines. |
+
+## Environment and external data
+
+The verified local environment is the conda environment `adaptive-py310`.
+Commands should run from the repository root with:
 
 ```bash
 export PYTHONPATH=src:unified-av-data-loader/src
 export WANDB_MODE=disabled
 export MPLBACKEND=Agg
-
-conda run -n adaptive-py310 python -m pytest tests
-conda run -n adaptive-py310 python run_sweep.py --dry_run
 ```
 
-If you need to install from scratch:
+The raw nuScenes release, trajdata cache, and full training checkpoints are not
+committed. Download nuScenes under its licence and provide machine-local paths
+through command-line overrides:
 
 ```bash
-python3.10 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-pip install --no-dependencies l5kit==1.5.0
-pip install -e unified-av-data-loader
-pip install -e .
+conda run -n adaptive-py310 python -m torch.distributed.run \
+  --nproc_per_node=1 train_unified.py \
+  --conf config/nuScenes_full_trainval.json \
+  --trajdata_cache_dir /path/to/trajdata_cache \
+  --data_loc_dict '{"nusc_trainval":"/path/to/v1.0-trainval_raw"}'
 ```
 
-## Dataset Setup
+The prediction-challenge split indexes required by the data-loading code are
+committed under `config/experimental_setup/nuScenes/`. Shared configuration
+files contain the experiment settings; override their machine-specific data
+paths locally and do not commit those local changes.
 
-For nuScenes mini, the repo expects the usual local layout unless overridden:
+## Submitted result sets
 
-```text
-data/raw/
-├── maps/
-├── samples/
-├── sweeps/
-└── v1.0-mini/
+The report and presentation use two single-seed result sets:
 
-data/processed/trajdata_cache/
-```
+| Result set | Protocol | Committed joined input |
+|---|---|---|
+| Full trainval | 12 epochs, seed 123, fixed model settings | `results/trajectory_prediction/trajectory_metrics_joined/full_trainval_12ep_1seed/eval_epoch_12.csv` |
+| Settings sweep | 30 epochs, seed 123, 64 settings | `results/trajectory_prediction/trajectory_metrics_joined/sweep_large_30ep_1seed/eval_epoch_30_combined.csv` |
 
-For full trainval on the current project machine, raw files and cache are on the
-LaCie drive:
+The 64-setting grid is defined in `config/sweep_config_large.yaml`:
 
-```text
-/Volumes/LaCie 1TB/nuScenes/v1.0-trainval_raw
-/Volumes/LaCie 1TB/nuScenes/trajdata_cache
-```
+- history: 1, 2, 3, or 4 seconds;
+- prediction horizon: 2, 3, 4, or 6 seconds;
+- attention-radius scale: 0.25, 0.5, 1, or 2.
 
-`config/nuScenes_full_trainval.json` uses these paths. Override them on the CLI
-if your local layout differs:
+The realised `attention_radius_m`, rather than the internal scale multiplier,
+is used in downstream interpretation.
 
-```bash
---trajdata_cache_dir "/path/to/trajdata_cache" \
---data_loc_dict '{"nusc_trainval": "/path/to/v1.0-trainval_raw"}'
-```
+## Regenerating the submitted evidence
 
-Path precedence is:
+### 1. Recreate per-trajectory prediction results
 
-1. Explicit CLI flags such as `--trajdata_cache_dir` and `--data_loc_dict`.
-2. Values in the resolved JSON config passed to `--conf`.
-3. `--user` profile paths from `config/experimental_setup/nuScenes/user_config.py`,
-   but only when the selected config does not already define the path key.
-4. Repo-relative fallback paths.
-
-The dedicated mini and full config overlays already define `trajdata_cache_dir`
-and `data_loc_dict`, so `--user simon` or `--user zoe` does not replace those
-paths. For shared work across machines, either keep the same repo-local mini
-layout, pass path overrides on the CLI, or use a local uncommitted config/sweep
-overlay with only path overrides.
-
-The prediction-challenge split index files under
-`config/experimental_setup/nuScenes/` are required for trainval split handling
-and are already present:
-
-- `predchal_train_index.pkl`
-- `predchal_train_val_index.pkl`
-- `predchal_val_index.pkl`
-
-The full trainval path described below uses `nusc_trainval-train` and
-`nusc_trainval-train_val` without `--restrict_to_predchal`.
-
-## Path 1: Full Trainval Analysis
-
-### 1. Run Trajectron++
-
-Example full trainval command:
-
-```bash
-PYTHONPATH=src:unified-av-data-loader/src WANDB_MODE=disabled \
-conda run -n adaptive-py310 python -m torch.distributed.run --nproc_per_node=1 \
-  train_unified.py \
-  --conf config/nuScenes_full_trainval.json
-```
-
-`config/nuScenes_full_trainval.json` extends `config/nuScenes.json` and contains
-the full trainval split names, LaCie dataset/cache paths, 12 epochs, learning
-rate 0.003, serial preprocessing, pedestrian-only training targets, and
-pedestrian-only evaluation. Override paths on the CLI if your machine uses a
-different trainval layout.
-
-The full trainval config uses `only_predict: ["PEDESTRIAN"]` and
-`eval_only_predict: ["PEDESTRIAN"]`. This trains/evaluates pedestrian target
-trajectories while preserving non-`UNKNOWN` surrounding agents as context through
-the configured attention radii. Keep `no_types` at the shared default
-`["UNKNOWN"]`; do not add `VEHICLE`, `BICYCLE`, or `MOTORCYCLE` there unless you
-intentionally want to remove those agents from context.
-
-Keep `--preprocess_workers` at `0` unless you have validated multiprocessing on
-your platform. On macOS, multiple workers can fail while pickling dataset
-objects during DataLoader startup.
-
-Training writes evaluation CSVs to:
-
-```text
-results/trajectory_prediction/trajectory_metrics/<run_name>/eval_epoch_<N>.csv
-```
-
-`train_unified.py` also supports validation-only batch caps:
-
-```bash
---max_train_batches 5 --max_eval_batches 5
-```
-
-Do not use those caps for final reported results.
-
-### 2. Join Evaluation Metrics With Characteristics
-
-Use the saved run config so the join reconstructs the same eval context and the
-same persisted attention-radius map:
-
-```bash
-PYTHONPATH=src:unified-av-data-loader/src MPLBACKEND=Agg \
-conda run -n adaptive-py310 python -m data_preparation.join_characteristic_metrics \
-  --conf results/trajectory_prediction/nuScenes/models/<run_name>/config.json \
-  --run_dir <run_name> \
-  --output_root results/trajectory_prediction/trajectory_metrics_joined \
-  --format csv \
-  --incl_vector_map \
-  --trajdata_cache_dir "/path/to/trajdata_cache" \
-  --data_loc_dict '{"nusc_trainval": "/path/to/v1.0-trainval_raw"}' \
-  --preprocess_workers 0
-```
-
-The join path flags can be omitted when the saved run `config.json` already
-contains valid paths for the machine running the join. Include them when moving
-outputs across machines or when the saved config points at a different local
-layout.
-
-Output:
-
-```text
-results/trajectory_prediction/trajectory_metrics_joined/<run_name>/eval_epoch_<N>.csv
-```
-
-The joined table includes the per-trajectory prediction metrics, trajectory
-characteristics, scene characteristics, and realized model settings:
-
-```text
-attention_radius_m
-history_sec
-prediction_sec
-```
-
-### 3. Run Interpretable Modelling and Inspection
-
-Run the notebooks in this order, setting `RUN_NAME` and `EVAL_CSV_NAME` to the
-joined trainval output:
-
-1. `src/data_modelling/interpretable_model_data_preparation.ipynb`
-2. `src/data_modelling/gam.ipynb`
-3. `src/data_modelling/xgboost.ipynb`
-4. `src/data_modelling/model_inference_analysis.ipynb` for `MODEL_ID="gam"`
-5. `src/data_modelling/model_inference_analysis.ipynb` for `MODEL_ID="xgboost"`
-6. `src/data_modelling/feature_effect_performance_regimes.ipynb` for each model
-7. `src/data_modelling/feature_effect_pr_cluster_inspection.ipynb` for selected
-   non-empty cluster candidates
-
-The full trainval path is the only path that continues into performance-regime
-clustering and cluster inspection.
-
-## Path 2: Mini Model-Settings Sweep
-
-The sweep path is for studying how prediction performance varies with the
-realized model settings:
-
-```text
-attention_radius_m
-history_sec
-prediction_sec
-```
-
-`attention_radius_scale` appears in `config/sweep_config.yaml` only as the
-internal multiplier used to produce different realized `attention_radius_m`
-values. It is not copied into the combined dataframe and is not used as a GAM or
-XGBoost feature.
-
-### 1. Create a Local Sweep Config
-
-`config/sweep_config.yaml` is the small 18-setting grid used for the three-seed
-curated sweep. `config/sweep_config_large.yaml` is the expanded 64-setting grid
-used for the one-seed curated sweep. Copy either config to an ignored or
-temporary location and edit the paths if your machine uses a different data
-layout:
-
-```bash
-mkdir -p results/interpretable_model/local_configs
-cp config/sweep_config.yaml results/interpretable_model/local_configs/sweep_config.local.yaml
-```
-
-For direct `run_sweep.py` usage on local mini data, use the small grid and make
-the epoch-30 protocol explicit in the copied local config:
-
-```yaml
-base_args:
-  conf: config/nuScenes_mini.json
-  log_tag: sweep_tpp
-  train_epochs: 30
-  eval_every: 30
-  save_every: 30
-
-grid:
-  history_sec: [2.0, 4.0]
-  prediction_sec: [2.0, 4.0, 6.0]
-  attention_radius_scale: [0.5, 1.0, 2.0]
-```
-
-`config/nuScenes_mini.json` supplies the mini split/path settings and learning
-rate 0.003. The curated result-set launcher overrides sweep training to 30
-epochs with an epoch-30 eval/save cadence, so downstream interpretation should
-use `eval_epoch_30.csv`.
-If your mini data is not under `data/raw` and `data/processed/trajdata_cache`,
-add `trajdata_cache_dir` and `data_loc_dict` overrides under `base_args` in your
-local sweep config.
-
-For the curated four-result layout, prefer the single entrypoint:
+This stage performs the expensive Trajectron++ runs and requires the external
+nuScenes data and cache. After configuring local data paths, the curated
+entrypoints are:
 
 ```bash
 conda run -n adaptive-py310 python scripts/run_prediction_result_set.py \
-  --experiment sweep_small_3seeds \
-  --phase all
+  --experiment full_trainval_1seed --phase all
+
+conda run -n adaptive-py310 python scripts/run_prediction_result_set.py \
+  --experiment sweep_large_1seed --phase all
 ```
 
-Example local-path override:
+Use `--phase train --dry_run` first to inspect every planned command without
+starting training. The large-sweep dry run must report 64 combinations.
 
-```yaml
-base_args:
-  conf: config/nuScenes_mini.json
-  log_tag: sweep_tpp
-  trajdata_cache_dir: /path/to/mini_trajdata_cache
-  data_loc_dict: '{"nusc_mini": "/path/to/mini_raw"}'
-```
+### 2. Recreate the interpretable analyses
 
-### 2. Run the Sweep
-
-```bash
-PYTHONPATH=src:unified-av-data-loader/src WANDB_MODE=disabled MPLBACKEND=Agg \
-conda run -n adaptive-py310 python run_sweep.py \
-  --sweep_config results/interpretable_model/local_configs/sweep_config.local.yaml \
-  --metrics_root results/trajectory_prediction/trajectory_metrics \
-  --joined_root results/trajectory_prediction/trajectory_metrics_joined \
-  --format csv
-```
-
-`run_sweep.py` runs each combination sequentially. For every combination it:
-
-1. scales `config/shared_config.yaml` attention radii by
-   `attention_radius_scale`;
-2. runs `train_unified.py` on `nusc_mini-mini_train` and `nusc_mini-mini_val`;
-3. joins the evaluation output with trajectory and scene characteristics;
-4. restores `config/shared_config.yaml`;
-5. combines only the joined run directories produced by the current sweep.
-
-The combined output is written to:
-
-```text
-results/trajectory_prediction/combined_runs.csv
-```
-
-`combine_runs.py` refuses implicit all-runs combines. If you combine manually,
-pass explicit run directories:
-
-```bash
-PYTHONPATH=src:unified-av-data-loader/src \
-conda run -n adaptive-py310 python -m data_preparation.combine_runs \
-  --joined_root results/trajectory_prediction/trajectory_metrics_joined \
-  --run_dirs <current_sweep_run_1> <current_sweep_run_2> \
-  --output results/trajectory_prediction/combined_runs \
-  --format csv
-```
-
-Use `--all_runs` only when you intentionally want every joined run under the
-joined root.
-
-### 3. Bridge the Combined Sweep Table Into the Notebook Contract
-
-The preparation notebook consumes run-like files under
-`trajectory_metrics_joined/<run_name>/eval_epoch_*.csv`. After a sweep, bridge
-the combined table into that layout:
-
-```bash
-SWEEP_RUN_NAME=sweep_combined
-SWEEP_EVAL_CSV=eval_epoch_sweep_combined.csv
-
-mkdir -p "results/trajectory_prediction/trajectory_metrics_joined/${SWEEP_RUN_NAME}"
-cp results/trajectory_prediction/combined_runs.csv \
-  "results/trajectory_prediction/trajectory_metrics_joined/${SWEEP_RUN_NAME}/${SWEEP_EVAL_CSV}"
-```
-
-Then set in `src/data_modelling/interpretable_model_data_preparation.ipynb`:
-
-```python
-RUN_NAME = "sweep_combined"
-EVAL_CSV_NAME = "eval_epoch_sweep_combined.csv"
-```
-
-### 4. Run Modelling and Stop at Inference
-
-Run only:
+The committed joined CSVs allow this stage to be rerun without retraining
+Trajectron++. For the full-trainval analysis, execute the preparation, GAM,
+XGBoost, inference, feature-effect, and selected mode-inspection workflows in
+this order:
 
 1. `src/data_modelling/interpretable_model_data_preparation.ipynb`
 2. `src/data_modelling/gam.ipynb`
 3. `src/data_modelling/xgboost.ipynb`
-4. `src/data_modelling/model_inference_analysis.ipynb` for `MODEL_ID="gam"`
-5. `src/data_modelling/model_inference_analysis.ipynb` for `MODEL_ID="xgboost"`
+4. `src/data_modelling/model_inference_analysis.ipynb` for each model
+5. `src/data_modelling/feature_effect_performance_regimes.ipynb` for each model
+6. `src/data_modelling/feature_effect_pr_cluster_inspection.ipynb`
 
-Do not run `feature_effect_performance_regimes.ipynb` or
-`feature_effect_pr_cluster_inspection.ipynb` for the model-settings sweep path.
+Use `RUN_NAME="full_trainval_12ep_1seed"` and
+`EVAL_CSV_NAME="eval_epoch_12.csv"`; exclude model-setting columns as
+predictors. The submitted evidence includes the MI+VIF main analysis and the
+VIF-only comparison.
 
-## Validation Before Expensive Runs
-
-Use the capped harness before full trainval or full sweep runs, especially after
-changes to training, eval CSV writing, metric joining, sweep combination, or
-modelling notebooks:
+For the settings sweep, use `RUN_NAME="sweep_large_30ep_1seed"` and
+`EVAL_CSV_NAME="eval_epoch_30_combined.csv"`; include model-setting columns as
+predictors and stop after model inference. The workflow wrapper exposes the
+same contract:
 
 ```bash
-PYTHONPATH=src:unified-av-data-loader/src WANDB_MODE=disabled MPLBACKEND=Agg \
-conda run -n adaptive-py310 python scripts/validate_pipeline_paths.py
+conda run -n adaptive-py310 python \
+  src/data_modelling/run_interpretable_notebook_workflow.py \
+  --run-name sweep_large_30ep_1seed \
+  --eval-csv-name eval_epoch_30_combined.csv \
+  --include-model-settings-as-features \
+  --models gam xgboost
 ```
 
-The harness:
+### 3. Evidence provenance
 
-- validates imports, conda environment, data roots, caches, split files, and
-  trajdata dataset construction;
-- samples first/middle/last records from mini and trainval splits;
-- runs a capped full-trainval path through cluster inspection;
-- runs a capped mini sweep path through model inference only;
-- writes executed notebook copies and a JSON summary under
-  `results/interpretable_model/notebook_runs/...`;
-- restores `config/shared_config.yaml` byte-for-byte after sweep validation.
+| Finding | Primary evidence |
+|---|---|
+| RQ1: feature associations | Full-trainval joined CSV; `prepared_data/full_trainval_12ep_1seed_MI_correct/`; GAM and XGBoost exports with the same run name. |
+| RQ2: success/failure modes | Full-trainval MI+VIF and VIF-only feature-effect/mode exports under `results/interpretable_model/feature_effect_performance_regimes/`. |
+| RQ3: settings effects | Large-sweep joined CSV; `prepared_data/sweep_large_30ep_1seed_MI_corrected/`; corresponding GAM and XGBoost exports. |
+| Report model and mode tables | The OOF prediction and nested-CV tables consumed by `scripts/verify_report_tables.py`. |
+| Final figures | Exact copies under `Report/figures/` and `Presentation/figures/`. |
 
-The latest validation during this audit passed at:
+## Fast verification without retraining
 
-```text
-results/interpretable_model/notebook_runs/pipeline_validation_20260503_100713/validation_summary.json
+Run the following from a clean checkout:
+
+```bash
+conda run -n adaptive-py310 python -m compileall -q \
+  src scripts train_unified.py run_sweep.py
+
+conda run -n adaptive-py310 python scripts/verify_report_tables.py --show
+
+conda run -n adaptive-py310 python scripts/run_prediction_result_set.py \
+  --experiment sweep_large_1seed --phase train --dry_run
+
+conda run -n adaptive-py310 python -m pytest -q
 ```
 
-## Notes for `dev-model-setting-inclusion` Users
+The report-table check recomputes 110 displayed values from committed OOF and
+nested-CV artifacts. The dry run validates the exact 64-setting experiment
+contract without training.
 
-If you previously worked from `dev-model-setting-inclusion`, the intended
-workflow is mostly the same, but the contracts are stricter now:
+## Building the deliverables
 
-- Keep `attention_radius_scale` in the sweep config as the multiplier that
-  creates scaled runs.
-- Do not expect `attention_radius_scale` in joined, combined, prepared, GAM, or
-  XGBoost feature tables.
-- Interpret model-setting effects through `attention_radius_m`, `history_sec`,
-  and `prediction_sec`.
-- `run_sweep.py` now combines only the joined dirs produced by the current
-  sweep. Manual combines require `--run_dirs` or explicit `--all_runs`.
-- `config/shared_config.yaml` is temporarily modified during the sweep and
-  restored after each run. Avoid killing the process mid-write; if interrupted,
-  check this file before continuing.
-- The sweep path stops at `model_inference_analysis.ipynb`. Clustering and
-  cluster inspection belong to the full trainval path only.
-- Regenerate old prepared data, OOF predictions, feature-effect exports, and
-  regime outputs before interpretation. Older artifacts may lack stable identity
-  columns or persisted attention-radius settings.
-- Update local path values before running if needed. `--user` does not override
-  path keys that are already present in a selected run config. Do not commit
-  machine-specific edits to shared configs; prefer CLI overrides or a local copy
-  under `results/` or another ignored location.
+```bash
+cd Report
+latexmk -pdf -interaction=nonstopmode -halt-on-error -recorder main.tex
 
-## Common Troubleshooting
+cd ../Presentation
+latexmk -gg -pdf -interaction=nonstopmode -halt-on-error -recorder main.tex
+```
 
-- `ModuleNotFoundError: trajectron` or `trajdata`:
-  re-run editable installs with `pip install -e unified-av-data-loader` and
-  `pip install -e .`, or set `PYTHONPATH=src:unified-av-data-loader/src`.
-- Missing eval CSVs:
-  confirm `train_unified.py` ran with `--eval_every` set and wrote to
-  `results/trajectory_prediction/trajectory_metrics/<run_name>/`.
-- Join identity/context mismatch:
-  use the saved run `config.json` and the same data/cache paths used for
-  training. New eval CSVs include identity and context columns so mismatches
-  fail loudly.
-- Sweep combine includes unexpected rows:
-  rerun with current code and explicit current run dirs. Do not use `--all_runs`
-  unless that is intentional.
-- Notebook results look stale:
-  committed notebooks may contain old rendered outputs. Trust freshly executed
-  outputs under `results/`, not stale cell output text.
+The verified builds produce `Report/main.pdf` and `Presentation/main.pdf`.
+
+## Limitations
+
+- The submitted Trajectron++ results use one training seed.
+- Findings are specific to Trajectron++, pedestrian targets, nuScenes, and the
+  tested setting ranges.
+- Feature effects are observational associations with model error, not causal
+  effects.
+- Raw data and model checkpoints must be regenerated or supplied externally.
+- Current features do not fully explain the highest-error tail.
 
 ## Acknowledgements
 
-This codebase integrates and adapts:
-
-- Trajectron++ (Stanford ASL / NVIDIA contributors)
-- trajdata (NVLabs / NVIDIA contributors)
-
-See `LICENSE`, `CITATIONS.bib` if present, and package metadata for attribution
-details.
+This project adapts Trajectron++ and uses the vendored `trajdata` loader. See
+the report bibliography and package metadata for source attribution.
