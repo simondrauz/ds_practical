@@ -1,0 +1,15 @@
+# Expanded hyperparameter sweep configuration for the one-seed mini sweep.
+#
+# `base_args` are passed to every train_unified.py invocation unchanged.
+# `grid` defines the axes to sweep; all combinations are run (Cartesian product).
+# `attention_radius_scale` is a multiplier applied to every radius value in
+# shared_config.yaml.
+
+base_args:
+  conf: config/nuScenes_mini.json
+  log_tag: sweep_tpp
+
+grid:
+  history_sec: [1.0, 2.0, 3.0, 4.0]
+  prediction_sec: [2.0, 3.0, 4.0, 6.0]
+  attention_radius_scale: [0.25, 0.5, 1.0, 2.0]
