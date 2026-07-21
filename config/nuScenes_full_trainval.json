@@ -1,0 +1,26 @@
+{
+  "extends": "nuScenes.json",
+  "train_data": "nusc_trainval-train",
+  "eval_data": "nusc_trainval-train_val",
+  "trajdata_cache_dir": "/Volumes/LaCie 1TB/nuScenes/trajdata_cache",
+  "data_loc_dict": "{\"nusc_trainval\":\"/Volumes/LaCie 1TB/nuScenes/v1.0-trainval_raw\"}",
+  "history_sec": 2.0,
+  "prediction_sec": 6.0,
+  "train_epochs": 12,
+  "learning_rate": 0.003,
+  "eval_every": 1,
+  "save_every": 1,
+  "log_dir": "results/trajectory_prediction/nuScenes/models",
+  "log_tag": "nusc_trainval_tpp",
+  "eval_batch_size": 256,
+  "preprocess_workers": 0,
+  "only_predict": [
+    "PEDESTRIAN"
+  ],
+  "eval_only_predict": [
+    "PEDESTRIAN"
+  ],
+  "no_types": [
+    "UNKNOWN"
+  ]
+}

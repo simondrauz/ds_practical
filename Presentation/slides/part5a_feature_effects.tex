@@ -1,0 +1,211 @@
+%--- Part 5a: Feature Effects & Importance (7 min) ----------------------------
+
+\section{Feature Effects \& Importance}
+
+\begin{frame}{Analysis Pipeline}
+  \begin{center}
+    \includegraphics[width=\textwidth]{pipeline-featureeffect}
+  \end{center}
+\end{frame}
+
+\renewcommand{\cornerpipeline}{cornerpipeline/pipeline-featureeffect}
+
+\newcommand{\featureEffectRangeNote}{%
+  \vfill
+  \hfill{\tiny\textcolor{gray}{PDPs: 5th--95th feature percentiles; GAM smooths: full observed feature range.}}\par
+}
+
+%--- Slide 1: Global Feature Importance (combined) ----------------------------
+\begin{frame}{Global Feature Importance}
+  \small
+  Two feature sets, both models, side-by-side.
+  \vspace{0.4em}
+  \begin{columns}[T]
+    \begin{column}{0.62\textwidth}
+      \scriptsize
+      \renewcommand{\arraystretch}{1.2}
+      \begin{tabular}{lccc}
+        \toprule
+        \textbf{Feature} &
+          \textbf{MI\,+\,VIF $|\mathrm{SHAP}|$} &
+          \textbf{VIF-only $|\mathrm{SHAP}|$} &
+          \textbf{GAM sig?} \\
+        \midrule
+        \texttt{std\_speed}                & \textbf{0.109} & \textbf{0.129}
+                                           & \textcolor{lmugreen}{\checkmark} \\
+        \texttt{max\_speed}                & 0.103          & —
+                                           & \textcolor{lmugreen}{\checkmark} \\
+        \texttt{heading\_change\_per\_sec} & 0.090          & 0.070
+                                           & \textcolor{lmugreen}{\checkmark} \\
+        \texttt{mean\_acceleration}        & 0.026          & 0.027
+                                           & \textcolor{lmugreen}{\checkmark} \\
+        \midrule
+        \texttt{min\_neighbor\_distance}   & —              & 0.027
+                                           & \textcolor{lmugreen}{\checkmark} \\
+        \texttt{scene\_density\_VEHICLE}   & —              & 0.020
+                                           & $\times$ \\
+        \texttt{scene\_num\_VEHICLE}       & —              & 0.016
+                                           & \textcolor{lmugreen}{\checkmark} \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.36\textwidth}
+      \begin{itemize}[<+->]\setlength\itemsep{0.6em}
+        \item Motion features dominate; Scene / social features carry little signal for per-trajectory error
+        \item \texttt{std\_speed} is the top driver in both feature sets
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Slide 2: std_speed & heading_change_per_sec ------------------------------
+\begin{frame}[t]{Feature Effects}
+  % Header row
+  \begin{columns}[T]
+    \begin{column}{0.40\textwidth}\end{column}
+    \begin{column}{0.27\textwidth}\centering\scriptsize\textbf{PDP}\end{column}
+    \begin{column}{0.27\textwidth}\centering\scriptsize\textbf{GAM smooth}\end{column}
+  \end{columns}
+  \vspace{0.15em}
+  % Row 1: std_speed
+  \begin{columns}[T]
+    \begin{column}{0.40\textwidth}
+      \footnotesize
+      \onslide<1->{%
+        {\small\textbf{\texttt{std\_speed}} — strong, monotone positive}
+        \begin{itemize}\setlength\itemsep{0.05em}
+          \item More variation $\Rightarrow$ higher ADE, monotonically
+          \item GAM confirms the trend within the PDP range
+          \item<2->[$\rightarrow$] \textit{Erratic speed is harder to forecast}
+        \end{itemize}
+      }
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \onslide<1->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_std_speed.png}}
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \onslide<1->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_std_speed.png}}
+    \end{column}
+  \end{columns}
+  \vspace{0.3em}
+  % Row 2: heading_change_per_sec
+  \begin{columns}[T]
+    \begin{column}{0.40\textwidth}
+      \footnotesize
+      \onslide<3->{%
+        {\small\textbf{\texttt{heading\_change\_per\_sec}} — positive, non-linear}
+        \begin{itemize}\setlength\itemsep{0.05em}
+          \item Turning generally raises ADE; drop-off at high values
+          \item GAM confirms the trend within the PDP range
+          \item<4->[$\rightarrow$] \textit{Turns hurt accuracy — up to a point}
+        \end{itemize}
+      }
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \onslide<3->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_heading_change_per_sec.png}}
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \onslide<3->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_heading_change_per_sec.png}}
+    \end{column}
+  \end{columns}
+  \featureEffectRangeNote
+\end{frame}
+
+%--- Slide 3: max_speed & mean_acceleration -----------------------------------
+\begin{frame}[t]{Feature Effects}
+  % Header row
+  \begin{columns}[T]
+    \begin{column}{0.40\textwidth}\end{column}
+    \begin{column}{0.27\textwidth}\centering\scriptsize\textbf{PDP}\end{column}
+    \begin{column}{0.27\textwidth}\centering\scriptsize\textbf{GAM smooth}\end{column}
+  \end{columns}
+  \vspace{0.15em}
+  % Row 1: max_speed
+  \begin{columns}[T]
+    \begin{column}{0.40\textwidth}
+      \footnotesize
+      \onslide<1->{%
+        {\small\textbf{\texttt{max\_speed}} — positive, increasing}
+        \begin{itemize}\setlength\itemsep{0.05em}
+          \item Higher peak speeds raise predicted ADE
+          \item GAM agrees; CI widens at the tail
+          \item<2->[$\rightarrow$] \textit{Increasing top speed drives error}
+        \end{itemize}
+      }
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \onslide<1->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_max_speed.png}}
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \onslide<1->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_max_speed.png}}
+    \end{column}
+  \end{columns}
+  \vspace{0.3em}
+  % Row 2: mean_acceleration
+  \begin{columns}[T]
+    \begin{column}{0.40\textwidth}
+      \footnotesize
+      \onslide<3->{%
+        {\small\textbf{\texttt{mean\_acceleration}} — near-zero, mixed}
+        \begin{itemize}\setlength\itemsep{0.05em}
+          \item Oscillates around zero
+          \item Population-level effect $\approx 0$, but signed
+                per-trajectory effects still vary
+          \item<4->[$\rightarrow$] \textit{What matters is that pedestrians are
+                changing speed, not how quickly}
+        \end{itemize}
+      }
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \onslide<3->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_pdp_mean_acceleration.png}}
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \onslide<3->{\includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_MI_correct_target_ml_ade_log_smooth_additive_effect_mean_acceleration.png}}
+    \end{column}
+  \end{columns}
+  \featureEffectRangeNote
+\end{frame}
+
+%--- Slide 4: scene_density_VEHICLE ------------------------------------------
+\begin{frame}[t]{Feature Effects}
+  % Header row (identical to two-feature slides)
+  \begin{columns}[T]
+    \begin{column}{0.40\textwidth}\end{column}
+    \begin{column}{0.27\textwidth}\centering\scriptsize\textbf{PDP}\end{column}
+    \begin{column}{0.27\textwidth}\centering\scriptsize\textbf{GAM smooth}\end{column}
+  \end{columns}
+  \vspace{0.15em}
+  % Row 1: scene_density_VEHICLE (same layout as first row of two-feature slides)
+  \begin{columns}[T]
+    \begin{column}{0.40\textwidth}
+      \footnotesize
+      {\small\textbf{\texttt{scene\_density\_VEHICLE}} — negligible, noisy}
+      \begin{itemize}\setlength\itemsep{0.05em}
+        \item Lower density seems to increase predicted ADE, but PDP is noisy
+        \item Other scene / social features
+              (\texttt{scene\_num\_VEHICLE},
+               \texttt{min\_neighbor\_distance})
+              show near-flat PDPs
+        \item<2->[$\rightarrow$] \textit{Scene features do not robustly explain
+                      individual trajectory error}
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/xgboost_full_trainval_12ep_1seed_vif_only_no_collision_target_ml_ade_log_pdp_scene_density_VEHICLE.png}
+    \end{column}
+    \begin{column}{0.27\textwidth}
+      \centering
+      \includegraphics[width=\columnwidth,height=0.36\textheight,keepaspectratio]{feature_effect_pdp_plots/gam_full_trainval_12ep_1seed_vif_only_no_collision_target_ml_ade_raw_smooth_additive_effect_scene_density_VEHICLE.png}
+    \end{column}
+  \end{columns}
+  \featureEffectRangeNote
+\end{frame}

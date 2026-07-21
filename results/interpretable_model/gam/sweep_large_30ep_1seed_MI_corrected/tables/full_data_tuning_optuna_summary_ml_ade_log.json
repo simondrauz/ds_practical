@@ -1,0 +1,112 @@
+{
+  "model_id": "gam",
+  "run_name": "sweep_large_30ep_1seed_MI_corrected",
+  "target_col": "ml_ade_log",
+  "raw_target_col": "ml_ade",
+  "log_target_col": "ml_ade_log",
+  "selection_metric_name": "mean_outer_rmse",
+  "selection_metric_value": 0.24436736449324128,
+  "variant_results": [
+    {
+      "variant_model_id": "gam-linear-log",
+      "variant_name": "LinearGAM (log)",
+      "model_kind": "linear",
+      "target_mode": "log",
+      "status": "completed",
+      "selection_metric_name": "mean_outer_rmse",
+      "selection_metric_value": 0.25086009765569467,
+      "outer_r2_mean": 0.6360663763352268,
+      "outer_r2_std": 0.0058929526085654835,
+      "outer_mae_mean": 0.16183125880228458,
+      "outer_mae_std": 0.0022155131276825227,
+      "outer_rmse_mean": 0.25086009765569467,
+      "outer_rmse_std": 0.006633802191800727,
+      "nested_cv_path": "../../results/interpretable_model/gam-linear-log/sweep_large_30ep_1seed_MI_corrected/tables/nested_cv_optuna_ml_ade_log.csv",
+      "nested_cv_summary_path": "../../results/interpretable_model/gam-linear-log/sweep_large_30ep_1seed_MI_corrected/tables/nested_cv_optuna_summary_ml_ade_log.csv",
+      "oof_predictions_path": "../../results/interpretable_model/gam-linear-log/sweep_large_30ep_1seed_MI_corrected/tables/oof_predictions_ml_ade_log.csv",
+      "oof_metrics_path": "../../results/interpretable_model/gam-linear-log/sweep_large_30ep_1seed_MI_corrected/tables/metrics_oof_ml_ade_log.csv",
+      "model_data_with_oof_path": "../../results/interpretable_model/gam-linear-log/sweep_large_30ep_1seed_MI_corrected/tables/model_data_with_oof_ml_ade_log.csv",
+      "manifest_path": "../../results/interpretable_model/gam-linear-log/sweep_large_30ep_1seed_MI_corrected/tables/run_manifest_ml_ade_log.json"
+    },
+    {
+      "variant_model_id": "gam-linear",
+      "variant_name": "LinearGAM (no log)",
+      "model_kind": "linear",
+      "target_mode": "raw",
+      "status": "completed",
+      "selection_metric_name": "mean_outer_rmse",
+      "selection_metric_value": 0.2601734518612832,
+      "outer_r2_mean": 0.608526866193143,
+      "outer_r2_std": 0.0074477990910138325,
+      "outer_mae_mean": 0.17649224310551256,
+      "outer_mae_std": 0.002027000919055354,
+      "outer_rmse_mean": 0.2601734518612832,
+      "outer_rmse_std": 0.006837753169901636,
+      "nested_cv_path": "../../results/interpretable_model/gam-linear/sweep_large_30ep_1seed_MI_corrected/tables/nested_cv_optuna_ml_ade_log.csv",
+      "nested_cv_summary_path": "../../results/interpretable_model/gam-linear/sweep_large_30ep_1seed_MI_corrected/tables/nested_cv_optuna_summary_ml_ade_log.csv",
+      "oof_predictions_path": "../../results/interpretable_model/gam-linear/sweep_large_30ep_1seed_MI_corrected/tables/oof_predictions_ml_ade_log.csv",
+      "oof_metrics_path": "../../results/interpretable_model/gam-linear/sweep_large_30ep_1seed_MI_corrected/tables/metrics_oof_ml_ade_log.csv",
+      "model_data_with_oof_path": "../../results/interpretable_model/gam-linear/sweep_large_30ep_1seed_MI_corrected/tables/model_data_with_oof_ml_ade_log.csv",
+      "manifest_path": "../../results/interpretable_model/gam-linear/sweep_large_30ep_1seed_MI_corrected/tables/run_manifest_ml_ade_log.json"
+    },
+    {
+      "variant_model_id": "gam-gamma",
+      "variant_name": "GammaGAM",
+      "model_kind": "gamma",
+      "target_mode": "raw",
+      "status": "completed",
+      "selection_metric_name": "mean_outer_rmse",
+      "selection_metric_value": 0.24436736449324128,
+      "outer_r2_mean": 0.6544990428430425,
+      "outer_r2_std": 0.008626263757720066,
+      "outer_mae_mean": 0.15343299817962072,
+      "outer_mae_std": 0.0010385947784105956,
+      "outer_rmse_mean": 0.24436736449324128,
+      "outer_rmse_std": 0.0031544583274800944,
+      "nested_cv_path": "../../results/interpretable_model/gam-gamma/sweep_large_30ep_1seed_MI_corrected/tables/nested_cv_optuna_ml_ade_log.csv",
+      "nested_cv_summary_path": "../../results/interpretable_model/gam-gamma/sweep_large_30ep_1seed_MI_corrected/tables/nested_cv_optuna_summary_ml_ade_log.csv",
+      "oof_predictions_path": "../../results/interpretable_model/gam-gamma/sweep_large_30ep_1seed_MI_corrected/tables/oof_predictions_ml_ade_log.csv",
+      "oof_metrics_path": "../../results/interpretable_model/gam-gamma/sweep_large_30ep_1seed_MI_corrected/tables/metrics_oof_ml_ade_log.csv",
+      "model_data_with_oof_path": "../../results/interpretable_model/gam-gamma/sweep_large_30ep_1seed_MI_corrected/tables/model_data_with_oof_ml_ade_log.csv",
+      "manifest_path": "../../results/interpretable_model/gam-gamma/sweep_large_30ep_1seed_MI_corrected/tables/run_manifest_ml_ade_log.json"
+    }
+  ],
+  "nested_variant_comparison_path": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/tables/nested_variant_comparison_ml_ade_log.csv",
+  "nested_variant_comparison_plot_path": "../../results/interpretable_model/gam/sweep_large_30ep_1seed_MI_corrected/plots/nested_variant_comparison_ml_ade_log.png",
+  "selected_variant_model_id": "gam-gamma",
+  "selected_variant_manifest_path": "../../results/interpretable_model/gam-gamma/sweep_large_30ep_1seed_MI_corrected/tables/run_manifest_ml_ade_log.json",
+  "selected_variant_name": "GammaGAM",
+  "selected_variant_model_kind": "gamma",
+  "selected_variant_target_mode": "raw",
+  "selected_variant_nested_summary": {
+    "outer_rmse_mean": 0.24436736449324128,
+    "outer_rmse_std": 0.0031544583274800944,
+    "outer_mae_mean": 0.15343299817962072,
+    "outer_mae_std": 0.0010385947784105956,
+    "outer_r2_mean": 0.6544990428430425,
+    "outer_r2_std": 0.008626263757720066
+  },
+  "selected_best_params": {
+    "n_splines": 49,
+    "spline_order": 4,
+    "lam": 0.08741436832570491
+  },
+  "full_data_best_cv_rmse": 0.24576271891095702,
+  "tuning_config": {
+    "nfold": 3,
+    "n_trials": 15,
+    "n_splines_range": [
+      10,
+      50
+    ],
+    "spline_order_range": [
+      3,
+      4
+    ],
+    "lam_range": [
+      0.001,
+      1000.0
+    ],
+    "random_state": 42
+  }
+}

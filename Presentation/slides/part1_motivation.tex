@@ -1,0 +1,142 @@
+%--- Part 1: Motivation (4 min) -------------------------------------------------
+
+\section{Motivation}
+
+%--- Slide: Trajectory Prediction for Autonomous Driving -----------------------
+\begin{frame}{Trajectory Prediction for Autonomous Driving}
+  \begin{columns}
+    \begin{column}{0.55\textwidth}
+      \begin{itemize}[<+->]
+        \item \textbf{Task:} forecast future $(x, y)$ positions of agents
+              (pedestrians, cyclists, motorcyclists, vehicles) from observed past movements
+        \item Challenging due to \textbf{complex agent interactions} and influence of \textbf{static context}
+        \item Essential for \textcolor{lmugreen}{\textbf{safe path planning}} and \textcolor{lmugreen}{\textbf{collision avoidance}}
+              in autonomous vehicles
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \begin{center}
+        \includegraphics[width=\textwidth]{trajectory_prediction}\\
+        \vspace{0.2em}
+        {\tiny Source: Salzmann et al.\ (2020)}
+      \end{center}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Slide: Trajectron++ (base architecture) -----------------------------------
+\begin{frame}{Trajectron++}
+  \begin{columns}[c]
+    \begin{column}{0.55\textwidth}
+      \begin{itemize}
+        \item Probabilistic trajectory prediction model
+              \textnormal{\small[Ivanovic \& Pavone, 2019; Salzmann et al., 2020]}
+        \item<2-> \emph{Spatio-temporal graph encoder}
+        \begin{itemize}
+          \item<2-> LSTM encodes each agent's history
+          \item<2-> edges encode agent--agent interactions
+        \end{itemize}
+        \item<3-> \emph{CVAE decoder} — distribution over future trajectories
+        \item<4-> Handles \emph{heterogeneous agent types} jointly
+              (pedestrian, bicycle, motorcycle, vehicle)
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \begin{minipage}[c][0.78\textheight][c]{\linewidth}
+        \centering
+        \includegraphics[width=\textwidth]{trajectronpp}\\
+        {\tiny Source: Salzmann et al.\ (2020)}
+      \end{minipage}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Slide: Trajectron++ (additions + metrics) ---------------------------------
+\begin{frame}{Trajectron++}
+  \begin{columns}[c]
+    \begin{column}{0.55\textwidth}
+      \textbf{Extends Trajectron with:}
+      \textnormal{\small[Salzmann et al., 2020]}
+      \begin{itemize}
+        \item \emph{Dynamics integration} — kinematic model per
+              agent type $\Rightarrow$ dynamically-feasible trajectories
+        \item \emph{Semantic scene context} — CNN encoder over
+              rasterized HD maps
+      \end{itemize}
+      \onslide<2->{%
+        \vspace{0.6em}
+        \textbf{Performance metrics}\\
+        {\small \textbf{ADE}: avg.\ L2 over horizon; \textbf{FDE}: L2 at final step}
+        \begin{itemize}
+          \item \texttt{ml\_ade} — most-likely ADE
+                \textcolor{lmugreen}{\textbf{$\leftarrow$ used}}
+          \item \texttt{ml\_fde} — most-likely FDE
+          \item \texttt{min\_ade\_5} — best-of-5 ADE
+          \item \texttt{nll\_mean} — neg.\ log-likelihood
+        \end{itemize}
+      }
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \begin{minipage}[c][0.78\textheight][c]{\linewidth}
+        \centering
+        \includegraphics[width=\textwidth]{trajectronpp}\\
+        {\tiny Source: Salzmann et al.\ (2020)}
+      \end{minipage}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Slide: nuScenes -----------------------------------------------------------
+\begin{frame}{nuScenes Dataset}
+  \begin{columns}[c]
+    \begin{column}{0.55\textwidth}
+      \begin{itemize}
+        \item 1\,000 urban driving scenes, Boston \& Singapore
+        \item Agent types: pedestrians, cyclists, motorcyclists, vehicles
+        \item Rich sensor suite: camera, LiDAR, radar, GPS, HD map
+        \item<2-> \textbf{Scope:} we predict \emph{pedestrian} trajectories
+              only, all agent types serve as scene context
+        \item<3-> \emph{trajdata} \textnormal{\small[NVLabs]} — unified
+              interface to many trajectory datasets (nuScenes, ETH/UCY, \ldots)
+              \begin{itemize}
+                \item<3->[$\Rightarrow$] Our analysis pipeline applies to
+                      \emph{any} trajdata-supported dataset
+              \end{itemize}
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \centering
+      \includegraphics[width=0.65\textwidth]{nuscenes_example3}\\[0.2em]
+      \includegraphics[width=\textwidth]{nuscenes_maps}\\[0.1em]
+      {\tiny Source: Caesar et al.\ (2020)}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Slide: Research Questions -------------------------------------------------
+\begin{frame}{Challenges and Research Questions}
+  \begin{columns}
+    \begin{column}{0.52\textwidth}
+      \begin{itemize}[<1->]
+        \item Some trajectories are inherently hard, others trivially
+              easy---but \emph{why?}
+        \item A single average ADE/FDE gives no insight into reasons
+              for failure and success
+        \item No understanding of which trajectory or scene characteristics
+              drive per-trajectory prediction error
+      \end{itemize}
+      \vspace{0.4em}
+      \onslide<2->{$\Rightarrow$ \textbf{\textcolor{lmugreen}{Three research questions:}}}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \begin{enumerate}
+        \item<3-> Which trajectory and scene characteristics affect model
+              performance?
+        \item<4-> What are the \emph{success and failure modes} that explain
+              model performance?
+        \item<5-> How do model settings (history window, prediction horizon,
+              attention radius) affect performance?
+      \end{enumerate}
+    \end{column}
+  \end{columns}
+\end{frame}

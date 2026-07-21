@@ -1,5 +1,0 @@
-# Ignore raw nuScenes assets and large derived artifacts
-raw/
-processed/
-metadata/
-!metadata/*.md

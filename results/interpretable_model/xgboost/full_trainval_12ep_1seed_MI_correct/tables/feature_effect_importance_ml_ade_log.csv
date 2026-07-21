@@ -1,0 +1,5 @@
+feature,global_rank,mean_abs_shap,importance_metric,importance_value,importance_ascending
+std_speed,1,0.10883768980740983,mean_abs_shap,0.10883768980740983,False
+max_speed,2,0.10307359310830956,mean_abs_shap,0.10307359310830956,False
+heading_change_per_sec,3,0.08991554816839407,mean_abs_shap,0.08991554816839407,False
+mean_acceleration,4,0.025764716462696235,mean_abs_shap,0.025764716462696235,False

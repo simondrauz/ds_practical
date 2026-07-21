@@ -1,96 +1,196 @@
-# Trajectory Prediction Performance Analysis for Federated Learning
+# Interpreting Trajectron++ Prediction Errors on nuScenes
 
-## Project Overview
-This repository explores how data characteristics drawn from the nuScenes dataset impact the performance of a Trajectron++ trajectory prediction model. The centralized analysis produced here will guide the design of a future federated learning (FL) setup for trajectory forecasting in diverse traffic scenarios.
+This repository contains the code and evidence used to analyse why Trajectron++
+predicts some pedestrian trajectories more accurately than others. The pipeline
+recovers per-trajectory prediction errors, joins them with interpretable motion,
+scene, and social features, and analyses those errors with GAM and XGBoost
+meta-models.
 
-## Getting Started
+![Analysis pipeline](Report/figures/pipeline.png)
 
-### Prerequisites
-- Python 3.10+ (tested with 3.10.16; see `runtime.txt`)
-- ~5.5 GB free disk space for nuScenes mini dataset + map expansion
-- Git for version control
+## Research questions
 
-### Environment Setup
-1. Clone this repository and navigate to the project root:
-   ```bash
-   git clone https://github.com/simondrauz/ds_practical.git
-   cd ds_practical
-   ```
+1. Which trajectory and scene characteristics are associated with prediction
+   performance?
+2. Which interpretable success and failure modes explain performance?
+3. How do observation history, prediction horizon, and attention radius affect
+   performance within the tested ranges?
 
-2. Create and activate a virtual environment:
-   ```bash
-   python3.10 -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
+The project evaluates an existing trajectory-prediction model; it does not
+propose a new prediction architecture. GAM and XGBoost are explanatory
+meta-models of Trajectron++ error, not trajectory predictors.
 
-3. Install project dependencies:
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
+## Repository map
 
-4. **(Optional)** Register a Jupyter kernel if not using VS Code:
-   ```bash
-   python -m ipykernel install --user --name trajectory-fl --display-name "trajectory-fl"
-   ```
-   **Note:** VS Code auto-detects `.venv` as a kernel—just select `.venv (Python 3.10.16)` from the kernel picker in notebooks.
+| Path | Purpose |
+|---|---|
+| `train_unified.py` | Trajectron++ training and evaluation entry point. |
+| `run_sweep.py` | Sequential settings-sweep runner and joined-run combiner. |
+| `scripts/run_prediction_result_set.py` | Curates the named full-trainval and settings-sweep result sets. |
+| `scripts/run_seeded_experiments.py` | Shared training, joining, seed aggregation, and manifest logic used by the curated runner. |
+| `scripts/verify_report_tables.py` | Recomputes and checks report Tables 2, 13, and 14 from committed artifacts. |
+| `scripts/validate_pipeline_paths.py` | Capped integration validation before expensive runs. |
+| `src/trajectron/` | Adapted Trajectron++ model, evaluation, and utilities. |
+| `src/data_preparation/` | Per-trajectory/scene metrics, joining, and explicit run combination. |
+| `src/data_modelling/` | Preparation, GAM/XGBoost, inference, feature-effect, and mode-analysis workflows. |
+| `config/` | Model, runtime, analysis, sweep, and split-index configuration. |
+| `results/trajectory_prediction/trajectory_metrics_joined/` | Committed per-trajectory inputs for the submitted analyses. |
+| `results/interpretable_model/` | Prepared data and exported model/effect/mode evidence. |
+| `Report/` | Report source, cited figures, bibliography, and compiled PDF. |
+| `Presentation/` | Presentation source, slide inputs, figures, and compiled PDF. |
+| `unified-av-data-loader/` | Vendored `trajdata` dependency used by the training and join pipelines. |
 
-### Dataset Acquisition
-1. Create a nuScenes account at https://www.nuscenes.org/download
-2. Download the **v1.0-mini** dataset and the **Map expansion pack (v1.3)**
-3. Extract both archives and organize as follows:
-   ```
-   data/raw/
-   ├── maps/
-   │   ├── expansion/
-   │   │   ├── boston-seaport.json
-   │   │   ├── singapore-hollandvillage.json
-   │   │   ├── singapore-onenorth.json
-   │   │   └── singapore-queenstown.json
-   │   └── (map image files)
-   ├── samples/
-   ├── sweeps/
-   └── v1.0-mini/
-   ```
-4. Open `notebooks/00_setup_validation.ipynb` and run all cells to verify the setup
+## Environment and external data
 
-### Trajectron++ Setup
-The Trajectron++ model will be integrated in Step 3 for performance evaluation. Setup options:
+The verified local environment is the conda environment `adaptive-py310`.
+Commands should run from the repository root with:
 
-1. **Using the official Trajectron++ repository:**
-   ```bash
-   git clone https://github.com/StanfordASL/Trajectron-plus-plus.git
-   # Follow their installation instructions in Trajectron-plus-plus/README.md
-   ```
-
-2. **Integration approach** (to be determined during development):
-   - Option A: Use pretrained weights from their repository
-   - Option B: Train from scratch on nuScenes clusters
-   - Option C: Fine-tune pretrained weights on cluster-specific data
-
-### Optional: Experiment Tracking
-If using Weights & Biases for experiment tracking:
 ```bash
-pip install wandb
-wandb login  # Follow prompts to authenticate
+export PYTHONPATH=src:unified-av-data-loader/src
+export WANDB_MODE=disabled
+export MPLBACKEND=Agg
 ```
 
-## Project Workflow
-- **Step 0 — Setup Validation:** Run `notebooks/00_setup_validation.ipynb` to verify dataset access and trajdata functionality.
-- **Step 1 — Data Characterization:** Use the trajdata library to summarize nuScenes agent behaviors, scene context, and interaction cues (upcoming notebook).
-- **Step 2 — Data Clustering:**
-  - Manual clusters based on domain heuristics (agent class, interaction level, weather, etc.).
-  - Algorithmic clusters derived from feature embeddings (e.g., K-Means on scene and motion descriptors).
-- **Step 3 — Performance Evaluation:** Train and evaluate Trajectron++ on the full dataset and on each cluster to identify performance sensitivities.
+The raw nuScenes release, trajdata cache, and full training checkpoints are not
+committed. Download nuScenes under its licence and provide machine-local paths
+through command-line overrides:
 
-## Repository Diagram
-- `config/` — Configuration templates for experiments, clustering settings, and model hyperparameters.
-- `data/` — Local storage hooks, metadata exports, and scripts for dataset ingestion (nuScenes files not tracked).
-- `notebooks/` — Exploratory data analysis, clustering prototypes, and evaluation summaries.
-- `results/` — Consolidated metrics, plots, and analysis artifacts.
-- `src/` — Reusable Python modules for data pipelines, clustering utilities, and evaluation routines.
+```bash
+conda run -n adaptive-py310 python -m torch.distributed.run \
+  --nproc_per_node=1 train_unified.py \
+  --conf config/nuScenes_full_trainval.json \
+  --trajdata_cache_dir /path/to/trajdata_cache \
+  --data_loc_dict '{"nusc_trainval":"/path/to/v1.0-trainval_raw"}'
+```
 
-## Next Steps
-- Fill in configuration templates in `config/` to document dataset paths and cluster definitions.
-- Begin exploratory analysis in `notebooks/` to validate feature engineering choices.
-- Implement reusable data loaders and evaluators under `src/` once the workflow is finalized.
+The prediction-challenge split indexes required by the data-loading code are
+committed under `config/experimental_setup/nuScenes/`. Shared configuration
+files contain the experiment settings; override their machine-specific data
+paths locally and do not commit those local changes.
+
+## Submitted result sets
+
+The report and presentation use two single-seed result sets:
+
+| Result set | Protocol | Committed joined input |
+|---|---|---|
+| Full trainval | 12 epochs, seed 123, fixed model settings | `results/trajectory_prediction/trajectory_metrics_joined/full_trainval_12ep_1seed/eval_epoch_12.csv` |
+| Settings sweep | 30 epochs, seed 123, 64 settings | `results/trajectory_prediction/trajectory_metrics_joined/sweep_large_30ep_1seed/eval_epoch_30_combined.csv` |
+
+The 64-setting grid is defined in `config/sweep_config_large.yaml`:
+
+- history: 1, 2, 3, or 4 seconds;
+- prediction horizon: 2, 3, 4, or 6 seconds;
+- attention-radius scale: 0.25, 0.5, 1, or 2.
+
+The realised `attention_radius_m`, rather than the internal scale multiplier,
+is used in downstream interpretation.
+
+## Regenerating the submitted evidence
+
+### 1. Recreate per-trajectory prediction results
+
+This stage performs the expensive Trajectron++ runs and requires the external
+nuScenes data and cache. After configuring local data paths, the curated
+entrypoints are:
+
+```bash
+conda run -n adaptive-py310 python scripts/run_prediction_result_set.py \
+  --experiment full_trainval_1seed --phase all
+
+conda run -n adaptive-py310 python scripts/run_prediction_result_set.py \
+  --experiment sweep_large_1seed --phase all
+```
+
+Use `--phase train --dry_run` first to inspect every planned command without
+starting training. The large-sweep dry run must report 64 combinations.
+
+### 2. Recreate the interpretable analyses
+
+The committed joined CSVs allow this stage to be rerun without retraining
+Trajectron++. For the full-trainval analysis, execute the preparation, GAM,
+XGBoost, inference, feature-effect, and selected mode-inspection workflows in
+this order:
+
+1. `src/data_modelling/interpretable_model_data_preparation.ipynb`
+2. `src/data_modelling/gam.ipynb`
+3. `src/data_modelling/xgboost.ipynb`
+4. `src/data_modelling/model_inference_analysis.ipynb` for each model
+5. `src/data_modelling/feature_effect_performance_regimes.ipynb` for each model
+6. `src/data_modelling/feature_effect_pr_cluster_inspection.ipynb`
+
+Use `RUN_NAME="full_trainval_12ep_1seed"` and
+`EVAL_CSV_NAME="eval_epoch_12.csv"`; exclude model-setting columns as
+predictors. The submitted evidence includes the MI+VIF main analysis and the
+VIF-only comparison.
+
+For the settings sweep, use `RUN_NAME="sweep_large_30ep_1seed"` and
+`EVAL_CSV_NAME="eval_epoch_30_combined.csv"`; include model-setting columns as
+predictors and stop after model inference. The workflow wrapper exposes the
+same contract:
+
+```bash
+conda run -n adaptive-py310 python \
+  src/data_modelling/run_interpretable_notebook_workflow.py \
+  --run-name sweep_large_30ep_1seed \
+  --eval-csv-name eval_epoch_30_combined.csv \
+  --include-model-settings-as-features \
+  --models gam xgboost
+```
+
+### 3. Evidence provenance
+
+| Finding | Primary evidence |
+|---|---|
+| RQ1: feature associations | Full-trainval joined CSV; `prepared_data/full_trainval_12ep_1seed_MI_correct/`; GAM and XGBoost exports with the same run name. |
+| RQ2: success/failure modes | Full-trainval MI+VIF and VIF-only feature-effect/mode exports under `results/interpretable_model/feature_effect_performance_regimes/`. |
+| RQ3: settings effects | Large-sweep joined CSV; `prepared_data/sweep_large_30ep_1seed_MI_corrected/`; corresponding GAM and XGBoost exports. |
+| Report model and mode tables | The OOF prediction and nested-CV tables consumed by `scripts/verify_report_tables.py`. |
+| Final figures | Exact copies under `Report/figures/` and `Presentation/figures/`. |
+
+## Fast verification without retraining
+
+Run the following from a clean checkout:
+
+```bash
+conda run -n adaptive-py310 python -m compileall -q \
+  src scripts train_unified.py run_sweep.py
+
+conda run -n adaptive-py310 python scripts/verify_report_tables.py --show
+
+conda run -n adaptive-py310 python scripts/run_prediction_result_set.py \
+  --experiment sweep_large_1seed --phase train --dry_run
+
+conda run -n adaptive-py310 python -m pytest -q
+```
+
+The report-table check recomputes 110 displayed values from committed OOF and
+nested-CV artifacts. The dry run validates the exact 64-setting experiment
+contract without training.
+
+## Building the deliverables
+
+```bash
+cd Report
+latexmk -pdf -interaction=nonstopmode -halt-on-error -recorder main.tex
+
+cd ../Presentation
+latexmk -gg -pdf -interaction=nonstopmode -halt-on-error -recorder main.tex
+```
+
+The verified builds produce `Report/main.pdf` and `Presentation/main.pdf`.
+
+## Limitations
+
+- The submitted Trajectron++ results use one training seed.
+- Findings are specific to Trajectron++, pedestrian targets, nuScenes, and the
+  tested setting ranges.
+- Feature effects are observational associations with model error, not causal
+  effects.
+- Raw data and model checkpoints must be regenerated or supplied externally.
+- Current features do not fully explain the highest-error tail.
+
+## Acknowledgements
+
+This project adapts Trajectron++ and uses the vendored `trajdata` loader. See
+the report bibliography and package metadata for source attribution.

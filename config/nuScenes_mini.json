@@ -1,0 +1,24 @@
+{
+  "extends": "nuScenes.json",
+  "train_data": "nusc_mini-mini_train",
+  "eval_data": "nusc_mini-mini_val",
+  "trajdata_cache_dir": "data/processed/trajdata_cache",
+  "data_loc_dict": "{\"nusc_mini\":\"data/raw\"}",
+  "history_sec": 2.0,
+  "prediction_sec": 6.0,
+  "train_epochs": 40,
+  "learning_rate": 0.003,
+  "eval_every": 5,
+  "save_every": 5,
+  "log_dir": "results/trajectory_prediction/nuScenes/models",
+  "log_tag": "nusc_mini_tpp",
+  "only_predict": [
+    "PEDESTRIAN"
+  ],
+  "eval_only_predict": [
+    "PEDESTRIAN"
+  ],
+  "no_types": [
+    "UNKNOWN"
+  ]
+}

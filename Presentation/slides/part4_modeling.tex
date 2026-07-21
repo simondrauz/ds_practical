@@ -1,0 +1,229 @@
+%--- Part 4: Interpretable Modeling (8 min) ------------------------------------
+
+\section{Interpretable Modeling}
+
+\begin{frame}{Analysis Pipeline}
+  \begin{center}
+    \includegraphics[width=\textwidth]{pipeline-modelling}
+  \end{center}
+\end{frame}
+
+\renewcommand{\cornerpipeline}{cornerpipeline/pipeline-modelling}
+
+%--- Slide: Why interpretable models? ------------------------------------------
+\begin{frame}{Why Interpretable Models?}
+  \begin{itemize}[<+->]
+    \item Per-trajectory \texttt{ml\_ade} alone do not tell us \emph{why} some trajectories are hard
+    \item Interpretable models let us directly read off feature effects: how does speed, heading change or scene density affect prediction error?
+    \item Two tested approaches:
+    \begin{itemize}[<3->]
+        \item \textbf{GAM:} smooth effects directly readable from the model
+        \item \textbf{XGBoost:} post-hoc via SHAP values and partial
+          dependence plots
+    \end{itemize}
+    \item This turns ADE into \textcolor{lmugreen}{\textbf{actionable understanding}} of model
+          behaviour
+  \end{itemize}
+\end{frame}
+
+%--- Slide: GAM and XGBoost ---------------------------------------------------
+\begin{frame}{GAM and XGBoost}
+  \begin{columns}[t]
+    \begin{column}{0.48\textwidth}
+      \textbf{GAM (Generalized Additive Model)}\\
+      \textit{\footnotesize Inherently interpretable}
+      \visible<2->{\begin{itemize}
+        \item Models target as a sum of smooth functions: $f(x) = \sum_j s_j(x_j)$
+        \item One spline per feature — no interaction terms
+        \item p-values for significance testing
+        \item Feature effects directly readable from the model
+      \end{itemize}}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{XGBoost}\\
+      \textit{\footnotesize Black-box, interpreted post-hoc}
+      \visible<3->{\begin{itemize}
+        \item Gradient-boosted decision trees
+        \item Flexibly captures non-linearities
+              and feature interactions
+        \item Interpreted via \textbf{SHAP values} and
+              \textbf{partial dependence plots}
+        \item SHAP: per-row, signed contribution of each feature,
+              additive on top of a baseline (mean model prediction)
+              : $$f(x) = \phi_0 + \sum_j \phi_j(x)$$      \end{itemize}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Slide: Additive effects & SHAP -------------------------------------------
+\newcommand{\nestedResamplingFigure}{%
+  \begin{minipage}[c][0.58\textheight][c]{\linewidth}
+    \centering
+    \makebox[\linewidth][c]{%
+      \includegraphics[
+        width=1.05\linewidth,
+        height=0.56\textheight,
+        keepaspectratio
+      ]{nested_resampling_slide}%
+    }%
+  \end{minipage}%
+}
+
+%--- Slide 12 ------------------------------------------------------------------
+\begin{frame}[t]{Validating Tuning Procedure - Nested Resampling}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.53\textwidth}
+      \small
+      \begin{itemize}
+        \item<2-> \textbf{Problem:} hyperparameter tuning risks overfitting to a
+              particular data split
+        \item<3-> \textbf{Solution:} nested cross-validation
+        \begin{itemize}
+          \item<3-> Outer folds: evaluate generalization of the full tuning procedure
+          \item<3-> Inner folds: tune hyperparameters on each outer-fold training set via cross-validation
+        \end{itemize}
+        \item<4-> OOF evaluation: inspect out-of-fold predictions for instability
+              and bias
+      \end{itemize}
+    \end{column}
+
+    \begin{column}{0.43\textwidth}
+      \onslide<3->{\nestedResamplingFigure}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+
+%--- OOF diagnostics: XGBoost MI+VIF -------------------------------------------
+\begin{frame}{OOF Diagnostics — XGBoost}
+  \framesubtitle{MI\,+\,VIF feature set — main analysis}
+  \centering
+  \vspace{-0.25em}
+
+  \begin{minipage}[t][0.48\textheight][t]{0.95\textwidth}
+    \centering
+    \includegraphics[width=\textwidth,height=0.48\textheight,keepaspectratio]{oof_diagnostics_xgb_mi_vif}
+  \end{minipage}
+
+  \vspace{0.15em}
+  \begin{minipage}[t][0.22\textheight][t]{0.88\textwidth}
+    \footnotesize
+    \begin{itemize}
+      \item Strong agreement at low-to-moderate ADE; systematic
+            underprediction at high ADE values
+    \end{itemize}
+  \end{minipage}
+\end{frame}
+
+%--- OOF diagnostics: XGBoost VIF only -----------------------------------------
+\begin{frame}{OOF Diagnostics — XGBoost}
+  \framesubtitle{VIF-only feature set — follow-up comparison}
+  \centering
+  \vspace{-0.25em}
+
+  \begin{minipage}[t][0.48\textheight][t]{0.95\textwidth}
+    \centering
+    \includegraphics[width=\textwidth,height=0.48\textheight,keepaspectratio]{oof_diagnostics_xgb_vif_only}
+  \end{minipage}
+
+  \vspace{0.15em}
+  \begin{minipage}[t][0.22\textheight][t]{0.88\textwidth}
+    \footnotesize
+    \begin{itemize}
+      \item Residual pattern nearly unchanged
+      \item MI\,+\,VIF retained for clearer downstream cluster structure;
+            VIF-only used as a complementary check
+    \end{itemize}
+  \end{minipage}
+\end{frame}
+
+%--- Return to validation slide with conclusion --------------------------------
+\begin{frame}[t]{Validating Tuning Procedure - Nested Resampling}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.53\textwidth}
+      \small
+      \begin{itemize}
+        \item \textbf{Problem:} hyperparameter tuning risks overfitting to a
+              particular data split
+        \item \textbf{Solution:} nested cross-validation
+        \begin{itemize}
+          \item Outer folds: evaluate generalization of the full tuning procedure
+          \item Inner folds: tune hyperparameters on each outer-fold training set via cross-validation
+        \end{itemize}
+        \item OOF evaluation: inspect out-of-fold predictions for instability
+              and bias
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.43\textwidth}
+      \nestedResamplingFigure
+    \end{column}
+  \end{columns}
+  \small
+  \begin{itemize}
+    \item \textbf{Conclusion:} tuning generalises stably 
+  \end{itemize}
+  \vspace{0.3em}
+  \onslide<2->{\textcolor{lmugreen}{$\Rightarrow$} proceed to
+          full-data tuning + refit on all data—no held-out test set needed}
+\end{frame}
+
+%--- Slide: model variant selection ---------------------------------------------
+\begin{frame}[t]{Model Variant Selection}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \small
+      \textbf{GAM variants:}
+      \begin{itemize}\setlength\itemsep{0.15em}
+        \item \textbf{LinearGAM (no log)} — fitted on raw \texttt{ml\_ade}
+        \item \textbf{LinearGAM (log)} — fitted on
+              $\log(1+\texttt{ml\_ade})$, evaluated on original scale
+        \item \textbf{GammaGAM} — Gamma distribution with log link,
+              suited for positive right-skewed targets
+      \end{itemize}
+      \vspace{0.25em}
+      \textbf{XGBoost variants:}
+      \begin{itemize}\setlength\itemsep{0.15em}
+        \item fitted on raw
+        \item fitted on \texttt{log1p} target
+      \end{itemize}
+      \vspace{0.45em}
+      \onslide<2->{%
+        \textcolor{lmugreen}{$\Rightarrow$} \textbf{Selection rule:} Select by OOF metrics on the original
+        \texttt{ml\_ade} scale.
+      }
+    \end{column}
+
+    \begin{column}{0.49\textwidth}
+      \onslide<3->{%
+      \scriptsize
+      \renewcommand{\arraystretch}{1.18}
+      \begin{tabular}{lccc}
+        \toprule
+        \textbf{Variant} & \textbf{RMSE} & \textbf{R$^2$} & \textbf{MAE} \\
+        \midrule
+        LinearGAM (raw) & 0.448 & 0.491 & 0.263 \\
+        \alt<3->{\textcolor{lmugreen}{\textbf{LinearGAM (log)}}}{LinearGAM (log)} &
+        \alt<3->{\textcolor{lmugreen}{\textbf{0.445}}}{0.445} &
+        \alt<3->{\textcolor{lmugreen}{\textbf{0.498}}}{0.498} &
+        \alt<3->{\textcolor{lmugreen}{0.250}}{0.250} \\
+        GammaGAM (Gamma/log) & 0.445 & 0.498 & 0.253 \\
+        XGBoost (raw) & 0.389 & 0.617 & 0.223 \\
+        \alt<3->{\textcolor{lmugreen}{\textbf{XGBoost (log)}}}{XGBoost (log)} &
+        \alt<3->{\textcolor{lmugreen}{\textbf{0.388}}}{0.388} &
+        \alt<3->{\textcolor{lmugreen}{\textbf{0.619}}}{0.619} &
+        \alt<3->{\textcolor{lmugreen}{\textbf{0.214}}}{0.214} \\
+        \bottomrule
+      \end{tabular}\\[0.4em]
+      \footnotesize
+      \onslide<4->{%
+        \textcolor{lmugreen}{\textbf{Selected: LinearGAM (log) and XGBoost (log).}}}\\
+      \vspace{0.35em}
+      \onslide<5->{%
+        \textcolor{lmugreen}{$\Rightarrow$ \textbf{XGBoost outperforms GAM on all metrics.}}\\[0.2em]
+        \footnotesize
+        Both models are used as a cross-check: the feature-effect narratives should agree across approaches.
+      }
+      }
+    \end{column}
+  \end{columns}
+\end{frame}

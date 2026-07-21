@@ -1,0 +1,48 @@
+{
+  "model_id": "xgboost",
+  "run_name": "full_trainval_12ep_1seed_vif_only_no_collision_xgboost_raw_target_quickfix",
+  "target_col": "ml_ade",
+  "feature_cols": [
+    "std_speed",
+    "mean_acceleration",
+    "min_neighbor_distance",
+    "heading_change_per_sec",
+    "scene_num_VEHICLE",
+    "scene_density_VEHICLE"
+  ],
+  "artifact_root": "../../results/interpretable_model/xgboost/full_trainval_12ep_1seed_vif_only_no_collision_xgboost_raw_target_quickfix",
+  "plots_dir": "../../results/interpretable_model/xgboost/full_trainval_12ep_1seed_vif_only_no_collision_xgboost_raw_target_quickfix/plots",
+  "tables_dir": "../../results/interpretable_model/xgboost/full_trainval_12ep_1seed_vif_only_no_collision_xgboost_raw_target_quickfix/tables",
+  "nested_resampling": {
+    "nested_cv_path": "../../results/interpretable_model/xgboost/full_trainval_12ep_1seed_vif_only_no_collision_xgboost_raw_target_quickfix/tables/nested_cv_optuna_ml_ade.csv",
+    "nested_cv_summary_path": "../../results/interpretable_model/xgboost/full_trainval_12ep_1seed_vif_only_no_collision_xgboost_raw_target_quickfix/tables/nested_cv_optuna_summary_ml_ade.csv",
+    "oof_predictions_path": "../../results/interpretable_model/xgboost/full_trainval_12ep_1seed_vif_only_no_collision_xgboost_raw_target_quickfix/tables/oof_predictions_ml_ade.csv",
+    "oof_metrics_path": "../../results/interpretable_model/xgboost/full_trainval_12ep_1seed_vif_only_no_collision_xgboost_raw_target_quickfix/tables/metrics_oof_ml_ade.csv",
+    "model_data_with_oof_path": "../../results/interpretable_model/xgboost/full_trainval_12ep_1seed_vif_only_no_collision_xgboost_raw_target_quickfix/tables/model_data_with_oof_ml_ade.csv"
+  },
+  "final_model": {
+    "model_path": "../../results/interpretable_model/xgboost/full_trainval_12ep_1seed_vif_only_no_collision_xgboost_raw_target_quickfix/xgb_model_ml_ade.json",
+    "full_data_tuning_trials_path": "../../results/interpretable_model/xgboost/full_trainval_12ep_1seed_vif_only_no_collision_xgboost_raw_target_quickfix/tables/full_data_tuning_optuna_trials_ml_ade.csv",
+    "full_data_tuning_summary_path": "../../results/interpretable_model/xgboost/full_trainval_12ep_1seed_vif_only_no_collision_xgboost_raw_target_quickfix/tables/full_data_tuning_optuna_summary_ml_ade.json",
+    "selected_best_params": {
+      "learning_rate": 0.021939308288506768,
+      "max_depth": 9,
+      "min_child_weight": 6,
+      "subsample": 0.8838129988503957,
+      "colsample_bytree": 0.7957716762981599,
+      "reg_alpha": 0.00016437764594884343,
+      "reg_lambda": 0.4472110604283289
+    },
+    "selected_best_iteration": 1724,
+    "best_cv_score": 0.38793194084702654,
+    "tuning_metric_name": "rmse",
+    "exported_model_name": "XGBoost",
+    "exported_model_kind": "xgboost",
+    "exported_model_target_mode": "raw",
+    "exported_model_selection_metric_name": "best_cv_score",
+    "exported_model_selection_metric_value": 0.38793194084702654
+  },
+  "analysis": {
+    "poor_well_quantile": 0.2
+  }
+}

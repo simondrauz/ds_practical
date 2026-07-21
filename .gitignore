@@ -1,3 +1,27 @@
+# LaTeX build artifacts
+Presentation/*.aux
+Presentation/*.fdb_latexmk
+Presentation/*.fls
+Presentation/*.log
+Presentation/*.nav
+Presentation/*.out
+Presentation/*.pdf
+Presentation/*.snm
+Presentation/*.synctex.gz
+Presentation/*.synctex(busy)
+Presentation/*.toc
+Report/*.aux
+Report/*.blg
+Report/*.fdb_latexmk
+Report/*.fls
+Report/*.log
+Report/*.out
+Report/*.pdf
+Report/*.synctex.gz
+Report/*.synctex(busy)
+Report/*.toc
+Report/AGENTS.md
+
 # Python
 __pycache__/
 *.py[cod]
@@ -27,5 +51,109 @@ Thumbs.db
 # Project-specific
 trajdata_cache/
 *.log
+wandb/
+results/trajectory_prediction/logs/
+results/trajectory_prediction/trajectory_metrics/
+results/trajectory_prediction/trajectory_metrics_joined/
+results/trajectory_prediction/nuScenes/models/
+results/trajectory_prediction/experiment_sets/
+results/trajectory_prediction/seeded_experiments/
+results/trajectory_prediction/overnight_runs/
+results/_archive/
+results_old/
+results_cleanup_manifests/
+results/evaluation/metrics/*.csv
+results/evaluation/plots/characterization/*.png
+# Results artifacts
+results/**/plots/
+results/**/*.csv
+results/interpretable_model/
+
+# Curated result artifacts for collaborators. Keep broad result ignores above,
+# then explicitly expose compact summaries, plots, notebook exports, and
+# prepared data for the maintained runs.
+!results/interpretable_model/
+!results/interpretable_model/**/
+results/interpretable_model/**/*.csv
+results/interpretable_model/**/*.json
+results/interpretable_model/**/*.ipynb
+results/interpretable_model/**/*.png
+results/interpretable_model/**/*.pkl
+!results/interpretable_model/**/plots/
+!results/interpretable_model/**/plots/*.png
+!results/interpretable_model/prepared_data/**/prepared_data_ml_ade.csv
+!results/interpretable_model/prepared_data/**/prepared_data_ml_ade.metadata.json
+!results/interpretable_model/notebook_runs/**/*.ipynb
+!results/interpretable_model/notebook_runs/**/*.json
+!results/interpretable_model/**/tables/run_manifest_ml_ade_log.json
+!results/interpretable_model/**/tables/full_data_tuning_optuna_summary_ml_ade_log.json
+!results/interpretable_model/**/tables/nested_cv_optuna_ml_ade_log.csv
+!results/interpretable_model/**/tables/nested_cv_optuna_summary_ml_ade_log.csv
+!results/interpretable_model/**/tables/metrics_oof_ml_ade_log.csv
+!results/interpretable_model/**/tables/nested_variant_comparison_ml_ade_log.csv
+!results/interpretable_model/**/tables/feature_effects_ml_ade_log.csv
+!results/interpretable_model/**/tables/feature_effect_importance_ml_ade_log.csv
+!results/interpretable_model/**/tables/performance_group_summary.csv
+!results/interpretable_model/**/tables/feature_effect_global_ranking.csv
+!results/interpretable_model/**/tables/cluster_catalog.csv
+!results/interpretable_model/**/tables/cluster_feature_effect_profiles.csv
+!results/interpretable_model/**/tables/cluster_scores.csv
+!results/interpretable_model/**/tables/umap_trustworthiness.csv
+!results/interpretable_model/feature_effect_performance_regimes/**/manifest.json
+docs/current_pipeline_overview*.svg
+docs/current_pipeline_overview*.png
+docs/current_pipeline_overview*.pdf
+.mplconfig/
+*.egg-info/
+*.pt
+
+# Shared trajectory metric CSVs for downstream notebooks
+!results/trajectory_prediction/trajectory_metrics_joined/
+!results/trajectory_prediction/trajectory_metrics_joined/sweep_large_30ep_1seed/
+!results/trajectory_prediction/trajectory_metrics_joined/sweep_large_30ep_1seed/eval_epoch_30_combined.csv
+!results/trajectory_prediction/trajectory_metrics_joined/sweep_small_30ep_3seeds/
+!results/trajectory_prediction/trajectory_metrics_joined/sweep_small_30ep_3seeds/eval_epoch_30_seed_mean.csv
+!results/trajectory_prediction/trajectory_metrics_joined/full_trainval_12ep_3seeds/
+!results/trajectory_prediction/trajectory_metrics_joined/full_trainval_12ep_3seeds/eval_epoch_12_seed_mean.csv
+!results/trajectory_prediction/trajectory_metrics_joined/full_trainval_12ep_1seed/
+!results/trajectory_prediction/trajectory_metrics_joined/full_trainval_12ep_1seed/eval_epoch_12.csv
+
+# Selected plot artifacts for committed pipeline result snapshots
+!results/interpretable_model/
+!results/interpretable_model/**/
+results/interpretable_model/**/*
+!results/interpretable_model/**/
+!results/interpretable_model/**/full_trainval_12ep_1seed/**/plots/
+!results/interpretable_model/**/full_trainval_12ep_1seed/**/plots/**
+!results/interpretable_model/**/full_trainval_12ep_1seed_MI_correct/**/plots/
+!results/interpretable_model/**/full_trainval_12ep_1seed_MI_correct/**/plots/**
+!results/interpretable_model/**/full_trainval_12ep_1seed_VIF_only/**/plots/
+!results/interpretable_model/**/full_trainval_12ep_1seed_VIF_only/**/plots/**
+!results/interpretable_model/**/full_trainval_12ep_1seed_vif_only_no_collision/**/plots/
+!results/interpretable_model/**/full_trainval_12ep_1seed_vif_only_no_collision/**/plots/**
+!results/interpretable_model/**/sweep_large_30ep_1seed/**/plots/
+!results/interpretable_model/**/sweep_large_30ep_1seed/**/plots/**
+!results/interpretable_model/**/sweep_large_30ep_1seed_MI_corrected/**/plots/
+!results/interpretable_model/**/sweep_large_30ep_1seed_MI_corrected/**/plots/**
+
+# Ad hoc cluster inspection plots generated by feature_effect_pr_cluster_inspection.ipynb
+results/interpretable_model/feature_effect_performance_regimes/**/inspection/**/plots/
+results/interpretable_model/feature_effect_performance_regimes/**/inspection/**/plots/**
+
+# Ad hoc conditional PDP hypothesis checks generated by conditional_pdp_hypothesis.py
+results/interpretable_model/xgboost/**/plots/conditional_pdp_*.png
+results/interpretable_model/xgboost/conditional_pdp_hypotheses/
+results/interpretable_model/xgboost/conditional_pdp_hypotheses/**
 
 # Data (heavy files tracked separately in data/.gitignore)
+
+# Internal working notes (not part of the submission)
+Report/REPORT_PACKAGE_IMPLEMENTATION_PROMPT.md
+Report/missing_presentation_packages.md
+Report/report_enhancement_findings.md
+Report/report_presentation_mismatches.md
+Report/report_consistency_review.md
+
+# LaTeX list-of-figures/tables build artifacts
+Report/*.lof
+Report/*.lot

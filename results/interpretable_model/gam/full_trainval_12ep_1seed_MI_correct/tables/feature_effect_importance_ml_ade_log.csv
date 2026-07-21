@@ -1,0 +1,5 @@
+feature,global_rank,p_value,neg_log10_p_value,significant_0_05,importance_metric,importance_value,importance_ascending
+heading_change_per_sec,1,1.1102230246251565e-16,15.954589770191003,True,p_value,1.1102230246251565e-16,True
+max_speed,2,1.1102230246251565e-16,15.954589770191003,True,p_value,1.1102230246251565e-16,True
+mean_acceleration,3,1.1102230246251565e-16,15.954589770191003,True,p_value,1.1102230246251565e-16,True
+std_speed,4,1.1102230246251565e-16,15.954589770191003,True,p_value,1.1102230246251565e-16,True

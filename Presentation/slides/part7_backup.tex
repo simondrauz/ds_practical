@@ -1,0 +1,617 @@
+%==============================================================================
+%  BACKUP SLIDES
+%==============================================================================
+
+\appendix
+
+\begin{frame}[noframenumbering, plain]
+  \begin{center}
+    {\Huge \textcolor{lmugreen}{\textbf{Appendix}}}
+  \end{center}
+\end{frame}
+
+
+%--- SHAP explanation ---------------------------------------------------------
+\begin{frame}[noframenumbering]{SHAP Values - SHapley Additive exPlanations}
+  \footnotesize
+  For each trajectory $i$, SHAP decomposes the XGBoost prediction into
+  per-feature contributions — quantifying how much each feature
+  shifts $\log(1+\widehat{\texttt{ml\_ade}}_i)$ away from the global mean:
+  \vspace{0.2em}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \textbf{Additive decomposition}
+      \[
+        f(\mathbf{x}_i) \;=\;
+        \underbrace{E\bigl[f(\mathbf{x})\bigr]}_{\text{baseline}}
+        \;+\; \sum_{j=1}^{p} \phi_{i,j}
+      \]
+      \vspace{0.1em}
+      \textbf{Shapley value for feature $j$}
+      \[
+        \phi_j(\mathbf{x}) =
+        \!\!\!\sum_{S\,\subseteq\, F\setminus\{j\}}
+        \frac{|S|\,!\;(|F|-|S|-1)!}{|F|!}
+        \bigl[
+          f_{S\cup\{j\}}(\mathbf{x}_{S\cup\{j\}}) - f_S(\mathbf{x}_S)
+        \bigr]
+      \]
+      \vspace{-0.3em}
+      \scriptsize Averages the marginal contribution of $j$ over all
+      possible feature subsets.
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \textbf{Notation}
+      \begin{itemize}\setlength\itemsep{0.18em}
+        \item $\phi_{i,j}$: contribution of feature $j$ to trajectory $i$
+        \item $F$: full feature set (trajectory \& scene features)
+        \item $S \subseteq F\setminus\{j\}$: subset excluding $j$
+        \item $f_S(\mathbf{x}_S)$: prediction using only features in $S$
+        \item $E[f(\mathbf{x})]$: mean prediction across all trajectories
+      \end{itemize}
+      \vspace{0.4em}
+      \textbf{Interpretation}\\[0.2em]
+      $\phi_{i,j}>0$: feature $j$ pushes predicted ADE \textbf{up}\\
+      $\phi_{i,j}<0$: feature $j$ pushes predicted ADE \textbf{down}\\[0.3em]
+      Mean $|\phi_j|$ over all $i$ $\;\rightarrow\;$
+      \textcolor{lmugreen}{\textbf{global feature importance}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Trajectron++ configuration -----------------------------------------------
+\begin{frame}[noframenumbering]{Trajectron++ — Model Configuration}
+  \scriptsize
+  \renewcommand{\arraystretch}{1.0}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Data \& Training}\\[0.15em]
+      \begin{tabular}{@{}ll@{}}
+        \toprule
+        Parameter & Value \\
+        \midrule
+        \texttt{history\_sec}         & 2.0\,s \\
+        \texttt{prediction\_sec}      & 6.0\,s \\
+        \texttt{train\_epochs}        & 12 \\
+        \texttt{batch\_size}          & 256 \\
+        \texttt{learning\_rate}       & 0.003 \\
+        \texttt{learning\_rate\_style}& exponential \\
+        \texttt{learning\_decay\_rate}& 0.9999 \\
+        \texttt{min\_learning\_rate}  & $10^{-5}$ \\
+        \texttt{grad\_clip}           & 1.0 \\
+        \bottomrule
+      \end{tabular}
+
+      \vspace{0.3em}
+      \textbf{Map Encoder} (all agent types)\\[0.15em]
+      \begin{tabular}{@{}ll@{}}
+        \toprule
+        Parameter & Value \\
+        \midrule
+        \texttt{patch\_size}      & 100 \\
+        \texttt{map\_channels}    & 3 \\
+        \texttt{hidden\_channels} & [10, 20, 10, 1] \\
+        \texttt{output\_size}     & 32 \\
+        \texttt{dropout}          & 0.5 \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Architecture}\\[0.15em]
+      \begin{tabular}{@{}ll@{}}
+        \toprule
+        Parameter & Value \\
+        \midrule
+        \texttt{enc\_rnn\_dim\_history}        & 32 \\
+        \texttt{enc\_rnn\_dim\_future}         & 32 \\
+        \texttt{enc\_rnn\_dim\_edge}           & 32 \\
+        \texttt{enc\_rnn\_dim\_edge\_influence}& 32 \\
+        \texttt{dec\_rnn\_dim}                 & 128 \\
+        \texttt{p\_z\_x\_MLP\_dims}            & 32 \\
+        \texttt{rnn dropout keep prob}         & 0.75 \\
+        \texttt{MLP dropout keep prob}         & 0.90 \\
+        \bottomrule
+      \end{tabular}
+
+      \vspace{0.3em}
+      \textbf{CVAE / Latent}\\[0.15em]
+      \begin{tabular}{@{}ll@{}}
+        \toprule
+        Parameter & Value \\
+        \midrule
+        \texttt{K} (prediction samples) & 25 \\
+        \texttt{GMM\_components}         & 1 \\
+        \texttt{kl\_weight}              & 100.0 \\
+        \texttt{kl\_min}                 & 0.07 \\
+        $\tau$ (Gumbel init / final)     & 2.0 / 0.05 \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Hyperparameter tuning search space --------------------------------------
+\begin{frame}[noframenumbering]{Hyperparameter Tuning — Search Space}
+  \footnotesize
+  Bayesian optimization with Optuna (TPE sampler) on a $3$-fold inner CV;
+  $15$ trials per study.
+  \vspace{0.3em}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \textbf{XGBoost} \\
+      \scriptsize
+      \renewcommand{\arraystretch}{1.1}
+      \begin{center}
+      \begin{tabular}{@{}ll@{}}
+        \toprule
+        Parameter & Search range \\
+        \midrule
+        \texttt{learning\_rate}    & $[0.01,\,0.2]$ (log) \\
+        \texttt{max\_depth}        & $\{3,\dots,10\}$ \\
+        \texttt{min\_child\_weight}& $\{1,\dots,20\}$ \\
+        \texttt{subsample}         & $[0.5,\,1.0]$ \\
+        \texttt{colsample\_bytree} & $[0.5,\,1.0]$ \\
+        \texttt{reg\_alpha}        & $[10^{-8},\,10]$ (log) \\
+        \texttt{reg\_lambda}       & $[10^{-6},\,20]$ (log) \\
+        \texttt{num\_boost\_round} & up to $2000$, early-stop $50$ \\
+        \bottomrule
+      \end{tabular}
+      \end{center}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \textbf{GAM} \\
+      \scriptsize
+      \renewcommand{\arraystretch}{1.1}
+      \begin{center}
+      \begin{tabular}{@{}ll@{}}
+        \toprule
+        Parameter & Search range \\
+        \midrule
+        \texttt{n\_splines}    & $\{10,\dots,50\}$ \\
+        \texttt{spline\_order} & $\{3,\,4\}$ \\
+        \texttt{lam}           & $[10^{-3},\,10^{3}]$ (log) \\
+        \bottomrule
+      \end{tabular}
+      \end{center}
+      \vspace{0.5em}
+
+      \textbf{Variants compared:}
+      \begin{itemize}\setlength\itemsep{0.05em}
+        \item LinearGAM on log and raw targets
+        \item GammaGAM on raw target
+        \item XGBoost on log and raw targets
+      \end{itemize}
+      Winner selected by lowest mean outer-fold RMSE on original scale.
+    \end{column}
+  \end{columns}
+  \vspace{0.4em}
+  \scriptsize
+  \begin{itemize}\setlength\itemsep{0.08em}
+    \item Each model is tuned on its training target; final comparison uses OOF
+      metrics on original \texttt{ml\_ade} scale.
+    \item Nested resampling: $3$ outer folds $\times$ $3$ inner folds; tuning
+      rerun on all rows for the final refit.
+  \end{itemize}
+\end{frame}
+
+%--- XGBoost target-scale comparison ------------------------------------------
+\begin{frame}[noframenumbering]{XGBoost Target-Scale Comparison}
+  \footnotesize
+  OOF metrics reported on the original \texttt{ml\_ade} scale.
+  \vspace{0.35em}
+
+  \begin{center}
+  \scriptsize
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabular}{llccc}
+    \toprule
+    \textbf{Context} & \textbf{Target} & \textbf{RMSE} & \textbf{R$^2$} & \textbf{MAE} \\
+    \midrule
+    MI\,+\,VIF (main) & raw \texttt{ml\_ade} & 0.389 & 0.617 & 0.223 \\
+    \textcolor{lmugreen}{\textbf{MI\,+\,VIF (main)}} &
+      \textcolor{lmugreen}{\textbf{\texttt{log1p(ml\_ade)}}}
+      & \textcolor{lmugreen}{\textbf{0.388}}
+      & \textcolor{lmugreen}{\textbf{0.619}}
+      & \textcolor{lmugreen}{\textbf{0.214}} \\
+    VIF only & raw \texttt{ml\_ade} & 0.386 & 0.626 & 0.220 \\
+    VIF only & \texttt{log1p(ml\_ade)} & 0.387 & 0.624 & 0.213 \\
+    Settings sweep & raw \texttt{ml\_ade} & 0.134 & 0.896 & 0.081 \\
+    Settings sweep & \texttt{log1p(ml\_ade)} & 0.133 & 0.897 & 0.079 \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+\end{frame}
+
+%--- Best XGBoost configurations across runs ---------------------------------
+\begin{frame}[noframenumbering]{Hyperparameter Tuning — XGBoost Configurations}
+  \footnotesize
+  Full-data retuned configurations of the selected log-target XGBoost models.
+  \vspace{0.3em}
+
+  \scriptsize
+  \renewcommand{\arraystretch}{1.05}
+  \begin{center}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+     & \textbf{MI\,+\,VIF} & \textbf{VIF only} & \textbf{Settings sweep (MI\,+\,VIF)} \\
+    \midrule
+    \texttt{learning\_rate}    & $0.0174$ & $0.0219$ & $0.0486$ \\
+    \texttt{max\_depth}        & $10$     & $9$      & $9$ \\
+    \texttt{min\_child\_weight}& $16$     & $6$      & $17$ \\
+    \texttt{subsample}         & $0.97$   & $0.88$   & $0.92$ \\
+    \texttt{colsample\_bytree} & $0.95$   & $0.80$   & $0.99$ \\
+    \texttt{reg\_alpha}        & $2.4\!\times\!10^{-3}$ & $1.6\!\times\!10^{-4}$ & $1.9\!\times\!10^{-2}$ \\
+    \texttt{reg\_lambda}       & $5.38$                 & $0.45$                 & $3.5\!\times\!10^{-4}$ \\
+    best iteration             & $1475$   & $1998$   & $1585$ \\
+    full-data CV RMSE (log target) & $0.176$  & $0.177$  & $\mathbf{0.078}$ \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+
+  \vspace{0.3em}
+  \scriptsize
+  \begin{itemize}\setlength\itemsep{0.08em}
+    \item CV scores in this table are on \texttt{ml\_ade\_log}.
+    \item Cross-target comparison uses OOF metrics on original
+      \texttt{ml\_ade} scale.
+  \end{itemize}
+\end{frame}
+
+%--- Best XGBoost raw-target configurations ----------------------------------
+\begin{frame}[noframenumbering]{Hyperparameter Tuning — XGBoost Raw Target}
+  \footnotesize
+  Full-data retuned configurations of the raw-target XGBoost variants.
+  \vspace{0.3em}
+
+  \scriptsize
+  \renewcommand{\arraystretch}{1.05}
+  \begin{center}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+     & \textbf{MI\,+\,VIF} & \textbf{VIF only} & \textbf{Settings sweep (MI\,+\,VIF)} \\
+    \midrule
+    \texttt{learning\_rate}    & $0.0174$ & $0.0219$ & $0.0486$ \\
+    \texttt{max\_depth}        & $10$     & $9$      & $9$ \\
+    \texttt{min\_child\_weight}& $16$     & $6$      & $17$ \\
+    \texttt{subsample}         & $0.97$   & $0.88$   & $0.92$ \\
+    \texttt{colsample\_bytree} & $0.95$   & $0.80$   & $0.99$ \\
+    \texttt{reg\_alpha}        & $2.4\!\times\!10^{-3}$ & $1.6\!\times\!10^{-4}$ & $1.9\!\times\!10^{-2}$ \\
+    \texttt{reg\_lambda}       & $5.38$                 & $0.45$                 & $3.5\!\times\!10^{-4}$ \\
+    best iteration             & $568$    & $1724$   & $1508$ \\
+    full-data CV RMSE (raw target) & $0.388$ & $0.388$ & $0.133$ \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+
+  \vspace{0.3em}
+  \scriptsize
+  \begin{itemize}\setlength\itemsep{0.08em}
+    \item CV scores in this table are on raw \texttt{ml\_ade}.
+    \item Cross-target comparison uses OOF metrics on original
+      \texttt{ml\_ade} scale.
+  \end{itemize}
+\end{frame}
+
+%--- Best GAM configurations across runs -------------------------------------
+\begin{frame}[noframenumbering]{Hyperparameter Tuning — GAM Configurations}
+  \footnotesize
+  Full-data retuned configurations of the exported GAM winners.
+  \vspace{0.3em}
+
+  \scriptsize
+  \renewcommand{\arraystretch}{1.05}
+  \begin{center}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+     & \textbf{MI\,+\,VIF} & \textbf{VIF only} & \textbf{Settings sweep (MI\,+\,VIF)} \\
+    \midrule
+    variant            & LinearGAM (log) & LinearGAM (raw) & GammaGAM (raw) \\
+    \texttt{n\_splines}& $50$    & $50$    & $49$ \\
+    \texttt{spline\_order} & $4$ & $4$     & $4$ \\
+    \texttt{lam}       & $39.11$ & $39.11$ & $0.087$ \\
+    full-data CV RMSE  & $0.431$ & $0.439$ & $\mathbf{0.246}$ \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+
+  \vspace{0.3em}
+  \scriptsize
+  \begin{itemize}\setlength\itemsep{0.08em}
+    \item Settings-sweep results use nuScenes \emph{mini}, 30 epochs,
+      model-setting features, and a different row filter.
+    \item The lower RMSE is useful descriptively but is not a direct
+      full-trainval comparison.
+  \end{itemize}
+\end{frame}
+
+%--- OOF diagnostics: GAM MI+VIF ---------------------------------------------
+\begin{frame}[noframenumbering]{OOF Diagnostics — GAM}
+  \framesubtitle{MI\,+\,VIF feature set — main analysis}
+  \centering
+  \vspace{-0.25em}
+
+  \begin{minipage}[t][0.55\textheight][t]{0.95\textwidth}
+    \centering
+    \includegraphics[width=\textwidth,height=0.55\textheight,keepaspectratio]{oof_diagnostics_gam_mi_vif}
+  \end{minipage}
+
+  \vspace{0.15em}
+  \begin{minipage}[t][0.22\textheight][t]{0.88\textwidth}
+    \footnotesize
+    \begin{itemize}
+      \item Similar high-ADE compression as XGBoost; the log-GAM still
+            underpredicts the largest OOF errors
+    \end{itemize}
+  \end{minipage}
+\end{frame}
+
+%--- OOF diagnostics: GAM VIF only -------------------------------------------
+\begin{frame}[noframenumbering]{OOF Diagnostics — GAM}
+  \framesubtitle{VIF-only feature set — follow-up comparison}
+  \centering
+  \vspace{-0.25em}
+
+  \begin{minipage}[t][0.55\textheight][t]{0.95\textwidth}
+    \centering
+    \includegraphics[width=\textwidth,height=0.55\textheight,keepaspectratio]{oof_diagnostics_gam_vif_only}
+  \end{minipage}
+
+  \vspace{0.15em}
+  \begin{minipage}[t][0.22\textheight][t]{0.88\textwidth}
+    \footnotesize
+    \begin{itemize}
+      \item Residual spread remains wider at larger predictions
+      \item VIF-only kept as a complementary check against the MI\,+\,VIF
+            main analysis
+    \end{itemize}
+  \end{minipage}
+\end{frame}
+
+%--- Interaction PDPs: XGBoost MI+VIF -----------------------------------------
+\begin{frame}[noframenumbering]{Interaction PDPs — XGBoost}
+  \framesubtitle{MI\,+\,VIF feature set; log1p transformed target}
+  \centering
+  \includegraphics[
+    width=\textwidth,
+    height=0.82\textheight,
+    keepaspectratio
+  ]{interaction_plots/xgboost_mi_and_vif_pdp_interactions_ml_ade_log_cropped.png}
+\end{frame}
+
+%--- Algorithm comparison with noise: OPTICS vs HDBSCAN ----------------------
+\begin{frame}[noframenumbering]{Algorithm Choice — OPTICS vs.\ HDBSCAN (with noise)}
+  \footnotesize
+  Same XGBoost effect space; algorithm differs. Noise points shown.
+  \vspace{0.2em}
+  \begin{center}
+  \renewcommand{\arraystretch}{1.05}
+  \begin{tabular}{@{}c@{\hspace{0.3em}}c@{\hspace{0.4em}}c@{\hspace{0.4em}}c@{}}
+    & \textbf{Easy} & \textbf{Medium} & \textbf{Hard} \\
+    \rotatebox{90}{\quad\textbf{OPTICS}} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_easy_rank1_optics_raw-euclidean_eps0p0181_mcs24_ms40_K2_N30pct_DBCV0p41.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_medium_rank1_optics_raw-euclidean_eps0p0243_mcs13_ms15_K2_N40pct_DBCV0p40.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_hard_rank1_optics_raw-euclidean_eps0p0413_mcs10_ms15_K4_N75pct_DBCV0p09.png} \\
+    &
+      \tiny K\,$=$\,2 \textbar\ noise 30\% \textbar\ \textbf{DBCV 0.41} &
+      \tiny K\,$=$\,2 \textbar\ noise 40\% \textbar\ \textbf{DBCV 0.40} &
+      \tiny K\,$=$\,4 \textbar\ noise 75\% \textbar\ \textbf{DBCV 0.09} \\[0.3em]
+    \rotatebox{90}{\,\textbf{HDBSCAN}} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_easy_rank1_hdbscan_raw-euclidean_mcs475_ms30_K3_N30pct_DBCV0p30.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_medium_rank1_hdbscan_raw-euclidean_mcs13_ms20_K3_N24pct_DBCV0p04.png} &
+      \includegraphics[height=2.55cm]{xgboost_rank1_hdbscan_optics_umaps_with_noise/xgboost_with-noise_hard_rank1_hdbscan_raw-euclidean_mcs14_ms8_K4_N73pct_DBCV0p05.png} \\
+    &
+      \tiny K\,$=$\,3 \textbar\ noise 30\% \textbar\ DBCV 0.30 &
+      \tiny K\,$=$\,3 \textbar\ noise 24\% \textbar\ DBCV 0.04 &
+      \tiny K\,$=$\,4 \textbar\ noise 73\% \textbar\ DBCV 0.05 \\
+  \end{tabular}
+  \end{center}
+\end{frame}
+
+%--- Model comparison with noise: XGBoost vs GAM -----------------------------
+\begin{frame}[noframenumbering]{Effect Source — XGBoost vs.\ GAM (with noise)}
+  \footnotesize
+  Same OPTICS algorithm; feature-effect source differs. Noise points shown.
+  \vspace{0.2em}
+  \begin{center}
+  \renewcommand{\arraystretch}{1.05}
+  \begin{tabular}{@{}c@{\hspace{0.3em}}c@{\hspace{0.4em}}c@{\hspace{0.4em}}c@{}}
+    & \textbf{Easy} & \textbf{Medium} & \textbf{Hard} \\
+    \rotatebox{90}{\quad\textbf{XGBoost}} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/xgboost_with-noise_easy_rank1_optics_raw-euclidean_eps0p0181_mcs24_ms40_K2_N30pct_DBCV0p41.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/xgboost_with-noise_medium_rank1_optics_raw-euclidean_eps0p0243_mcs13_ms15_K2_N40pct_DBCV0p40.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/xgboost_with-noise_hard_rank1_optics_raw-euclidean_eps0p0413_mcs10_ms15_K4_N75pct_DBCV0p09.png} \\
+    &
+      \tiny K\,$=$\,2 \textbar\ noise 30\% \textbar\ \textbf{DBCV 0.41} &
+      \tiny K\,$=$\,2 \textbar\ noise 40\% \textbar\ \textbf{DBCV 0.40} &
+      \tiny K\,$=$\,4 \textbar\ noise 75\% \textbar\ DBCV 0.09 \\[0.3em]
+    \rotatebox{90}{\qquad\textbf{GAM}} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/gam_with-noise_easy_rank1_optics_raw-euclidean_xi0p01_mcs633_ms5_K4_N32pct_DBCV0p40.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/gam_with-noise_medium_rank1_optics_raw-euclidean_eps0p0338_mcs25_ms40_K3_N15pct_DBCV0p14.png} &
+      \includegraphics[height=2.55cm]{rank1_optics_xgboost_gam_umaps_with_noise/gam_with-noise_hard_rank1_optics_raw-euclidean_xi0p015_mcs110_ms5_K4_N70pct_DBCV0p19.png} \\
+    &
+      \tiny K\,$=$\,4 \textbar\ noise 32\% \textbar\ DBCV 0.40 &
+      \tiny K\,$=$\,3 \textbar\ noise 15\% \textbar\ DBCV 0.14 &
+      \tiny K\,$=$\,4 \textbar\ noise 70\% \textbar\ \textbf{DBCV 0.19} \\
+  \end{tabular}
+  \end{center}
+\end{frame}
+
+%--- Per-regime detail: Easy -------------------------------------------------
+\begin{frame}[noframenumbering]{Easy Regime — Success Modes}
+  \small
+  DBCV \textbf{0.41} \hspace{0.4em}\textbar\hspace{0.4em} 2 clusters
+  \hspace{0.4em}\textbar\hspace{0.4em} group median \texttt{ml\_ade}
+  \textbf{0.17\,m}
+  \begin{itemize}\setlength\itemsep{0.1em}
+    \item Two well-separated modes cover 70\% of easy
+    \item Different motion profiles $\to$ same low-error outcome
+  \end{itemize}
+  \vspace{0.25em}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \onslide<2->{%
+        \textbf{Slow turners} \\
+        \small 34\% of easy \textbar\ median \textbf{0.08\,m}
+        \begin{itemize}\setlength\itemsep{0.05em}
+          \item Very low max speed, very low speed variation, High turning rate
+          \item Turning increases error, but slow steady motion dominates
+          \item \emph{Slow despite turning} $\Rightarrow$ easiest
+        \end{itemize}
+      }
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \onslide<3->{%
+        \textbf{Straight walkers}\\
+        \small 36\% of easy \textbar\ median \textbf{0.20\,m}
+        \begin{itemize}\setlength\itemsep{0.05em}
+          \item Stable heading, normal max speed, Low speed variation
+          \item Heading stability drives low predicted error
+          \item \emph{Straight and steady} $\Rightarrow$ easy
+        \end{itemize}
+      }
+    \end{column}
+  \end{columns}
+  \vfill
+  \onslide<4->{\textcolor{lmugreen}{\textbf{Takeaway:}}
+  low speed \emph{or} stable heading $\to$ Trajectron++ stays on track.}
+\end{frame}
+
+%--- Per-regime detail: Medium -----------------------------------------------
+\begin{frame}[noframenumbering]{Medium Regime — Transition Zone}
+  \small
+  DBCV \textbf{0.40} \hspace{0.4em}\textbar\hspace{0.4em} 2 clusters
+  \hspace{0.4em}\textbar\hspace{0.4em} group median \texttt{ml\_ade}
+  \textbf{0.60\,m}
+  \begin{itemize}\setlength\itemsep{0.1em}
+    \item Transition zone between easy and hard
+    \item One discrete mode (60\%) + continuous gradient toward hard
+  \end{itemize}
+  \vspace{0.25em}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \onslide<2->{%
+        \textbf{Ordinary medium}\\
+        \small 60\% of medium \textbar\ median \textbf{0.55\,m}
+        \begin{itemize}\setlength\itemsep{0.05em}
+          \item Slightly elevated max speed, Modest speed variation, Heading near global median
+          \item \texttt{max\_speed} = only consistent error driver, heading effects near neutral
+          \item Stable heading prevents slide into hard
+        \end{itemize}
+      }
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \onslide<3->{%
+        \textbf{Toward the hard boundary}\\
+        \small No second discrete mode
+        \begin{itemize}\setlength\itemsep{0.05em}
+          \item Higher error $\to$ speed variation $\uparrow$, turning $\uparrow$,
+                acceleration / jerk $\uparrow$
+          \item Same axes as hard, lower magnitudes
+          \item Continuous gradient, not a stable second cluster
+        \end{itemize}
+      }
+    \end{column}
+  \end{columns}
+  \vfill
+  \onslide<4->{\textcolor{lmugreen}{\textbf{Takeaway:}}
+  speed pushes error up; stable heading keeps it bounded.}
+\end{frame}
+
+%--- Per-regime detail: Hard -------------------------------------------------
+\begin{frame}[noframenumbering]{Hard Regime — Failure Modes}
+  \small
+  DBCV \textbf{0.09} \hspace{0.4em}\textbar\hspace{0.4em} 4 clusters
+  \hspace{0.4em}\textbar\hspace{0.4em} group median \texttt{ml\_ade}
+  \textbf{1.78\,m}
+  \begin{itemize}\setlength\itemsep{0.1em}
+    \item 99.5\% of hard rows: positive total feature effect
+    \item Dominant axes: high speed variation + elevated turning
+    \item Two distinct failure modes (25\% combined); rest spreads
+          continuously along the same axes
+  \end{itemize}
+  \vspace{0.25em}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \onslide<2->{%
+        \textbf{Erratic motion at low pace}\\
+        \small 8\% of hard \textbar\ median \textbf{1.6–1.9\,m}
+        \begin{itemize}\setlength\itemsep{0.05em}
+          \item Below-median max speed, Very high speed variation, Elevated turning
+          \item Different magnitudes of
+                variation $\times$ turning drive error
+          \item Mean acceleration well below average
+        \end{itemize}
+      }
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \onslide<3->{%
+        \textbf{Fast motion with mild turning}\\
+        \small 17\% of hard \textbar\ median \textbf{1.50\,m}
+        \begin{itemize}\setlength\itemsep{0.05em}
+          \item Only hard mode with above-median max speed
+          \item Loss split between \texttt{max\_speed} and
+                \texttt{heading\_change}
+          \item Speed variation only mildly elevated — not the
+dominant driver
+        \end{itemize}
+      }
+    \end{column}
+  \end{columns}
+  \vfill
+  \onslide<4->{\textcolor{lmugreen}{\textbf{Takeaway:}}
+  failure driven by \emph{erratic} motion, not raw speed —
+  fast matters when paired with turning.}
+\end{frame}
+
+%--- DBCV: high-level interpretation -----------------------------------------
+\begin{frame}[noframenumbering]{DBCV — Density-Based Clustering Validation}
+  \footnotesize
+  Density-Based Clustering Validation: internal score for non-spherical,
+  density-based clusters (Moulavi et al., 2014).
+  \vspace{0.45em}
+
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \scriptsize
+      \textbf{Core idea}
+      \begin{itemize}\setlength\itemsep{0.25em}
+        \item \textbf{Reward:} dense, connected clusters.
+        \item \textbf{Reward:} low-density gaps between clusters.
+        \item \textbf{Penalize:} sparse bridges and weak internal links.
+        \item \textbf{Penalize:} high noise share via the final weighting.
+      \end{itemize}
+      \vspace{0.45em}
+      \textbf{Validity per cluster}
+      \[
+        V(C_i)=
+        \frac{\min_{j\neq i}\text{DSPC}(C_i,C_j)-\text{DSC}(C_i)}
+             {\max\!\bigl(\min_{j\neq i}\text{DSPC}(C_i,C_j),\,
+                          \text{DSC}(C_i)\bigr)}
+      \]
+      \vspace{-0.6em}
+      \begin{itemize}\setlength\itemsep{0.15em}
+        \item $\text{DSC}$: sparsest internal cluster link.
+        \item $\text{DSPC}$: nearest density separation to another cluster.
+      \end{itemize}
+    \end{column}
+
+    \begin{column}{0.48\textwidth}
+      \scriptsize
+      \textbf{Overall score}
+      \[
+        \text{DBCV} =
+        \sum_{i=1}^{K} \frac{|C_i|}{|\mathcal{O}|}\, V(C_i)
+      \]
+      Noise has no own validity term, but remains in $\mathcal{O}$.
+      \vspace{0.45em}
+      
+      \textbf{How to read it}
+      \begin{itemize}\setlength\itemsep{0.15em}
+        \item Range: $[-1,1]$; higher is better.
+        \item Positive: dense clusters, lower-density gaps.
+        \item Near $0$: ambiguous density structure.
+        \item Negative: implausible partition.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}

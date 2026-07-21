@@ -1,0 +1,34 @@
+{
+  "model_id": "gam-gamma",
+  "run_name": "full_trainval_12ep_1seed_MI_correct",
+  "target_col": "ml_ade_log",
+  "feature_cols": [
+    "std_speed",
+    "max_speed",
+    "heading_change_per_sec",
+    "mean_acceleration"
+  ],
+  "artifact_root": "../../results/interpretable_model/gam-gamma/full_trainval_12ep_1seed_MI_correct",
+  "plots_dir": "../../results/interpretable_model/gam-gamma/full_trainval_12ep_1seed_MI_correct/plots",
+  "tables_dir": "../../results/interpretable_model/gam-gamma/full_trainval_12ep_1seed_MI_correct/tables",
+  "nested_resampling": {
+    "nested_cv_path": "../../results/interpretable_model/gam-gamma/full_trainval_12ep_1seed_MI_correct/tables/nested_cv_optuna_ml_ade_log.csv",
+    "nested_cv_summary_path": "../../results/interpretable_model/gam-gamma/full_trainval_12ep_1seed_MI_correct/tables/nested_cv_optuna_summary_ml_ade_log.csv",
+    "oof_predictions_path": "../../results/interpretable_model/gam-gamma/full_trainval_12ep_1seed_MI_correct/tables/oof_predictions_ml_ade_log.csv",
+    "oof_metrics_path": "../../results/interpretable_model/gam-gamma/full_trainval_12ep_1seed_MI_correct/tables/metrics_oof_ml_ade_log.csv",
+    "model_data_with_oof_path": "../../results/interpretable_model/gam-gamma/full_trainval_12ep_1seed_MI_correct/tables/model_data_with_oof_ml_ade_log.csv"
+  },
+  "final_model": {},
+  "analysis": {
+    "poor_well_quantile": 0.2
+  },
+  "raw_target_col": "ml_ade",
+  "log_target_col": "ml_ade_log",
+  "variant_model_id": "gam-gamma",
+  "variant_name": "GammaGAM",
+  "model_kind": "gamma",
+  "target_mode": "raw",
+  "variant_status": "completed",
+  "selection_metric_name": "mean_outer_rmse",
+  "selection_metric_value": 0.4451702237136124
+}

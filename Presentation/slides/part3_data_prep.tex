@@ -1,0 +1,108 @@
+%--- Part 3: Data Preparation (6 min) ------------------------------------------
+
+\section{Data Preparation}
+
+\begin{frame}{Analysis Pipeline}
+  \begin{center}
+    \includegraphics[width=\textwidth]{pipeline-dataprep}
+  \end{center}
+\end{frame}
+
+\renewcommand{\cornerpipeline}{cornerpipeline/pipeline-dataprep}
+
+%--- Slide: Feature Engineering -----------------------------------------------
+\begin{frame}{Feature Engineering — Trajectory \\ \& Scene Characteristics}
+  \onslide<1->{%
+  \small
+  \textit{Trajectron++ outputs only $(x,y)$ position sequences and time stamps —
+  all features below are computed by us from those trajectories.}
+  \vspace{0.4em}
+  }
+  \begin{columns}
+    \begin{column}{0.48\textwidth}
+      \onslide<2->{\textbf{Agent motion features}}
+      \begin{itemize}\setlength\itemsep{0.05em}
+        \item<2-> Speed: mean, max, std
+        \item<2-> Acceleration: mean, max
+        \item<2-> Jerk: mean, max
+        \item<2-> Heading change per second
+        \item<2-> Min.\ neighbour distance
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \onslide<3->{
+      \textbf{Scene context features}
+      \begin{itemize}\setlength\itemsep{0.05em}
+        \item<3-> Number of agents in scene
+        \item<3-> Number of vehicles
+        \item<3-> Scene bounding box area
+        \item<3-> Spatial agent density
+      \end{itemize}
+      }
+      \vspace{0.5em}
+      \onslide<3->{
+      $\Rightarrow$ \textbf{17 candidate features} joined with
+      Trajectron++ evaluation output via \texttt{data\_idx}
+      }
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Slide: Target Distribution & Log Transform --------------------------------
+\begin{frame}{Target Distribution \& Log Transformation}
+  \begin{columns}
+    \begin{column}{0.50\textwidth}
+      \begin{itemize}[<+->]
+        \item \texttt{ml\_ade} is strongly \emph{right-skewed}
+              (skewness $= 3.01$)
+        \item Log transformation (\texttt{log1p}) considered to stabilise
+              variance — tested as a modeling choice in the next step
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \begin{center}
+        \includegraphics[width=\textwidth]{target_log_transform_ml_ade}
+      \end{center}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+%--- Slide: Feature Selection — two approaches --------------------------------
+\begin{frame}{Feature Selection — Two Approaches}
+  \begin{columns}[t]
+    \begin{column}{0.48\textwidth}
+      \onslide<1->{\textbf{Approach 1: MI elbow + VIF}}
+      \begin{itemize}[<2->]
+        \item Rank features by Mutual Information with target
+        \item Drop low-signal tail below the elbow: 17 $\to$ 9
+        \item Apply VIF filter (threshold $= 5$): 9 $\to$ \textbf{4 features}
+      \end{itemize}
+      \onslide<2->{
+      \vspace{0.4em}
+      \small
+      \texttt{std\_speed}, \texttt{mean\_acceleration},\\
+      \texttt{max\_speed}, \texttt{heading\_change\_per\_sec}\\[0.3em]
+      \footnotesize Motion features only
+      ($p \ll 0.01$).
+      }
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \onslide<3->{\textbf{Approach 2: VIF only}}
+      \begin{itemize}
+        \item<3-> Skip MI; apply VIF directly to all 17 candidates
+        \item<3-> VIF filter (threshold $= 5$): 17 $\to$ \textbf{6 features}
+      \end{itemize}
+      \onslide<3->{
+      \vspace{0.4em}
+      \small
+      \texttt{std\_speed}, \texttt{mean\_acceleration},\\
+      \texttt{min\_neighbor\_distance},
+      \texttt{heading\_change\_per\_sec},\\
+      \texttt{scene\_num\_VEHICLE},
+      \texttt{scene\_density\_VEHICLE}\\[0.3em]
+      \footnotesize Retains scene-level features alongside motion features.
+      }
+    \end{column}
+  \end{columns}
+  \vspace{0.5em}
+\end{frame}
