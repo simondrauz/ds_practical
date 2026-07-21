@@ -20,14 +20,14 @@ Takuya Akiba, Shotaro Sano, Toshihiko Yanase, Takeru Ohta, and Masanori Koyama.
   Savarese]{alahi2016social}
 Alexandre Alahi, Kratarth Goel, Vignesh Ramanathan, Alexandre Robicquet,
   Li~Fei-Fei, and Silvio Savarese.
-\newblock Social lstm: Human trajectory prediction in crowded spaces.
+\newblock Social {LSTM}: Human trajectory prediction in crowded spaces.
 \newblock In \emph{Proceedings of the IEEE conference on computer vision and
   pattern recognition}, pages 961--971, 2016.
 
 \bibitem[Ankerst et~al.(1999)Ankerst, Breunig, Kriegel, and
   Sander]{ankerst1999optics}
 Mihael Ankerst, Markus~M. Breunig, Hans-Peter Kriegel, and J\"{o}rg Sander.
-\newblock Optics: ordering points to identify the clustering structure.
+\newblock {OPTICS}: ordering points to identify the clustering structure.
 \newblock In \emph{Proceedings of the 1999 ACM SIGMOD International Conference
   on Management of Data}, SIGMOD '99, page 49–60, New York, NY, USA, 1999.
   Association for Computing Machinery.
@@ -93,7 +93,7 @@ Gavin~C. Cawley and Nicola L.~C. Talbot.
 
 \bibitem[Chen and Guestrin(2016)]{chen2016xgboost}
 Tianqi Chen and Carlos Guestrin.
-\newblock Xgboost: A scalable tree boosting system.
+\newblock {XGBoost}: A scalable tree boosting system.
 \newblock In \emph{Proceedings of the 22nd ACM SIGKDD International Conference
   on Knowledge Discovery and Data Mining}, pages 785--794, 2016.
 
@@ -131,7 +131,7 @@ Tianpei Gu, Jiabing Yang, and Cheng Zhang.
 \bibitem[Gupta et~al.(2018)Gupta, Johnson, Fei-Fei, Savarese, and
   Alahi]{gupta2018social}
 Agrim Gupta, Justin Johnson, Li~Fei-Fei, Silvio Savarese, and Alexandre Alahi.
-\newblock Social gan: Socially acceptable trajectories with generative
+\newblock Social {GAN}: Socially acceptable trajectories with generative
   adversarial networks.
 \newblock In \emph{Proceedings of the IEEE conference on computer vision and
   pattern recognition}, pages 2255--2264, 2018.
@@ -147,7 +147,7 @@ Charles~R. Harris, K.~Jarrod Millman, St{\'{e}}fan van~der Walt, Ralf Gommers,
   Mark Wiebe, Pearu Peterson, Pierre G{\'{e}}rard{-}Marchant, Kevin Sheppard,
   Tyler Reddy, Warren Weckesser, Hameer Abbasi, Christoph Gohlke, and Travis~E.
   Oliphant.
-\newblock Array programming with numpy.
+\newblock Array programming with {NumPy}.
 \newblock \emph{Nature}, 585:\penalty0 357--362, 2020.
 \newblock \doi{10.1038/s41586-020-2649-2}.
 \newblock URL \url{https://doi.org/10.1038/s41586-020-2649-2}.
@@ -164,7 +164,7 @@ Dirk Helbing and Peter Molnar.
 
 \bibitem[Hunter(2007)]{hunter2007matplotlib}
 John~D. Hunter.
-\newblock Matplotlib: {A} 2d graphics environment.
+\newblock Matplotlib: {A} {2D} graphics environment.
 \newblock \emph{Computing in Science \& Engineering}, 9\penalty0 (3):\penalty0
   90--95, 2007.
 \newblock \doi{10.1109/MCSE.2007.55}.
@@ -172,7 +172,7 @@ John~D. Hunter.
 
 \bibitem[Ivanovic and Pavone(2019)]{ivanovic2019trajectron}
 Boris Ivanovic and Marco Pavone.
-\newblock The trajectron: Probabilistic multi-agent trajectory modeling with
+\newblock The {Trajectron}: Probabilistic multi-agent trajectory modeling with
   dynamic spatiotemporal graphs.
 \newblock In \emph{2019 {IEEE/CVF} International Conference on Computer Vision,
   {ICCV} 2019, Seoul, Korea (South), October 27 - November 2, 2019}, pages
@@ -208,8 +208,8 @@ MH~Kutner, CJ~Nachtsheim, J~Neter, and W~Li.
   Chandraker]{lee2017desire}
 Namhoon Lee, Wongun Choi, Paul Vernaza, Christopher~B Choy, Philip~HS Torr, and
   Manmohan Chandraker.
-\newblock Desire: Distant future prediction in dynamic scenes with interacting
-  agents.
+\newblock {DESIRE}: Distant future prediction in dynamic scenes with
+  interacting agents.
 \newblock In \emph{Proceedings of the IEEE conference on computer vision and
   pattern recognition}, pages 336--345, 2017.
 
@@ -221,7 +221,7 @@ Tian Li, Shengyuan Hu, Ahmad Beirami, and Virginia Smith.
 
 \bibitem[Lloyd(1982)]{lloyd1982kmeans}
 S.~Lloyd.
-\newblock Least squares quantization in pcm.
+\newblock Least squares quantization in {PCM}.
 \newblock \emph{IEEE Transactions on Information Theory}, 28\penalty0
   (2):\penalty0 129--137, 1982.
 \newblock \doi{10.1109/TIT.1982.1056489}.
@@ -249,7 +249,7 @@ Leland McInnes, John Healy, and Steve Astels.
 \bibitem[McInnes et~al.(2018)McInnes, Healy, Saul, and
   Großberger]{mcinnes2018umap}
 Leland McInnes, John Healy, Nathaniel Saul, and Lukas Großberger.
-\newblock Umap: Uniform manifold approximation and projection.
+\newblock {UMAP}: Uniform manifold approximation and projection.
 \newblock \emph{Journal of Open Source Software}, 3\penalty0 (29):\penalty0
   861, 2018.
 \newblock \doi{10.21105/joss.00861}.
@@ -257,7 +257,7 @@ Leland McInnes, John Healy, Nathaniel Saul, and Lukas Großberger.
 
 \bibitem[McKinney(2010)]{mckinney2010pandas}
 Wes McKinney.
-\newblock Data structures for statistical computing in python.
+\newblock Data structures for statistical computing in {Python}.
 \newblock In St{\'{e}}fan van~der Walt and Jarrod Millman, editors,
   \emph{Proceedings of the 9th Python in Science Conference, SciPy 2010,
   Austin, Texas, USA, June 28 - July 3, 2010}, pages 56--61. scipy.org, 2010.
@@ -303,7 +303,8 @@ Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory
   Desmaison, Andreas K{\"{o}}pf, Edward~Z. Yang, Zachary DeVito, Martin Raison,
   Alykhan Tejani, Sasank Chilamkurthy, Benoit Steiner, Lu~Fang, Junjie Bai, and
   Soumith Chintala.
-\newblock Pytorch: An imperative style, high-performance deep learning library.
+\newblock {PyTorch}: An imperative style, high-performance deep learning
+  library.
 \newblock In Hanna~M. Wallach, Hugo Larochelle, Alina Beygelzimer, Florence
   d'Alch{\'{e}}{-}Buc, Emily~B. Fox, and Roman Garnett, editors, \emph{Advances
   in Neural Information Processing Systems 32: Annual Conference on Neural
@@ -319,7 +320,7 @@ Fabian Pedregosa, Ga{\"{e}}l Varoquaux, Alexandre Gramfort, Vincent Michel,
   Bertrand Thirion, Olivier Grisel, Mathieu Blondel, Peter Prettenhofer, Ron
   Weiss, Vincent Dubourg, Jake VanderPlas, Alexandre Passos, David Cournapeau,
   Matthieu Brucher, Matthieu Perrot, and Edouard Duchesnay.
-\newblock Scikit-learn: Machine learning in python.
+\newblock Scikit-learn: Machine learning in {Python}.
 \newblock \emph{Journal of Machine Learning Research}, 12:\penalty0 2825--2830,
   2011.
 \newblock URL \url{https://dl.acm.org/doi/10.5555/1953048.2078195}.
@@ -334,7 +335,7 @@ Tim Salzmann, Boris Ivanovic, Punarjay Chakravarty, and Marco Pavone.
 
 \bibitem[Seabold and Perktold(2010)]{seabold2010statsmodels}
 Skipper Seabold and Josef Perktold.
-\newblock Statsmodels: Econometric and statistical modeling with python.
+\newblock Statsmodels: Econometric and statistical modeling with {Python}.
 \newblock In St{\'{e}}fan van~der Walt and Jarrod Millman, editors,
   \emph{Proceedings of the 9th Python in Science Conference, SciPy 2010,
   Austin, Texas, USA, June 28 - July 3, 2010}, page~92. scipy.org, 2010.
@@ -344,12 +345,12 @@ Skipper Seabold and Josef Perktold.
 \bibitem[Serv{\'e}n et~al.(2025)Serv{\'e}n, Brummitt, Kir{\'a}ly,
   et~al.]{serven2025pygam}
 Daniel Serv{\'e}n, Charlie Brummitt, Franz Kir{\'a}ly, et~al.
-\newblock pygam: Generalized additive models in python, 2025.
+\newblock {pyGAM}: Generalized additive models in {Python}, 2025.
 \newblock URL \url{https://doi.org/10.5281/zenodo.17981758}.
 
 \bibitem[Snoek et~al.(2012)Snoek, Larochelle, and Adams]{snoek2012bayesian}
 Jasper Snoek, Hugo Larochelle, and Ryan Adams.
-\newblock Practical bayesian optimization of machine learning algorithms.
+\newblock Practical {Bayesian} optimization of machine learning algorithms.
 \newblock In F.~Pereira, C.J. Burges, L.~Bottou, and K.~Weinberger, editors,
   \emph{Advances in Neural Information Processing Systems}, volume~25. Curran
   Associates, Inc., 2012.

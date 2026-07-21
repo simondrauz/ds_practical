@@ -22,6 +22,9 @@ bindingoffset = 0mm]{geometry}
 \usepackage{pdflscape}
 \makeatletter
 \newcommand{\captionof}[2]{\def\@captype{#1}\caption{#2}}
+% Widen the ToC/LoF/LoT page-number column so long Roman page numbers (appendix) fit
+\renewcommand{\@pnumwidth}{3em}
+\renewcommand{\@tocrmarg}{4em}
 \makeatother
 \newcommand{\changefont}{%
     \fontsize{8}{11}\selectfont
@@ -103,13 +106,13 @@ and scene characteristics, and fit GAM and XGBoost meta-models to explain the
 resulting variation in most-likely ADE. Nested resampling and out-of-fold
 diagnostics are used to validate the meta-models, while SHAP values, partial
 dependence plots, and effect-space clustering are used to identify global
-drivers and success or failure regimes. A separate sweep over prediction
+drivers and success or failure modes. A separate sweep over prediction
 horizon, history window, and attention radius studies how Trajectron++ settings
 affect performance. The results show that the focal agent's motion, especially
 speed variability, heading change, and maximum speed, explains most of the
 trajectory-level error, whereas the engineered scene and social features are
 secondary. Trajectron++ performs best for slow or heading-stable pedestrians and
-fails most clearly when speed variation and turning occur together. Among model
+fails most clearly when speed variability and turning occur together. Among model
 settings, prediction horizon has the largest effect, attention radius is second,
 and history-window length is comparatively weak within the tested range.
 
@@ -125,6 +128,9 @@ and history-window length is comparatively weak within the tested range.
 \newpage
 
 % CHAPTERS ---------------------------------------------------------------------
+
+% Paragraph spacing for the body; set after the front matter so the ToC/LoF/LoT stay compact
+\setlength{\parskip}{0.45em}
 
 \pagenumbering{arabic}
     
@@ -142,11 +148,11 @@ This work addresses that gap. Rather than proposing a new prediction architectur
 We structure the investigation around three research questions:
 
 \begin{description}
-  \item[RQ1 — Which trajectory and scene characteristics affect model performance?] We seek to identify the features, such as speed, speed variability, acceleration, heading change, and scene density, that systematically influence the per-trajectory prediction error, and to quantify the direction and magnitude of their effects.
+  \item[RQ1] \textbf{Which trajectory and scene characteristics affect model performance?} We seek to identify the features, such as speed, speed variability, acceleration, heading change, and scene density, that systematically influence the per-trajectory prediction error, and to quantify the direction and magnitude of their effects.
 
-  \item[RQ2 — What are the success and failure modes that explain model performance?] Beyond the marginal effect of individual features, we ask whether trajectories cluster into coherent regimes that the model consistently handles well or poorly, and whether these regimes can be characterised in human-interpretable terms.
+  \item[RQ2] \textbf{What are the success and failure modes that explain model performance?} Beyond the marginal effect of individual features, we ask whether trajectories cluster into coherent modes that the model consistently handles well or poorly, and whether these modes can be characterised in human-interpretable terms.
 
-  \item[RQ3 — How do model settings affect performance?] Finally, we ask how Trajectron++'s own configuration, specifically the observation history length, the prediction horizon, and the attention radius, influences prediction quality, independently of the intrinsic difficulty of each trajectory.
+  \item[RQ3] \textbf{How do model settings affect performance?} Finally, we ask how Trajectron++'s own configuration, specifically the observation history length, the prediction horizon, and the attention radius, influences prediction quality, independently of the intrinsic difficulty of each trajectory.
 \end{description}
 
 These three questions map directly onto the structure of the remainder of this report. RQ1 and RQ2 are addressed through an interpretable meta-modelling and clustering pipeline applied to a fixed model configuration, while RQ3 is addressed through a controlled sweep over model settings.
@@ -169,7 +175,7 @@ Transformer-based models such as AgentFormer \citep{yuan2021agentformer} have fu
 \subsection{The nuScenes Dataset}
 \label{sec:dataset}
  
-nuScenes \citep{caesar2020nuscenes} is a large-scale, multimodal autonomous driving dataset collected in Boston and Singapore. It provides 1000 driving scenes, each 20 seconds long, with 3D bounding box annotations for 23 object categories at 2 Hz. The dataset includes data from six cameras, a 32-beam LiDAR, and five radars, enabling rich multi-sensor perception. Each annotated object is assigned a semantic category such as car, pedestrian, or bicycle, as well as an attribute such as moving, stopped, or parked. The scenes are distributed across official splits for training, validation, and testing; in addition, nuScenes provides a small \emph{mini} split, a subset of ten scenes intended for lightweight experimentation, which we use for the computationally intensive model-setting sweep in Section~\ref{sec:settings_sweep}.
+nuScenes \citep{caesar2020nuscenes} is a large-scale, multimodal autonomous driving dataset collected in Boston and Singapore. It provides 1000 driving scenes, each 20 seconds long, with 3D bounding box annotations for 23 object categories at 2 Hz. The dataset includes data from six cameras, a 32-beam LiDAR, and five radars, enabling rich multi-sensor perception. Each annotated object is assigned a semantic category such as car, pedestrian, or bicycle, as well as an attribute such as moving, stopped, or parked. The scenes are distributed across official splits for training, validation, and testing; in addition, nuScenes provides a small \emph{mini} split, a subset of ten scenes intended for lightweight experimentation, which we use for the computationally intensive sweep over model settings in Section~\ref{sec:settings_sweep}.
  
 For trajectory prediction, nuScenes offers a standardised benchmark with defined observation and prediction horizons, typically 2 seconds of history and 6 seconds of future prediction, along with an official set of evaluation metrics. The dataset's diversity across two cities, varying traffic densities, and heterogeneous agent types makes it a challenging and realistic testbed. At the same time, this heterogeneity means that prediction difficulty varies substantially across scenes and agent types, motivating a deeper investigation of which trajectory characteristics drive model performance.
  
@@ -190,6 +196,7 @@ Generalised Additive Models (GAMs) \citep{hastie1990gam} decompose the predictio
 In the context of trajectory prediction analysis, these methods allow one to formally quantify how trajectory-level features such as agent speed, trajectory curvature, observation length, or scene density relate to the prediction error assigned by Trajectron++. This provides a data-driven characterisation of the model's strengths and failure modes, going beyond anecdotal inspection of individual examples.
  
 \subsection{Federated Learning and Personalisation}
+\label{sec:federated}
  
 Federated learning \citep{mcmahan2017fedavg} is a distributed training paradigm in which multiple clients such as vehicles or edge cameras collaboratively train a shared model without exchanging raw data. Each client trains locally and shares only model updates with a central server, which aggregates them into an updated global model via algorithms such as FedAvg. This preserves data privacy and reduces communication overhead.
  
@@ -201,12 +208,12 @@ While the present work focuses on a centralised, in-depth analysis of Trajectron
 \clearpage
 \section{Methodology}
 
-The complete analysis pipeline is summarised in Figure~\ref{fig:pipeline_overview}. Starting from nuScenes pedestrian trajectories, the main path adapts Trajectron++ evaluation to retain per-trajectory errors, joins those errors with engineered trajectory and scene features, fits interpretable meta-models, and uses the resulting feature effects for both global interpretation and success/failure regime analysis. A separate mini-split branch reuses the same preparation and modelling logic to analyse controlled changes in Trajectron++ model settings.
+The complete analysis pipeline is summarised in Figure~\ref{fig:pipeline_overview}. Starting from nuScenes pedestrian trajectories, the main path adapts Trajectron++ evaluation to retain per-trajectory errors, joins those errors with engineered trajectory and scene features, fits interpretable meta-models, and uses the resulting feature effects for both global interpretation and success/failure mode analysis. A separate mini-split branch reuses the same preparation and modelling logic to analyse controlled changes in Trajectron++ model settings.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.95\textwidth]{figures/pipeline.png}
-  \caption{Overview of the analysis pipeline used in this report. The upper path supports the fixed-configuration feature-effect and regime analyses, while the lower branch analyses model-setting effects on the nuScenes mini split.}
+  \caption[Overview of the analysis pipeline]{Overview of the analysis pipeline used in this report. The upper path supports the fixed-configuration feature-effect and mode analyses, while the lower branch analyses model-setting effects on the nuScenes mini split.}
   \label{fig:pipeline_overview}
 \end{figure}
 
@@ -219,7 +226,7 @@ Answering the research questions posed in Section~\ref{sec:introduction} require
 
 In its original form, the Trajectron++ evaluation loop reports batch-averaged ADE and FDE values. Predictions are generated for each batch of agents, the displacement errors are computed, and these errors are immediately aggregated into summary statistics. The intermediate, per-agent errors are not retained, and there is no mechanism to associate a given error value with the specific trajectory that produced it.
 
-This design is adequate for the model's original purpose, namely benchmarking aggregate accuracy against competing approaches. However, it is incompatible with our analysis. Because the per-trajectory errors are discarded and never linked to an identifier, it is impossible to study what makes a particular trajectory hard or easy: there is no way to relate the prediction error of a trajectory to its kinematic properties or to the characteristics of the scene in which it occurred.
+This design is adequate for the model's original purpose, namely benchmarking aggregate accuracy against competing approaches. For our analysis, however, it makes it impossible to relate the prediction error of a trajectory to its kinematic properties or to the characteristics of the scene in which it occurred.
 
 \subsubsection{Recovering Individual Trajectory Errors}
 
@@ -249,18 +256,24 @@ With per-trajectory prediction errors available, the next stage of the pipeline 
 
 \subsubsection{Trajectory and Scene Characteristics}
 
-We organise the engineered features into two groups: agent motion features, which describe the kinematics of the focal trajectory, and scene context features, which describe the environment in which the trajectory unfolds.
+We organise the engineered features into two groups: agent motion features, which describe the kinematics of the focal trajectory, and scene and social features, which describe the environment in which the trajectory unfolds and the agent's immediate surroundings.
 
-\paragraph{Agent motion features.} These capture the dynamics and geometric complexity of the focal agent's movement. They include:
+\paragraph{Agent motion features.} These nine features capture the dynamics and geometric complexity of the focal agent's movement:
 \begin{itemize}
-  \item \textbf{Speed} statistics: the mean, maximum, and standard deviation of speed over the trajectory. The standard deviation in particular captures how much the agent's speed fluctuates, which is a proxy for irregular or unpredictable motion.
-  \item \textbf{Acceleration} statistics: the mean and maximum acceleration, describing how rapidly the agent changes speed.
-  \item \textbf{Jerk} statistics: the mean and maximum jerk, that is, the rate of change of acceleration, which captures the smoothness of the motion.
-  \item \textbf{Heading change per second}, quantifying how much the agent turns over time and thus distinguishing straight-line motion from curved or erratic paths.
-  \item \textbf{Minimum neighbour distance}, the closest approach to any other agent, which reflects how tightly the agent must navigate around others.
+  \item \textbf{Speed} statistics (\texttt{mean\_speed}, \texttt{max\_speed}, \texttt{std\_speed}): the mean, maximum, and standard deviation of speed over the trajectory. The standard deviation in particular captures how much the agent's speed fluctuates, which is a proxy for irregular or unpredictable motion.
+  \item \textbf{Acceleration} statistics (\texttt{mean\_acceleration}, \texttt{max\_acceleration}): the mean and maximum acceleration, describing how rapidly the agent changes speed.
+  \item \textbf{Jerk} statistics (\texttt{mean\_jerk}, \texttt{max\_jerk}): the mean and maximum jerk, that is, the rate of change of acceleration, which captures the smoothness of the motion.
+  \item \textbf{Heading change per second} (\texttt{heading\_change\_per\_sec}), quantifying how much the agent turns over time and thus distinguishing straight-line motion from curved or erratic paths.
+  \item \textbf{Path efficiency} (\texttt{path\_efficiency}), the straight-line displacement between the start and end of the trajectory divided by the traversed path length, so that straight paths score high and meandering paths score low.
 \end{itemize}
 
-\paragraph{Scene context features.} These describe the broader environment and the degree of crowding around the focal agent. They include the number of agents in the scene, the number of vehicles specifically, the scene bounding-box area, and the spatial agent density.
+\paragraph{Scene and social features.} These eight features describe the broader environment and the degree of crowding around the focal agent:
+\begin{itemize}
+  \item \textbf{Minimum neighbour distance} (\texttt{min\_neighbor\_distance}), the closest approach to any other agent, which reflects how tightly the agent must navigate around others.
+  \item \textbf{Agent and vehicle counts} (\texttt{scene\_num\_agents}, \texttt{scene\_num\_VEHICLE}): the number of agents in the scene and the number of vehicles specifically.
+  \item \textbf{Scene extent} (\texttt{scene\_bbox\_height}, \texttt{scene\_bbox\_width}, \texttt{scene\_bbox\_area}): the height, width, and area of the scene bounding box.
+  \item \textbf{Density} statistics (\texttt{scene\_spatial\_density}, \texttt{scene\_density\_VEHICLE}): the spatial density of all agents in the scene and of vehicles specifically.
+\end{itemize}
 
 In total, the two groups yield $17$ candidate features. Each feature vector is associated with its corresponding Trajectron++ prediction error through the \texttt{data\_idx} join key introduced in Section~\ref{sec:trajectron_adaptation}, producing the unified per-trajectory dataset on which all subsequent modelling is performed.
 
@@ -273,7 +286,7 @@ Such pronounced skewness is problematic for regression models that assume approx
 \begin{figure}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/target_log_transform_ml_ade.png}
-  \caption{Distribution of the per-trajectory target \texttt{ml\_ade} before (left) and after (right) the \texttt{log1p} transformation. The transformation compresses the long upper tail and reduces the skewness from $3.01$ to $1.56$.}
+  \caption[Target distribution before and after the log transformation]{Distribution of the per-trajectory target \texttt{ml\_ade} before (left) and after (right) the \texttt{log1p} transformation. The transformation compresses the long upper tail and reduces the skewness from $3.01$ to $1.56$.}
   \label{fig:target_log_transform}
 \end{figure}
 
@@ -282,23 +295,23 @@ Such pronounced skewness is problematic for regression models that assume approx
 
 With $17$ candidate features, many of which are correlated by construction (for example, the various speed statistics; Appendix~\ref{app:feature_selection_diagnostics} shows the full pairwise correlation structure), an unfiltered feature set would introduce substantial multicollinearity. Multicollinearity is especially damaging for interpretability: when features are highly correlated, the estimated effect of any one of them becomes unstable and difficult to attribute, undermining the very goal of the analysis. We therefore performed feature selection, and to ensure that our conclusions were not an artefact of a single selection strategy, we implemented and compared two complementary approaches.
 
-\paragraph{Approach 1: Mutual-information elbow followed by VIF.} We first ranked the $17$ candidate features by their mutual information (MI) with the target \citep{kraskov2004estimating}, estimated with scikit-learn \citep{pedregosa2011sklearn}, which measures the strength of the (possibly non-linear) statistical dependence between each feature and the prediction error. Inspecting the ranked MI curve revealed an elbow (Figure~\ref{fig:mi_elbow}), and we discarded the low-signal features lying below it, reducing the set from $17$ to $9$. We then applied a variance inflation factor (VIF) filter \citep{kutner2005applied}, computed with statsmodels \citep{seabold2010statsmodels}, with a threshold of $5$ to remove residual multicollinearity, which further reduced the set to $4$ features: \texttt{std\_speed}, \texttt{mean\_acceleration}, \texttt{max\_speed}, and \texttt{heading\_change\_per\_sec}. The threshold was used as a conservative operational cutoff rather than a universal criterion, since fixed VIF rules should be treated as diagnostics rather than hard statistical laws \citep{obrien2007vif}. This procedure retains only motion features; all scene-context features fall below the MI elbow, indicating that, considered individually, they carry comparatively little information about per-trajectory prediction error. All four retained features are highly statistically significant ($p \ll 0.01$).
+\paragraph{Approach 1: Mutual-information elbow followed by VIF.} We first ranked the $17$ candidate features by their mutual information (MI) with the target \citep{kraskov2004estimating}, estimated with scikit-learn \citep{pedregosa2011sklearn}, which measures the strength of the (possibly non-linear) statistical dependence between each feature and the prediction error. Inspecting the ranked MI curve revealed an elbow (Figure~\ref{fig:mi_elbow}), and we discarded the low-signal features lying below it, reducing the set from $17$ to $9$. We then applied a variance inflation factor (VIF) filter \citep{kutner2005applied}, computed with statsmodels \citep{seabold2010statsmodels}, with a threshold of $5$ to remove residual multicollinearity, which further reduced the set to $4$ features: \texttt{std\_speed}, \texttt{mean\_acceleration}, \texttt{max\_speed}, and \texttt{heading\_change\_per\_sec}. The threshold is an operational cutoff, not a hard statistical law \citep{obrien2007vif}. This procedure retains only motion features; all scene and social features fall below the MI elbow, indicating that, considered individually, they carry comparatively little information about per-trajectory prediction error. All four retained features are highly significant in the GAM fits reported in Section~\ref{sec:rq1_results} ($p \ll 0.01$).
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/mi_elbow.png}
-  \caption{Mutual-information scores of the $17$ candidate features with respect to \texttt{ml\_ade}, ranked in decreasing order. The dashed line marks the detected elbow: the nine features left of it (blue) are retained and passed to the VIF filter, while the low-signal features right of it (grey), all of them scene-context features, are discarded.}
+  \caption[Ranked mutual-information scores with the detected elbow]{Mutual-information scores of the $17$ candidate features with respect to \texttt{ml\_ade}, ranked in decreasing order. The dashed line marks the detected elbow: the nine features left of it (blue) are retained and passed to the VIF filter, while the low-signal features right of it (grey), all of them scene and social features, are discarded.}
   \label{fig:mi_elbow}
 \end{figure}
 
-\paragraph{Approach 2: VIF only.} As a contrasting strategy, we skipped the MI ranking entirely and applied the VIF filter (again with a threshold of $5$) directly to all $17$ candidates. This yielded $6$ features: \texttt{std\_speed}, \texttt{mean\_acceleration}, \texttt{min\_neighbor\_distance}, \texttt{heading\_change\_per\_sec}, \texttt{scene\_num\_VEHICLE}, and \texttt{scene\_density\_VEHICLE}. In contrast to the first approach, this set retains several scene-level features alongside the motion features.
+\paragraph{Approach 2: VIF only.} As a contrasting strategy, we skipped the MI ranking entirely and applied the VIF filter (again with a threshold of $5$) directly to all $17$ candidates. This yielded $6$ features: \texttt{std\_speed}, \texttt{mean\_acceleration}, \texttt{min\_neighbor\_distance}, \texttt{heading\_change\_per\_sec}, \texttt{scene\_num\_VEHICLE}, and \texttt{scene\_density\_VEHICLE}. In contrast to the first approach, this set retains several scene and social features alongside the motion features.
 
-Comparing the two feature sets serves as a robustness check. The MI-elbow-plus-VIF set is more parsimonious and motion-focused, whereas the VIF-only set deliberately preserves scene-context information that the MI filter would otherwise remove. Carrying both forward allows us to assess whether the inclusion of scene features materially changes the conclusions of the interpretable analysis, an assessment we return to in the results.
+Comparing the two feature sets serves as a robustness check. The MI-elbow-plus-VIF set is more parsimonious and motion-focused, whereas the VIF-only set deliberately preserves scene and social context information that the MI filter would otherwise remove. Carrying both forward allows us to assess whether the inclusion of scene features materially changes the conclusions of the interpretable analysis, an assessment we return to in the results.
 
 \subsection{Interpretable Models: GAM and XGBoost}
 \label{sec:interpretable_models}
 
-The per-trajectory \texttt{ml\_ade} values, together with the selected features, allow us to ask not merely \emph{how large} the prediction error is for a given trajectory, but \emph{why} it is large or small. The error value alone is uninformative in this respect: it tells us that variation exists but not what drives it. To uncover the drivers, we fit a second-stage, interpretable model, a \emph{meta-model}, that takes the engineered trajectory and scene features as inputs and predicts the Trajectron++ prediction error as output. If this meta-model is itself interpretable, then its learned structure can be read as an explanation of the conditions under which Trajectron++ performs well or poorly.
+The per-trajectory \texttt{ml\_ade} values, together with the selected features, allow us to ask not merely \emph{how large} the prediction error is for a given trajectory, but \emph{why} it is large or small. To uncover the drivers, we fit a second-stage, interpretable model, a \emph{meta-model}, that takes the engineered trajectory and scene features as inputs and predicts the Trajectron++ prediction error as output. If this meta-model is itself interpretable, then its learned structure can be read as an explanation of the conditions under which Trajectron++ performs well or poorly.
 
 We adopt two complementary meta-models: a Generalised Additive Model (GAM), which is inherently interpretable, and XGBoost, a gradient-boosted tree ensemble that is more flexible but must be interpreted post-hoc.
 
@@ -320,9 +333,9 @@ XGBoost~\citep{chen2016xgboost} is an ensemble method based on gradient-boosted 
   \hat{y}(x) = \sum_{t=1}^{T} f_t(x),
   \label{eq:xgboost}
 \end{equation}
-where each $f_t$ is a regression tree. Each tree partitions the feature space through a sequence of threshold rules and assigns a constant correction to each resulting region; because a single tree can split on several features in succession, the ensemble naturally captures non-linearities and interactions between features. This flexibility is precisely what the additive GAM lacks, and it allows XGBoost to represent effects in which the impact of one feature depends on the level of another, for example a speed-variability effect that is amplified when it coincides with turning. The empirically estimated interaction structure is examined in Appendix~\ref{app:feature_effect_evidence}.
+where each $f_t$ is a regression tree. Each tree partitions the feature space through a sequence of threshold rules and assigns a constant correction to each resulting region; because a single tree can split on several features in succession, the ensemble naturally captures non-linearities and interactions between features. This flexibility is precisely what the additive GAM lacks, and it allows XGBoost to represent effects in which the impact of one feature depends on the level of another, for example a maximum-speed effect that materialises mainly when elevated speed coincides with turning. The empirically estimated interaction structure is examined in Appendix~\ref{app:feature_effect_evidence}.
 
-The cost of this flexibility is that the fitted ensemble, typically comprising many trees, is not directly human-readable. We therefore interpret it post-hoc using two standard techniques: SHAP values \citep{lundberg2017shap} and partial dependence plots \citep{friedman2001gbm}. SHAP values decompose each individual prediction into additive, signed contributions from each feature on top of a baseline value:
+The cost of this flexibility is that the fitted ensemble, typically comprising many trees, is not directly human-readable. We therefore interpret it post-hoc using two standard techniques: SHAP values \citep{lundberg2017shap} and partial dependence plots (PDPs) \citep{friedman2001gbm}. SHAP values decompose each individual prediction into additive, signed contributions from each feature on top of a baseline value:
 \begin{equation}
   f(x) = \phi_0 + \sum_{j} \phi_j(x),
   \label{eq:shap}
@@ -333,7 +346,6 @@ where $\phi_0$ is the baseline (the mean model prediction) and each $\phi_j(x)$ 
 
 The two meta-models occupy complementary positions on the interpretability–flexibility spectrum. The GAM is fully transparent and provides significance tests, but its additive assumption rules out interactions. XGBoost can capture those interactions and typically attains a better fit, but requires post-hoc tools to be interpreted and offers no native significance testing. Reading the two together mitigates the weaknesses of each: agreement between a transparent additive model and a flexible interaction-aware ensemble is strong evidence that an identified effect is real rather than an artefact of one model's assumptions. This dual-model strategy underpins the feature-importance and feature-effect analyses that answer RQ1 and RQ2.
 
-\newpage
 \subsection{Model Selection and Validation Protocol}
 \label{sec:model_selection_validation}
 
@@ -343,7 +355,7 @@ Hyperparameters were tuned with Bayesian optimisation \citep{snoek2012bayesian} 
 
 Concretely, we used $3$ outer folds and $3$ inner folds. For each outer fold, hyperparameters were selected by inner cross-validation on the corresponding training portion using $15$ trials per study; the fitted model was then evaluated on the held-out outer fold. Because every row serves as an outer-fold holdout exactly once, the resulting out-of-fold predictions cover the full analysis dataset without relying on in-sample predictions. Table~\ref{tab:hyperparameter_search_space} reports the search space. After model selection, tuning was rerun on all rows for the final refit.
 
-\begin{table}[t]
+\begin{table}[H]
   \centering
   \caption{Hyperparameter search space used for Optuna/TPE tuning.}
   \label{tab:hyperparameter_search_space}
@@ -378,13 +390,15 @@ The out-of-fold predictions also make it possible to inspect diagnostic plots fo
 
   \textbf{GAM}\\[0.2em]
   \includegraphics[width=\textwidth]{figures/oof_diagnostics_gam_mi_vif.png}
-  \caption{Out-of-fold diagnostic plots for the main MI\,+\,VIF feature set. Both selected meta-model families show good agreement at low-to-moderate ADE and under-prediction in the high-error tail.}
+  \caption[Out-of-fold diagnostics, main MI\,+\,VIF feature set]{Out-of-fold diagnostic plots for the main MI\,+\,VIF feature set. Both selected meta-model families show good agreement at low-to-moderate ADE and under-prediction in the high-error tail.}
   \label{fig:oof_diagnostics}
 \end{figure}
 
-\begin{table}[t]
+Table~\ref{tab:model_variant_selection} reports the resulting comparison. The selected variants were LinearGAM with a log-transformed target and XGBoost with a log-transformed target. The XGBoost log model achieved the best out-of-fold performance overall, with RMSE $0.388$, $R^2 = 0.619$, and MAE $0.214$ on the original \texttt{ml\_ade} scale, while the log-GAM retained the transparent additive structure needed for direct effect interpretation. Rank preservation matters here in addition to squared-error fit, because the downstream clustering analysis groups trajectory-level effect vectors: the Spearman column shows that the selected XGBoost variant also preserves the ordering of trajectories by prediction error best ($\rho = 0.835$).
+
+\begin{table}[H]
   \centering
-  \caption{Out-of-fold model-variant comparison on the original \texttt{ml\_ade} scale for models fitted on the main MI\,+\,VIF feature set. Spearman $\rho$ is the rank correlation between out-of-fold predictions and observed \texttt{ml\_ade}. Bold rows indicate the selected variants carried forward for interpretation.}
+  \caption[Out-of-fold model-variant comparison]{Out-of-fold model-variant comparison on the original \texttt{ml\_ade} scale for models fitted on the main MI\,+\,VIF feature set. Spearman $\rho$ is the rank correlation between out-of-fold predictions and observed \texttt{ml\_ade}. Bold rows indicate the selected variants carried forward for interpretation.}
   \label{tab:model_variant_selection}
   \begin{tabular}{lcccc}
     \toprule
@@ -399,7 +413,7 @@ The out-of-fold predictions also make it possible to inspect diagnostic plots fo
   \end{tabular}
 \end{table}
 
-The selected variants were therefore LinearGAM with a log-transformed target and XGBoost with a log-transformed target. The XGBoost log model achieved the best out-of-fold performance overall, with RMSE $0.388$, $R^2 = 0.619$, and MAE $0.214$ on the original \texttt{ml\_ade} scale, while the log-GAM retained the transparent additive structure needed for direct effect interpretation. Rank preservation matters here in addition to squared-error fit, because the downstream regime analysis clusters trajectory-level effect vectors: the Spearman column shows that the selected XGBoost variant also preserves the ordering of trajectories by prediction error best ($\rho = 0.835$). The outer-fold dispersion of these metrics is small for all variants (Appendix Table~\ref{tab:appendix_nested_cv_stability}); standard deviations over only three outer folds are coarse estimates and should not be over-interpreted, but the consistently small fold-to-fold variation gives no indication of unstable tuning and supports the final refit on all rows. Both models were carried forward so that feature-effect conclusions could be checked across an interpretable additive model and a more flexible interaction-capable model. Appendix~\ref{app:tuning_details} reports the corresponding target-scale comparison and the full-data tuned configurations used for the exported meta-models.
+The outer-fold dispersion of these metrics is small for all variants (Appendix Table~\ref{tab:appendix_nested_cv_stability}; with three outer folds these are coarse estimates), giving no indication of unstable tuning and supporting the final refit on all rows. Both models were carried forward so that feature-effect conclusions could be checked across an interpretable additive model and a more flexible interaction-capable model. Appendix~\ref{app:tuning_details} reports the corresponding target-scale comparison and the full-data tuned configurations used for the exported meta-models.
 
 \subsection{Cluster Analysis for Success and Failure Modes}
 \label{sec:cluster_methodology}
@@ -412,7 +426,7 @@ The success-and-failure analysis proceeds in two stages. First, we divide trajec
     \centering
     \vspace{0pt}
     \includegraphics[width=\linewidth]{figures/performance_groups.png}
-    \caption{Distribution of \texttt{ml\_ade} with the k-means performance groups. The vertical dashed lines mark the easy/medium and medium/hard boundaries on the original ADE scale.}
+    \caption[Performance groups on the target distribution]{Distribution of \texttt{ml\_ade} with the k-means performance groups. The vertical dashed lines mark the easy/medium and medium/hard boundaries on the original ADE scale.}
     \label{fig:performance_groups}
   \end{minipage}
   \hfill
@@ -461,7 +475,7 @@ We compared OPTICS \citep{ankerst1999optics} and HDBSCAN \citep{campello2015hdbs
 \begin{table}[H]
   \centering
   
-  \caption{Primary XGBoost effect-space clustering selection. OPTICS is compared with the best HDBSCAN candidate for the same performance group.}
+  \caption[Primary effect-space clustering selection]{Primary XGBoost effect-space clustering selection. OPTICS is compared with the best HDBSCAN candidate for the same performance group.}
   \label{tab:cluster_selection}
   \small
   \renewcommand{\arraystretch}{1.12}
@@ -478,16 +492,16 @@ We compared OPTICS \citep{ankerst1999optics} and HDBSCAN \citep{campello2015hdbs
   \end{tabular}
 \end{table}
 
-Overall, the primary regime analysis uses OPTICS on XGBoost SHAP effect vectors. In the XGBoost effect space, OPTICS achieved higher DBCV than HDBSCAN for every performance group and produced the clearest easy and medium structures. The choice of XGBoost as the primary effect source is also supported by the model-selection results in Table~\ref{tab:model_variant_selection}: XGBoost fits the per-trajectory loss better than the GAM, and its selected effect-space clusters were semantically clearer after mapping them back to raw motion characteristics. The GAM additive-effect clustering was retained as a robustness check: it showed comparable easy-regime structure and corroborated the hard-regime speed-variation and turning pattern, but it produced weaker medium separation. Figure~\ref{fig:xgboost_optics_umaps} shows the selected XGBoost--OPTICS UMAP \citep{mcinnes2018umap} diagnostics with noise retained and removed. Appendix Table~\ref{tab:appendix_cluster_candidates} reports the corresponding OPTICS and HDBSCAN candidate scores for both XGBoost and GAM, and Appendix~\ref{app:cluster_umaps} shows the analogous UMAP diagnostics for the remaining algorithm--model combinations. The low hard-regime DBCV and high noise share in Table~\ref{tab:cluster_selection} are important caveats: the hard cases contain weaker, noisier density structure than the easy and medium cases.
+Overall, the primary mode analysis uses OPTICS on XGBoost SHAP effect vectors. In the XGBoost effect space, OPTICS achieved higher DBCV than HDBSCAN for every performance group and produced the clearest easy and medium structures. The choice of XGBoost as the primary effect source is also supported by the model-selection results in Table~\ref{tab:model_variant_selection}: XGBoost fits the per-trajectory loss better than the GAM, and its selected effect-space clusters were semantically clearer after mapping them back to raw motion characteristics. The GAM additive-effect clustering was retained as a robustness check: it showed comparable easy-group structure and corroborated the hard-group speed-variability and turning pattern, but it produced weaker medium separation. Figure~\ref{fig:xgboost_optics_umaps} shows the selected XGBoost--OPTICS UMAP \citep{mcinnes2018umap} diagnostics with noise retained and removed. Appendix Table~\ref{tab:appendix_cluster_candidates} reports the corresponding OPTICS and HDBSCAN candidate scores for both XGBoost and GAM, and Appendix~\ref{app:cluster_umaps} shows the analogous UMAP diagnostics for the remaining algorithm--model combinations. The low hard-group DBCV and high noise share in Table~\ref{tab:cluster_selection} are important caveats: the hard cases contain weaker, noisier density structure than the easy and medium cases.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.86\textwidth]{figures/cluster_umap_xgboost_optics_noise_compare.png}
-  \caption{Selected XGBoost--OPTICS effect-space UMAP diagnostics. Rows show the easy, medium, and hard performance groups; the left column includes OPTICS noise points and the right column removes them. These UMAP projections visualise the four-dimensional SHAP effect vectors from Equation~\ref{eq:cluster_effect_vectors} and were not used as clustering input.}
+  \caption[XGBoost--OPTICS effect-space UMAP diagnostics]{Selected XGBoost--OPTICS effect-space UMAP diagnostics. Rows show the easy, medium, and hard performance groups; the left column includes OPTICS noise points and the right column removes them. These UMAP projections visualise the four-dimensional SHAP effect vectors from Equation~\ref{eq:cluster_effect_vectors} and were not used as clustering input.}
   \label{fig:xgboost_optics_umaps}
 \end{figure}
 
-\subsection{Model Setting Sweep}
+\subsection{Settings Sweep}
 \label{sec:settings_sweep}
 
 The analysis described so far holds the Trajectron++ configuration fixed and studies how trajectory and scene characteristics relate to prediction error. RQ3 turns to a complementary question: how does the model's own configuration affect prediction quality? To answer this, we conducted a controlled sweep over three of Trajectron++'s key settings \citep{salzmann2020trajectron+} and analysed their effect using the same interpretable meta-modelling framework developed in Section~\ref{sec:interpretable_models}.
@@ -505,7 +519,7 @@ We performed a Cartesian sweep over these three parameters, evaluating the model
 
 \subsubsection{Pooled Model and Confound Control}
 
-To isolate the effect of the model settings from the intrinsic difficulty of individual trajectories, we fit a single \emph{pooled} meta-model that includes both the model-setting variables and the trajectory and scene features as predictors. The trajectory and scene features act as control variables: by accounting for the fact that different trajectories are inherently more or less difficult, the pooled model attributes the residual variation in error to the settings themselves. This design allows the effect of, say, the prediction horizon to be estimated while holding trajectory difficulty constant.
+To isolate the effect of the model settings from the intrinsic difficulty of individual trajectories, we fit a single \emph{pooled} meta-model that includes both the model-setting variables and the trajectory and scene features as predictors. The trajectory and scene features act as control variables: by accounting for the fact that different trajectories are inherently more or less difficult, the pooled model attributes the residual variation in error to the settings themselves. This design allows the effect of, say, the prediction horizon to be estimated while holding trajectory difficulty constant. The trajectory features entering the pooled model were selected by applying the same mutual-information and collinearity filtering of Section~\ref{sec:feature_selection} to the pooled sweep data, retaining \texttt{std\_speed}, \texttt{max\_speed}, \texttt{heading\_change\_per\_sec}, \texttt{mean\_acceleration}, and \texttt{min\_neighbor\_distance}; the three setting variables were always kept as predictors, since measuring their effects is the purpose of the sweep.
 
 A subtle but important issue in this setup is mechanical confounding between the settings and certain trajectory features. Some features scale trivially with a setting: for instance, the total path length of a trajectory grows mechanically with the prediction horizon, simply because a longer horizon covers more time, irrespective of any change in the agent's behaviour or the difficulty of the prediction. If left uncorrected, such features would absorb part of the genuine effect of the setting and distort the analysis. To prevent this, we used setting-agnostic, normalised versions of the affected features, for example \texttt{mean\_path\_length\_per\_second} in place of the raw \texttt{path\_length}. This normalisation ensures that the estimated effects of the model settings reflect genuine changes in prediction difficulty rather than arithmetic artefacts of the sweep.
 
@@ -523,7 +537,7 @@ Table~\ref{tab:feature_effect_importance} reports the global feature-importance 
 
 \begin{table}[H]
   \centering
-  \caption{Global feature importance for the MI\,+\,VIF and VIF-only feature sets. SHAP values are mean absolute XGBoost contributions on the log-target scale; GAM significance is taken from the corresponding GAM fit.}
+  \caption[Global feature importance for both feature sets]{Global feature importance for the MI\,+\,VIF and VIF-only feature sets. SHAP values are mean absolute XGBoost contributions on the log-target scale; GAM significance is taken from the corresponding GAM fit.}
   \label{tab:feature_effect_importance}
   \small
   \renewcommand{\arraystretch}{1.12}
@@ -544,7 +558,7 @@ Table~\ref{tab:feature_effect_importance} reports the global feature-importance 
   \end{tabular}
 \end{table}
 
-The ranking gives a clear answer to RQ1: motion features dominate the explanation of per-trajectory prediction error. In the main MI\,+\,VIF feature set, the three largest XGBoost effects are \texttt{std\_speed} ($0.109$), \texttt{max\_speed} ($0.103$), and \texttt{heading\_change\_per\_sec} ($0.090$). Mean acceleration is much smaller at $0.026$. The VIF-only comparison preserves this ordering in substance: \texttt{std\_speed} remains the largest feature by a clear margin, \texttt{heading\_change\_per\_sec} remains the next important motion feature, and the retained scene or social features have small SHAP magnitudes. In the GAM comparison, all listed terms except \texttt{scene\_density\_VEHICLE} are significant at the $5\%$ level; the non-significant density smooth reinforces that the scene-density signal is weak and unstable. Appendix Figure~\ref{fig:appendix_shap_beeswarm} complements these aggregate magnitudes with the full distribution of signed per-trajectory SHAP contributions, showing in particular the long positive tail of \texttt{std\_speed} contributions behind its top rank.
+The ranking gives a clear answer to RQ1: motion features dominate the explanation of per-trajectory prediction error. In the main MI\,+\,VIF feature set, the three largest XGBoost effects are \texttt{std\_speed} ($0.109$), \texttt{max\_speed} ($0.103$), and \texttt{heading\_change\_per\_sec} ($0.090$). Mean acceleration is much smaller at $0.026$. The VIF-only comparison preserves this ordering in substance: \texttt{std\_speed} remains the largest feature by a clear margin, \texttt{heading\_change\_per\_sec} remains the next important motion feature, and the retained scene and social features have small SHAP magnitudes. In the GAM comparison, all listed terms except \texttt{scene\_density\_VEHICLE} are significant at the $5\%$ level; the non-significant density smooth reinforces that the scene-density signal is weak and unstable. Appendix Figure~\ref{fig:appendix_shap_beeswarm} complements these aggregate magnitudes with the full distribution of signed per-trajectory SHAP contributions, showing in particular the long positive tail of \texttt{std\_speed} contributions behind its top rank.
 
 Figures~\ref{fig:feature_effects_motion} and~\ref{fig:feature_effects_scene_social} show the feature-effect shapes behind this ranking. The XGBoost PDPs are plotted over the feature interval between the 5th and 95th percentiles, while the GAM smooths cover the full observed range. The two plots should therefore be read together: the PDP gives the black-box model's average effect in the data-dense range, and the GAM smooth checks whether an additive model recovers a compatible marginal pattern.
 
@@ -615,15 +629,15 @@ Figures~\ref{fig:feature_effects_motion} and~\ref{fig:feature_effects_scene_soci
       \includegraphics[width=\linewidth]{figures/gam_mean_acceleration.png}
     \end{minipage}
   \end{minipage}
-  \caption{Feature-effect plots for the four motion features retained in the main MI\,+\,VIF feature set.}
+  \caption[Feature-effect plots, motion features]{Feature-effect plots for the four motion features retained in the main MI\,+\,VIF feature set.}
   \label{fig:feature_effects_motion}
 \end{figure}
 
 The strongest and most stable effect is \texttt{std\_speed}. Its XGBoost PDP increases monotonically across the feature interval shown in the PDP, and over that same interval, the GAM smooth supports the positive trend observed in the PDP. Trajectories whose speed varies more strongly therefore receive larger predicted ADE: erratic speed is harder for Trajectron++ to forecast. \texttt{heading\_change\_per\_sec} is also important but less monotone. Both models show that turning raises error in the low-to-moderate range, while the effect flattens or drops at high heading-change values where the relationship is less stable.
 
-\texttt{max\_speed} is the third major motion feature. The XGBoost PDP is broadly increasing, and the GAM smooth agrees over the feature interval shown in the PDP, although its confidence interval widens in the high-speed tail. Peak speed therefore contributes to error, but it is weaker than speed variability and turning. By contrast, \texttt{mean\_acceleration} has a small global SHAP value and a mixed effect shape. Its PDP oscillates around zero and the GAM smooth is not as stable as the leading motion features. This means that acceleration is detectable in the additive significance test, but its population-level effect is small compared with the dominant speed-variation and heading-change effects. A useful interpretation is that prediction error is driven more by how often a pedestrian changes speed than by the presence of non-zero acceleration alone.
+\texttt{max\_speed} is the third major motion feature. The XGBoost PDP is broadly increasing, and the GAM smooth agrees over the feature interval shown in the PDP, although its confidence interval widens in the high-speed tail. Peak speed therefore contributes to error, but it is weaker than speed variability and turning. By contrast, \texttt{mean\_acceleration} has a small global SHAP value and a mixed effect shape. Its PDP oscillates around zero and the GAM smooth is not as stable as the leading motion features. This means that acceleration is detectable in the additive significance test, but its population-level effect is small compared with the dominant speed-variability and heading-change effects. A useful interpretation is that prediction error is driven more by how often a pedestrian changes speed than by the presence of non-zero acceleration alone.
 
-The scene-context comparison is weaker. \texttt{scene\_density\_VEHICLE} has only a small VIF-only SHAP value ($0.020$), a noisy PDP, and a non-significant GAM smooth. The other retained VIF-only scene or social features are also small: \texttt{scene\_num\_VEHICLE} has mean absolute SHAP $0.016$, and \texttt{min\_neighbor\_distance} has $0.027$. Both are significant in the VIF-only GAM, so they are not pure noise, but their SHAP magnitudes remain small enough to support the broader conclusion that scene and social features are secondary. The main message is therefore not that scene context is irrelevant in principle, but that these engineered scene and social descriptors do not robustly explain individual Trajectron++ error in this analysis. Within the current feature representation, the focal agent's own motion dominates.
+The comparison for the scene and social features is weaker. \texttt{scene\_density\_VEHICLE} has only a small VIF-only SHAP value ($0.020$), a noisy PDP, and a non-significant GAM smooth. The other retained VIF-only scene and social features are also small: \texttt{scene\_num\_VEHICLE} has mean absolute SHAP $0.016$, and \texttt{min\_neighbor\_distance} has $0.027$. Both are significant in the VIF-only GAM, so they are not pure noise, but their SHAP magnitudes remain small enough to support the broader conclusion that scene and social features are secondary. The main message is therefore not that scene context is irrelevant in principle, but that these engineered scene and social descriptors do not robustly explain individual Trajectron++ error in this analysis. Within the current feature representation, the focal agent's own motion dominates.
 
 \newpage
 \begin{figure}[t]
@@ -678,7 +692,7 @@ The scene-context comparison is weaker. \texttt{scene\_density\_VEHICLE} has onl
     \end{minipage}
   \end{minipage}
   \hfill\null
-  \caption{Feature-effect plots for the social and scene-context features retained by the VIF-only feature set.}
+  \caption[Feature-effect plots, scene and social features]{Feature-effect plots for the scene and social features retained by the VIF-only feature set.}
   \label{fig:feature_effects_scene_social}
 \end{figure}
 
@@ -687,11 +701,11 @@ The scene-context comparison is weaker. \texttt{scene\_density\_VEHICLE} has onl
 
 Using the performance grouping and feature-effect clustering defined in Section~\ref{sec:cluster_methodology}, we interpret the selected clusters as explanation patterns for RQ2 rather than as clusters of raw trajectory coordinates.
 
-Table~\ref{tab:rq2_regime_summary} summarises the selected XGBoost--OPTICS regime structure. The easy and medium groups have usable density structure, with DBCV values around $0.40$, while the hard group is much noisier: its selected clustering has DBCV $0.09$ and assigns $75\%$ of hard trajectories to noise. The hard result is therefore interpreted more cautiously than the easy and medium regimes.
+Table~\ref{tab:rq2_regime_summary} summarises the selected XGBoost--OPTICS mode structure. The easy and medium groups have usable density structure, with DBCV values around $0.40$, while the hard group is much noisier: its selected clustering has DBCV $0.09$ and assigns $75\%$ of hard trajectories to noise.
 
 \begin{table}[H]
   \centering
-  \caption{Compact summary of the selected XGBoost--OPTICS success and failure regimes. Percentages are within each performance group, \texttt{ml\_ade} medians are reported on the original metre scale, and interpretations pair trajectory signatures with their signed feature-effect explanations.}
+  \caption[Summary of the selected success and failure modes]{Compact summary of the selected XGBoost--OPTICS success and failure modes. Percentages are within each performance group, \texttt{ml\_ade} medians are reported on the original metre scale, and interpretations pair trajectory signatures with their signed feature-effect explanations.}
   \label{tab:rq2_regime_summary}
   \small
   \renewcommand{\arraystretch}{1.16}
@@ -701,26 +715,26 @@ Table~\ref{tab:rq2_regime_summary} summarises the selected XGBoost--OPTICS regim
     \midrule
     Easy &
     DBCV $0.41$ in signed-effect space; two clusters; group median \texttt{ml\_ade} $0.17$ m. Slow turners cover $34\%$ of easy trajectories with median \texttt{ml\_ade} $0.08$ m; straight walkers cover $36\%$ with median $0.20$ m. &
-    The two non-noise success modes cover $70\%$ of easy trajectories. Slow turners combine high turning with very low maximum speed and speed variation; the low-speed effects dominate the positive turning effect. Straight walkers have ordinary speed but stable heading; the negative heading-change effect keeps predicted error low. \\
+    The two non-noise success modes cover $70\%$ of easy trajectories. Slow turners combine high turning with very low maximum speed and speed variability; the low-speed effects dominate the positive turning effect. Straight walkers have ordinary speed but stable heading; the negative heading-change effect keeps predicted error low. \\
     \addlinespace
     Medium &
     DBCV $0.40$ in signed-effect space; two clusters; group median \texttt{ml\_ade} $0.60$ m. The ordinary-medium cluster covers $60\%$ of medium trajectories with median \texttt{ml\_ade} $0.55$ m; the second non-noise cluster has only $19$ rows. &
-    Medium is a transition zone rather than a strong multi-mode regime. The main cluster has near-neutral total effect: maximum speed contributes positive pressure, while speed variation and heading effects remain modest. Higher-error medium cases are mostly noise, where speed variation and turning rise together and the signed effects move toward the hard-regime failure axes. \\
+    Medium is a transition zone rather than a strong multi-mode group. The main cluster has near-neutral total effect: maximum speed contributes positive pressure, while speed variability and heading effects remain modest. Higher-error medium cases are mostly noise, where speed variability and turning rise together and the signed effects move toward the hard-group failure axes. \\
     \addlinespace
     Hard &
     DBCV $0.09$ in signed-effect space; four clusters; group median \texttt{ml\_ade} $1.78$ m; $99.5\%$ of rows have positive total feature effect. Clusters 0--2 together cover $8\%$ of hard trajectories, while cluster 3 covers $17\%$. &
-    The four clusters are best read as two failure modes. Clusters 0--2 are erratic turners: all combine speed variation with heading change, and both effects push error upward at different magnitudes. Cluster 3 is fast and turning: maximum-speed and heading-change effects are jointly positive. Most hard trajectories remain in noise, where the same positive speed-variation and turning effects are even stronger. \\
+    The four clusters are best read as two failure modes. Clusters 0--2 are erratic turners: all combine speed variability with heading change, and both effects push error upward at different magnitudes. Cluster 3 is fast and turning: maximum-speed and heading-change effects are jointly positive. Most hard trajectories remain in noise, where the same positive speed-variability and turning effects are even stronger. \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-The easy regime provides the clearest success modes. The selected clustering separates slow turners from straight walkers, and both modes are large enough to be useful explanations rather than isolated edge cases. Appendix Tables~\ref{tab:rq2_cluster_evidence} and~\ref{tab:rq2_cluster_effects} report the supporting cluster values. In the slow-turner mode, the median maximum speed is only $0.12$ and the median speed variation is $0.037$, while the heading-change rate is high at $45.7$ degrees per second. Turning therefore increases the feature-effect contribution ($+0.041$), but the extremely low speed and low speed variation dominate the net effect through strongly negative \texttt{max\_speed} ($-0.223$) and \texttt{std\_speed} ($-0.128$) effects. In the straight-walker mode, median maximum speed is much more ordinary at $1.41$, but the median heading-change rate is only $1.93$ degrees per second. This second mode is easy because stable heading drives the predicted error down, with a heading-change effect of $-0.121$.
+The easy group provides the clearest success modes. The selected clustering separates slow turners from straight walkers, and both modes are large enough to be useful explanations rather than isolated edge cases. Appendix Tables~\ref{tab:rq2_cluster_evidence} and~\ref{tab:rq2_cluster_effects} report the supporting cluster values. In the slow-turner mode, the median maximum speed is only $0.12$\,m/s and the median speed variability is $0.037$\,m/s, while the heading-change rate is high at $45.7$ degrees per second. Turning therefore increases the feature-effect contribution ($+0.041$), but the extremely low speed and low speed variability dominate the net effect through strongly negative \texttt{max\_speed} ($-0.223$) and \texttt{std\_speed} ($-0.128$) effects. In the straight-walker mode, median maximum speed is much more ordinary at $1.41$\,m/s, but the median heading-change rate is only $1.93$ degrees per second. This second mode is easy because stable heading drives the predicted error down, with a heading-change effect of $-0.121$.
 
-The medium regime is less a distinct behavioural type than a boundary between the two extremes. Its whole-group median \texttt{ml\_ade} is $0.60$ m and its median total feature effect is only mildly positive. The main non-noise cluster covers $60\%$ of the group and has near-neutral total effect ($+0.008$): maximum speed contributes positive error pressure ($+0.072$), but speed variation and heading effects remain modest. The higher-error medium cases are mainly the noise component, whose median \texttt{ml\_ade} rises to $0.73$ m and whose median speed variation and heading-change rate rise to $0.224$ and $10.5$ degrees per second. Its total effect is clearly positive ($+0.187$), led by \texttt{std\_speed} ($+0.109$). This is the gradient toward hard cases: the medium-boundary trajectories move along the same axes, speed variation and turning, that later define the hard-regime failure modes, but with lower magnitude and without a stable second cluster boundary.
+The medium group is less a distinct behavioural type than a boundary between the two extremes. Its whole-group median \texttt{ml\_ade} is $0.60$ m and its median total feature effect is only mildly positive. The main non-noise cluster covers $60\%$ of the group and has near-neutral total effect ($+0.008$): maximum speed contributes positive error pressure ($+0.072$), but speed variability and heading effects remain modest. The higher-error medium cases are mainly the noise component, whose median \texttt{ml\_ade} rises to $0.73$ m and whose median speed variability and heading-change rate rise to $0.224$\,m/s and $10.5$ degrees per second. Its total effect is clearly positive ($+0.187$), led by \texttt{std\_speed} ($+0.109$). This is the gradient toward hard cases: the medium-boundary trajectories move along the same axes, speed variability and turning, that later define the hard-group failure modes, but with lower magnitude and without a stable second cluster boundary.
 
-The hard regime is the failure case, but its internal cluster structure is weaker than the easy and medium structures. The whole hard group has a median \texttt{ml\_ade} of $1.78$ m, a median total feature effect of $+0.525$, and almost all rows have positive total feature effects. The dominant axes are speed variation and heading change: hard trajectories have median speed variation $0.333$ and median heading-change rate $14.9$ degrees per second, while the hard-noise component rises further to $0.382$ and $18.8$. Following the two-mode interpretation in Table~\ref{tab:rq2_regime_summary}, the smaller erratic-turner clusters show combinations of speed variation and turning at different magnitudes, with combined effects of $+0.316$ for \texttt{std\_speed} and $+0.136$ for heading change. The larger fast-and-turning cluster instead splits its positive contribution between \texttt{max\_speed} ($+0.136$) and heading change ($+0.146$), showing that raw speed is not sufficient on its own. Fast motion becomes a failure mode when paired with heading change; otherwise, the stronger and more general failure mechanism is erratic motion. The very large hard-noise component reinforces this reading, with total effect $+0.601$ and a dominant \texttt{std\_speed} effect of $+0.361$, but it also confirms that the available feature set does not separate the high-error tail into clean clusters.
+The hard group is the failure case. The whole group has a median \texttt{ml\_ade} of $1.78$ m, a median total feature effect of $+0.525$, and almost all rows have positive total feature effects. The dominant axes are speed variability and heading change: hard trajectories have median speed variability $0.333$\,m/s and median heading-change rate $14.9$ degrees per second, while the hard-noise component rises further to $0.382$ and $18.8$. Following the two-mode interpretation in Table~\ref{tab:rq2_regime_summary}, the smaller erratic-turner clusters show combinations of speed variability and turning at different magnitudes, with combined effects of $+0.316$ for \texttt{std\_speed} and $+0.136$ for heading change. The larger fast-and-turning cluster instead splits its positive contribution between \texttt{max\_speed} ($+0.136$) and heading change ($+0.146$), showing that raw speed is not sufficient on its own. Fast motion becomes a failure mode when paired with heading change; otherwise, the stronger and more general failure mechanism is erratic motion. The very large hard-noise component is consistent with this reading, with total effect $+0.601$ and a dominant \texttt{std\_speed} effect of $+0.361$, but it also confirms that the available feature set does not separate the high-error tail into clean clusters.
 
-Taken together, the regime analysis answers RQ2 as follows: Trajectron++ succeeds when either low speed or stable heading removes one of the main sources of future-path uncertainty, and it fails when speed variation and turning occur together. The medium regime connects these endpoints through a gradual increase in the same motion characteristics, while the hard regime should be described with explicit uncertainty because the selected density structure is noisy and most hard trajectories lie outside the named clusters. This limitation is consistent with the high-error underprediction problem discussed again in Section~\ref{sec:conclusion}: the current features explain the main axes of difficulty, but not enough of the high-error tail to produce crisp hard subtypes.
+Taken together, the mode analysis answers RQ2 as follows: Trajectron++ succeeds when either low speed or stable heading removes one of the main sources of future-path uncertainty, and it fails when speed variability and turning occur together. The medium group connects these endpoints through a gradual increase in the same motion characteristics, while the hard-group modes should be described with explicit uncertainty because the selected density structure is noisy and most hard trajectories lie outside the named clusters. This limitation is consistent with the high-error under-prediction problem discussed again in Section~\ref{sec:conclusion}: the current features explain the main axes of difficulty, but not enough of the high-error tail to produce crisp hard subtypes.
 
 \newpage
 \subsection{Feature Importance of Model Settings}
@@ -730,7 +744,7 @@ Applying the pooled meta-model of Section~\ref{sec:settings_sweep}, we quantifie
 
 \begin{table}[h]
   \centering
-  \caption{Mean absolute SHAP values from the pooled XGBoost model, ranking the influence of model settings and trajectory features on per-trajectory prediction error. Larger values indicate greater influence.}
+  \caption[Pooled-model mean absolute SHAP values]{Mean absolute SHAP values from the pooled XGBoost model, ranking the influence of model settings and trajectory features on per-trajectory prediction error. Larger values indicate greater influence.}
   \label{tab:settings_shap}
   \begin{tabular}{l c}
     \toprule
@@ -752,7 +766,7 @@ The two highest-ranked features are model settings rather than trajectory charac
 
 All eight features in the pooled model are also statistically significant in the GAM ($p \ll 0.01$), confirming that the effects are not specific to the tree-based model. The two meta-models do, however, differ markedly in fit quality: XGBoost achieves $R^2 = 0.90$ with an RMSE of $0.13$, substantially better than the GAM's $R^2 = 0.65$ and RMSE of $0.24$. This gap is itself informative. Because the GAM is purely additive while XGBoost can represent interactions, the superior fit of the latter indicates that meaningful interaction effects exist between the model settings and the trajectory features, effects that an additive model cannot capture.
 
-We now examine each setting in turn through its partial dependence plot (PDP), which shows the average direction and shape of its effect on the log-scale prediction error. Figure~\ref{fig:settings_pdps} provides the corresponding discrete PDP evidence for the three swept settings. The vertical axis shows how much the XGBoost meta-model's predicted log error differs from its average prediction; values above zero indicate higher predicted error and values below zero indicate lower predicted error.
+We now examine each setting in turn through its PDP, which shows the average direction and shape of its effect on the log-scale prediction error. Figure~\ref{fig:settings_pdps} provides the corresponding discrete PDP evidence for the three swept settings. The vertical axis shows how much the XGBoost meta-model's predicted log error differs from its average prediction; values above zero indicate higher predicted error and values below zero indicate lower predicted error.
 
 \begin{figure}[H]
   \centering
@@ -760,7 +774,7 @@ We now examine each setting in turn through its partial dependence plot (PDP), w
   \hfill
   \includegraphics[width=0.48\textwidth]{figures/attention_radius_m_pdp.png}\\[0.8em]
   \includegraphics[width=0.48\textwidth]{figures/history_sec_pdp.png}
-  \caption{XGBoost partial dependence plots for the three Trajectron++ settings in the pooled settings-sweep meta-model: prediction horizon (top left), attention radius (top right), and history window (bottom).}
+  \caption[PDPs for the three swept settings]{XGBoost partial dependence plots for the three Trajectron++ settings in the pooled settings-sweep meta-model: prediction horizon (top left), attention radius (top right), and history window (bottom).}
   \label{fig:settings_pdps}
 \end{figure}
 
@@ -774,7 +788,7 @@ The attention radius is the second most influential feature, and its effect is m
 
 \subsubsection{History Window}
 
-The history window has the smallest effect of the three settings. Its PDP is close to zero for one to three seconds and increases only at the longest four-second history window, while its global SHAP value remains much smaller than those of \texttt{prediction\_sec} and \texttt{attention\_radius\_m}. From a practical standpoint, this is a reassuring finding: it suggests that Trajectron++ does not depend critically on a long observation window to produce reasonable predictions, and that the history length can be chosen with relatively little concern for its impact on accuracy within this regime.
+The history window has the smallest effect of the three settings. Its PDP is close to zero for one to three seconds and increases only at the longest four-second history window, while its global SHAP value remains much smaller than those of \texttt{prediction\_sec} and \texttt{attention\_radius\_m}. From a practical standpoint, this is a reassuring finding: it suggests that Trajectron++ does not depend critically on a long observation window to produce reasonable predictions, and that the history length can be chosen with relatively little concern for its impact on accuracy within the tested range.
 
 \clearpage
 \section{Conclusion and Discussion}
@@ -782,13 +796,13 @@ The history window has the smallest effect of the three settings. Its PDP is clo
 
 This work set out to look beyond aggregate error metrics and ask \emph{why} some trajectories are harder for Trajectron++ to predict than others. By recovering per-trajectory prediction errors, relating them to interpretable trajectory and scene features through GAM and XGBoost meta-models, and conducting a controlled sweep over model settings, we have characterised the model's strengths and weaknesses at the level of individual trajectories.
 
-The results reveal that trajectory characteristics, particularly speed variability and turning, are dominant drivers of prediction difficulty. Model configuration also plays a critical role, with the prediction horizon and attention radius exerting effects comparable to the trajectory features themselves. These findings provide concrete guidance for understanding and improving trajectory prediction performance.
+The results reveal that trajectory characteristics, particularly speed variability and turning, are dominant drivers of prediction difficulty. Model configuration also plays a critical role, with the prediction horizon and attention radius exerting effects at least as strong as the trajectory features themselves. These findings provide concrete guidance for understanding and improving trajectory prediction performance.
 
 \subsection{Limitations}
 
 Several limitations should temper the interpretation of these findings. First, our meta-models explain Trajectron++, not ground-truth difficulty. The identified drivers are inferred through the meta-models as proxies, since Trajectron++ does not expose its internal reasoning directly; the effects we report are therefore model-specific and may not generalise to other prediction architectures.
 
-Second, the meta-model under-predicts at high ADE. Out-of-fold diagnostics show strong agreement between predicted and actual error at low-to-moderate ADE but systematic under-prediction in the high-error tail. The implication is that our trajectory and scene features do not fully capture what makes the worst cases worst: factors such as map and lane geometry, location, or finer-grained social context may be missing from the current feature set. This shortfall is a plausible reason that the clustering of hard cases is comparatively weak, as the available feature effects do not differentiate cleanly within the high-error tail.
+Second, the meta-models under-predict at high ADE (Section~\ref{sec:model_selection_validation}, Appendix Table~\ref{tab:appendix_regime_errors}). The implication is that our trajectory and scene features do not fully capture what makes the worst cases worst: factors such as map and lane geometry, location, or finer-grained social context may be missing from the current feature set. This shortfall is a plausible reason that the clustering of hard cases is comparatively weak, as the available feature effects do not differentiate cleanly within the high-error tail.
 
 Third, the scope of the study is bounded. We predict pedestrian trajectories on nuScenes only, so there is no guarantee that the conclusions transfer to other agent types or to other datasets. Moreover, the settings sweep was conducted on the nuScenes mini split for reasons of computational cost, and its results may not transfer directly to full-scale training.
 
@@ -796,7 +810,7 @@ Third, the scope of the study is bounded. We predict pedestrian trajectories on 
 
 These limitations suggest several directions for future work. A central strength of our approach is that the pipeline is model- and dataset-agnostic by design: the meta-modelling and feature-effect clustering are decoupled from the prediction model and the dataset, and through the \texttt{trajdata} interface \citep{ivanovic2023trajdata} the same pipeline can be ported to other trajectory prediction models and datasets with little additional effort. This makes broad replication straightforward.
 
-A natural next step is to enrich the input space with map and lane geometry, location information, and finer social context. In particular, enabling and evaluating map-based inputs is reserved for future work rather than part of the present experimental setup. These additions would test whether the under-prediction ceiling identified in the diagnostics is partly due to missing environmental context, and whether richer context helps separate the hard-error regime more cleanly. Finally, extending the analysis to vehicle, cyclist, and motorcyclist trajectories would test whether the same drivers of difficulty, speed variability and turning, govern prediction error across agent types, or whether each agent class exhibits its own characteristic failure modes.
+A natural next step is to enrich the input space with map and lane geometry, location information, and finer social context. In particular, enabling and evaluating map-based inputs is reserved for future work rather than part of the present experimental setup. These additions would test whether the under-prediction ceiling identified in the diagnostics is partly due to missing environmental context, and whether richer context helps separate the hard-error regime more cleanly. Finally, extending the analysis to vehicle, cyclist, and motorcyclist trajectories would test whether the same drivers of difficulty, speed variability and turning, govern prediction error across agent types, or whether each agent class exhibits its own characteristic failure modes. The same per-trajectory perspective would also close the loop with the federated setting of Section~\ref{sec:federated}: knowing which motion profiles a shared model handles poorly is precisely the information needed to decide which clients would benefit from personalised models.
 
 
 
@@ -808,22 +822,22 @@ A natural next step is to enrich the input space with map and lane geometry, loc
 
 \pagenumbering{Roman}
 
-\setcounter{page}{8} % continue Roman numbering after the 7 front-matter pages (title, abstract, ToC, LoF, LoT)
+\setcounter{page}{6} % continue Roman numbering after the five numbered front-matter pages (abstract I, ToC II--III, LoF IV, LoT V; the title page is unnumbered)
 
 \appendix
 
 
-\section{Appendix}
+\section{Supplementary Analyses}
 
 \subsection{Feature Selection Diagnostics}
 \label{app:feature_selection_diagnostics}
 
 Figure~\ref{fig:appendix_correlation_clustermap} shows the pairwise Spearman correlation structure of the $17$ candidate features that motivates the collinearity pruning in Section~\ref{sec:feature_selection}. The dendrograms on the margins are obtained by agglomerative hierarchical clustering of the features, using average linkage on the Euclidean distances between the features' rows of the correlation matrix (the defaults of seaborn's \texttt{clustermap}); features with similar correlation profiles are thereby placed next to each other. The hierarchical dendrogram groups redundant features: the acceleration and jerk statistics form a tightly correlated block with \texttt{std\_speed} ($\rho \geq 0.88$), \texttt{mean\_speed} and \texttt{max\_speed} are strongly coupled ($\rho = 0.90$), and \texttt{path\_efficiency} is almost perfectly anti-correlated with \texttt{heading\_change\_per\_sec} ($\rho = -0.91$). The VIF filter resolves exactly these blocks, retaining one representative per group.
 
-\begin{figure}[H]
+\begin{figure}[htb]
   \centering
-  \includegraphics[width=0.92\textwidth]{figures/correlation_clustermap.png}
-  \caption{Spearman correlation clustermap of the candidate features. The dendrograms group correlated features; dark red blocks mark the redundancy that the VIF filter removes.}
+  \includegraphics[width=0.86\textwidth]{figures/correlation_clustermap.png}
+  \caption[Correlation clustermap of the candidate features]{Spearman correlation clustermap of the candidate features. The dendrograms group correlated features; dark red blocks mark the redundancy that the VIF filter removes.}
   \label{fig:appendix_correlation_clustermap}
 \end{figure}
 
@@ -834,7 +848,7 @@ Table~\ref{tab:appendix_xgboost_target_scale} reports the XGBoost target-scale c
 
 \begin{table}[H]
   \centering
-  \caption{XGBoost target-scale comparison across the main feature set, the VIF-only robustness feature set, and the settings sweep.}
+  \caption[XGBoost target-scale comparison]{XGBoost target-scale comparison across the main feature set, the VIF-only robustness feature set, and the settings sweep.}
   \label{tab:appendix_xgboost_target_scale}
   \footnotesize
   \renewcommand{\arraystretch}{1.12}
@@ -856,7 +870,7 @@ Table~\ref{tab:appendix_gam_variant_contexts} gives the corresponding GAM varian
 
 \begin{table}[H]
   \centering
-  \caption{GAM variant comparison across the main feature set, the VIF-only robustness feature set, and the settings sweep. Metrics are out-of-fold metrics on the original \texttt{ml\_ade} scale.}
+  \caption[GAM variant comparison]{GAM variant comparison across the main feature set, the VIF-only robustness feature set, and the settings sweep. Metrics are out-of-fold metrics on the original \texttt{ml\_ade} scale.}
   \label{tab:appendix_gam_variant_contexts}
   \footnotesize
   \renewcommand{\arraystretch}{1.10}
@@ -879,11 +893,11 @@ Table~\ref{tab:appendix_gam_variant_contexts} gives the corresponding GAM varian
   \end{tabular}
 \end{table}
 
-Table~\ref{tab:appendix_xgboost_configs} gives the full-data retuned configurations for the selected log-target XGBoost models. The CV scores in the final row are computed on the \texttt{ml\_ade\_log} target used for tuning; cross-target comparison should therefore use Table~\ref{tab:appendix_xgboost_target_scale}.
+Table~\ref{tab:appendix_xgboost_configs} gives the full-data retuned XGBoost configurations. After the nested-resampling comparison, tuning was rerun on all rows once per feature-set context; the selected configuration is shared by the log- and raw-target variants, which differ only in their early-stopped boosting iteration and CV score. The CV scores are computed on the target scale used for training, so cross-target comparison should use Table~\ref{tab:appendix_xgboost_target_scale}.
 
 \begin{table}[H]
   \centering
-  \caption{Full-data retuned XGBoost configurations for the selected log-target models.}
+  \caption[Full-data retuned XGBoost configurations]{Full-data retuned XGBoost configurations. The tuned hyperparameters are shared by the log- and raw-target variants of each context; best iteration and CV RMSE are reported per target, with CV RMSE on the respective training-target scale.}
   \label{tab:appendix_xgboost_configs}
   \footnotesize
   \renewcommand{\arraystretch}{1.08}
@@ -898,33 +912,11 @@ Table~\ref{tab:appendix_xgboost_configs} gives the full-data retuned configurati
     \texttt{colsample\_bytree}  & 0.95   & 0.80   & 0.99 \\
     \texttt{reg\_alpha}         & $2.4\!\times\!10^{-3}$ & $1.6\!\times\!10^{-4}$ & $1.9\!\times\!10^{-2}$ \\
     \texttt{reg\_lambda}        & 5.38   & 0.45   & $3.5\!\times\!10^{-4}$ \\
-    Best iteration              & 1475   & 1998   & 1585 \\
-    Full-data CV RMSE           & 0.176  & 0.177  & 0.078 \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-Table~\ref{tab:appendix_xgboost_raw_configs} reports the analogous full-data retuned configurations for the raw-target variants. These variants were not carried forward for interpretation, but they document the alternatives behind the raw-target rows in Table~\ref{tab:appendix_xgboost_target_scale}. The CV scores in the final row are computed on the raw \texttt{ml\_ade} target.
-
-\begin{table}[H]
-  \centering
-  \caption{Full-data retuned \mbox{XGBoost} configurations for the raw-target variants.}
-  \label{tab:appendix_xgboost_raw_configs}
-  \footnotesize
-  \renewcommand{\arraystretch}{1.08}
-  \begin{tabular}{@{}lccc@{}}
-    \toprule
-    & \textbf{MI\,+\,VIF} & \textbf{VIF only} & \textbf{Settings sweep} \\
     \midrule
-    \texttt{learning\_rate}     & 0.0174 & 0.0219 & 0.0486 \\
-    \texttt{max\_depth}         & 10     & 9      & 9 \\
-    \texttt{min\_child\_weight} & 16     & 6      & 17 \\
-    \texttt{subsample}          & 0.97   & 0.88   & 0.92 \\
-    \texttt{colsample\_bytree}  & 0.95   & 0.80   & 0.99 \\
-    \texttt{reg\_alpha}         & $2.4\!\times\!10^{-3}$ & $1.6\!\times\!10^{-4}$ & $1.9\!\times\!10^{-2}$ \\
-    \texttt{reg\_lambda}        & 5.38   & 0.45   & $3.5\!\times\!10^{-4}$ \\
-    Best iteration              & 568    & 1724   & 1508 \\
-    Full-data CV RMSE           & 0.388  & 0.388  & 0.133 \\
+    Best iteration (log target) & 1475   & 1998   & 1585 \\
+    Best iteration (raw target) & 568    & 1724   & 1508 \\
+    Full-data CV RMSE (log target) & 0.176 & 0.177 & 0.078 \\
+    Full-data CV RMSE (raw target) & 0.388 & 0.388 & 0.133 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -954,7 +946,7 @@ Finally, Table~\ref{tab:appendix_nested_cv_stability} reports the stability of t
 
 \begin{table}[H]
   \centering
-  \caption{Outer-fold stability of the nested-CV metrics (mean $\pm$ standard deviation across the three outer folds), evaluated on the original \texttt{ml\_ade} scale. Bold rows mark the variants carried forward in each context. Fold means can differ marginally from the pooled out-of-fold metrics of Tables~\ref{tab:appendix_xgboost_target_scale} and~\ref{tab:appendix_gam_variant_contexts}.}
+  \caption[Outer-fold stability of the nested-CV metrics]{Outer-fold stability of the nested-CV metrics (mean $\pm$ standard deviation across the three outer folds), evaluated on the original \texttt{ml\_ade} scale. Bold rows mark the variants carried forward in each context. Fold means can differ marginally from the pooled out-of-fold metrics of Tables~\ref{tab:appendix_xgboost_target_scale} and~\ref{tab:appendix_gam_variant_contexts}.}
   \label{tab:appendix_nested_cv_stability}
   \small
   \renewcommand{\arraystretch}{1.12}
@@ -998,7 +990,7 @@ Table~\ref{tab:appendix_regime_errors} quantifies the tail under-prediction visi
 
 \begin{table}[H]
   \centering
-  \caption{Out-of-fold errors of the selected MI\,+\,VIF meta-models stratified by performance group, on the original \texttt{ml\_ade} scale (in metres). Bias is the mean of predicted minus actual \texttt{ml\_ade}.}
+  \caption[Out-of-fold errors by performance group]{Out-of-fold errors of the selected MI\,+\,VIF meta-models stratified by performance group, on the original \texttt{ml\_ade} scale (in metres). Bias is the mean of predicted minus actual \texttt{ml\_ade}.}
   \label{tab:appendix_regime_errors}
   \small
   \renewcommand{\arraystretch}{1.12}
@@ -1026,7 +1018,7 @@ Figure~\ref{fig:appendix_shap_beeswarm} shows the distribution of signed per-tra
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.9\textwidth]{figures/shap_beeswarm_mi_vif.png}
-  \caption{SHAP beeswarm for the selected XGBoost model on the main MI\,+\,VIF feature set (log-target scale). Each point is one trajectory; colour encodes the feature value and the horizontal position the signed contribution to the predicted error.}
+  \caption[SHAP beeswarm, main MI\,+\,VIF feature set]{SHAP beeswarm for the selected XGBoost model on the main MI\,+\,VIF feature set (log-target scale). Each point is one trajectory; colour encodes the feature value and the horizontal position the signed contribution to the predicted error.}
   \label{fig:appendix_shap_beeswarm}
 \end{figure}
 
@@ -1035,25 +1027,25 @@ Figure~\ref{fig:appendix_shap_beeswarm_vif_only} shows the corresponding beeswar
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.9\textwidth]{figures/shap_beeswarm_vif_only.png}
-  \caption{SHAP beeswarm for the XGBoost model on the VIF-only robustness feature set (log-target scale), analogous to Figure~\ref{fig:appendix_shap_beeswarm}.}
+  \caption[SHAP beeswarm, VIF-only feature set]{SHAP beeswarm for the XGBoost model on the VIF-only robustness feature set (log-target scale), analogous to Figure~\ref{fig:appendix_shap_beeswarm}.}
   \label{fig:appendix_shap_beeswarm_vif_only}
 \end{figure}
 
-Figure~\ref{fig:appendix_pdp_interactions} examines the pairwise interaction structure that the additive GAM cannot represent, using two-dimensional centred partial dependence surfaces for the XGBoost model on the main MI\,+\,VIF feature set. The cleanest synergy is the \texttt{max\_speed}$\times$\texttt{heading\_change\_per\_sec} surface: raw speed alone leaves the centred effect close to neutral along the low-turning edge, and the strongest joint effect appears where elevated maximum speed coincides with moderate-to-high turning rates, consistent with the hard-regime interpretation in Section~\ref{sec:rq2_results} that fast motion matters when paired with turning. The \texttt{std\_speed}$\times$\texttt{heading\_change\_per\_sec} surface shows a more partial amplification pattern. In the moderate range of speed variability (\texttt{std\_speed} roughly $0.25$--$0.35$), the positive effect emerges mainly when it is paired with non-trivial turning, and at near-zero turning rates even elevated speed variability leaves the centred effect neutral. At the highest speed-variability values, however, the effect is strongly positive across essentially the whole turning range: extreme speed variability raises the predicted error largely irrespective of turning. The interaction is therefore real but confined to the moderate range; it amplifies the \texttt{std\_speed} effect rather than gating it, and the additive main effect of speed variability remains dominant at the extremes.
+Figure~\ref{fig:appendix_pdp_interactions} examines the pairwise interaction structure that the additive GAM cannot represent, using two-dimensional centred partial dependence surfaces for the XGBoost model on the main MI\,+\,VIF feature set. The cleanest synergy is the \texttt{max\_speed} $\times$ \texttt{heading\_change\_per\_sec} surface: raw speed alone leaves the centred effect close to neutral along the low-turning edge, and the strongest joint effect appears where elevated maximum speed coincides with moderate-to-high turning rates, consistent with the hard-group interpretation in Section~\ref{sec:rq2_results} that fast motion matters when paired with turning. The \texttt{std\_speed} $\times$ \texttt{heading\_change\_per\_sec} surface shows a more partial amplification pattern. In the moderate range of speed variability (\texttt{std\_speed} roughly $0.25$--$0.35$), the positive effect emerges mainly when it is paired with non-trivial turning, and at near-zero turning rates even elevated speed variability leaves the centred effect neutral. At the highest speed-variability values, however, the effect is strongly positive across essentially the whole turning range: extreme speed variability raises the predicted error largely irrespective of turning. The interaction is therefore real but confined to the moderate range; it amplifies the \texttt{std\_speed} effect rather than gating it, and the additive main effect of speed variability remains dominant at the extremes.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{figures/pdp_interactions_mi_vif.png}
-  \caption{Two-dimensional centred partial dependence surfaces for all feature pairs of the main MI\,+\,VIF feature set (XGBoost, log-target scale). Red regions indicate above-average predicted error, blue regions below-average.}
+  \caption[Pairwise interaction surfaces, main MI\,+\,VIF feature set]{Two-dimensional centred partial dependence surfaces for all feature pairs of the main MI\,+\,VIF feature set (XGBoost, log-target scale). Red regions indicate above-average predicted error, blue regions below-average.}
   \label{fig:appendix_pdp_interactions}
 \end{figure}
 
-Figure~\ref{fig:appendix_pdp_interactions_vif_only} repeats the interaction analysis for the VIF-only robustness feature set. The \texttt{std\_speed}$\times$\texttt{heading\_change\_per\_sec} surface reproduces the main-set pattern described above. The panels pairing motion features with the scene and social features show largely parallel, vertical contour lines: the motion effects neither shift nor change shape across neighbour distance, vehicle density, or vehicle count. This absence of notable motion--scene interactions reinforces the conclusion of Section~\ref{sec:rq1_results} that the engineered scene context plays a secondary role.
+Figure~\ref{fig:appendix_pdp_interactions_vif_only} repeats the interaction analysis for the VIF-only robustness feature set. The \texttt{std\_speed} $\times$ \texttt{heading\_change\_per\_sec} surface reproduces the main-set pattern described above. The panels pairing motion features with the scene and social features show largely parallel, vertical contour lines: the motion effects neither shift nor change shape across neighbour distance, vehicle density, or vehicle count. This absence of notable motion--scene interactions reinforces the conclusion of Section~\ref{sec:rq1_results} that the engineered scene context plays a secondary role.
 
 \begin{figure}[H]
   \centering
   \includegraphics[height=0.82\textheight,keepaspectratio]{figures/pdp_interactions_vif_only.png}
-  \caption{Two-dimensional centred partial dependence surfaces for all feature pairs of the VIF-only robustness feature set (XGBoost, log-target scale). The near-vertical contours in the panels pairing \texttt{std\_speed} with scene and social features indicate the absence of notable motion--scene interactions.}
+  \caption[Pairwise interaction surfaces, VIF-only feature set]{Two-dimensional centred partial dependence surfaces for all feature pairs of the VIF-only robustness feature set (XGBoost, log-target scale). The near-vertical contours in the panels pairing \texttt{std\_speed} with scene and social features indicate the absence of notable motion--scene interactions.}
   \label{fig:appendix_pdp_interactions_vif_only}
 \end{figure}
 
@@ -1065,7 +1057,7 @@ Table~\ref{tab:appendix_cluster_candidates} expands the main XGBoost selection t
 \begin{table}[H]
   \centering
   
-  \caption{Rank-1 effect-space clustering candidates for XGBoost SHAP and GAM additive effects. Noise is the share of trajectories labelled as noise by the candidate.}
+  \caption[Rank-1 clustering candidates for both meta-models]{Rank-1 effect-space clustering candidates for XGBoost SHAP and GAM additive effects. Noise is the share of trajectories labelled as noise by the candidate.}
   \label{tab:appendix_cluster_candidates}
   \footnotesize
   \renewcommand{\arraystretch}{1.12}
@@ -1085,11 +1077,11 @@ Table~\ref{tab:appendix_cluster_candidates} expands the main XGBoost selection t
   \end{tabular}
 \end{table}
 
-Tables~\ref{tab:rq2_cluster_evidence} and~\ref{tab:rq2_cluster_effects} report the cluster-level evidence used for the main-text regime interpretation: the former gives the raw trajectory characteristics of each cluster, the latter the corresponding signed XGBoost feature effects. Both include all eight non-noise clusters from the selected XGBoost--OPTICS solution and the three corresponding noise groups, because the noise groups explain much of the continuous boundary structure.
+Tables~\ref{tab:rq2_cluster_evidence} and~\ref{tab:rq2_cluster_effects} report the cluster-level evidence used for the main-text mode interpretation: the former gives the raw trajectory characteristics of each cluster, the latter the corresponding signed XGBoost feature effects. Both include all eight non-noise clusters from the selected XGBoost--OPTICS solution and the three corresponding noise groups, because the noise groups explain much of the continuous boundary structure.
 
 \begin{table}[H]
   \centering
-  \caption{Cluster-level trajectory characteristics behind the regime interpretations: median raw feature values per cluster of the selected XGBoost--OPTICS solution. Heading change is measured in degrees per second.}
+  \caption[Cluster-level raw trajectory characteristics]{Cluster-level trajectory characteristics behind the mode interpretations: median raw feature values per cluster of the selected XGBoost--OPTICS solution. Speeds are measured in metres per second; heading change in degrees per second.}
   \label{tab:rq2_cluster_evidence}
   \footnotesize
   \renewcommand{\arraystretch}{1.15}
@@ -1124,7 +1116,7 @@ Tables~\ref{tab:rq2_cluster_evidence} and~\ref{tab:rq2_cluster_effects} report t
 
 \begin{table}[H]
   \centering
-  \caption{Cluster-level signed XGBoost feature effects behind the regime interpretations. Feature columns report the mean signed SHAP effect on the \texttt{ml\_ade\_log} target; the total-effect column reports the median summed signed effect per cluster. Cluster sizes as in Table~\ref{tab:rq2_cluster_evidence}.}
+  \caption[Cluster-level signed feature effects]{Cluster-level signed XGBoost feature effects behind the mode interpretations. Feature columns report the mean signed SHAP effect on the \texttt{ml\_ade\_log} target; the total-effect column reports the median summed signed effect per cluster. Cluster sizes as in Table~\ref{tab:rq2_cluster_evidence}.}
   \label{tab:rq2_cluster_effects}
   \footnotesize
   \renewcommand{\arraystretch}{1.15}
@@ -1162,21 +1154,21 @@ Figure~\ref{fig:xgboost_optics_umaps} gives the primary XGBoost--OPTICS diagnost
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.86\textwidth]{figures/cluster_umap_xgboost_hdbscan_noise_compare.png}
-  \caption{XGBoost--HDBSCAN effect-space UMAP diagnostics. Rows show the easy, medium, and hard performance groups; the left column includes HDBSCAN noise points and the right column removes them.}
+  \caption[XGBoost--HDBSCAN effect-space UMAP diagnostics]{XGBoost--HDBSCAN effect-space UMAP diagnostics. Rows show the easy, medium, and hard performance groups; the left column includes HDBSCAN noise points and the right column removes them.}
   \label{fig:appendix_xgboost_hdbscan_umaps}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.86\textwidth]{figures/cluster_umap_gam_optics_noise_compare.png}
-  \caption{GAM--OPTICS additive-effect UMAP diagnostics. Rows show the easy, medium, and hard performance groups; the left column includes OPTICS noise points and the right column removes them.}
+  \caption[GAM--OPTICS effect-space UMAP diagnostics]{GAM--OPTICS additive-effect UMAP diagnostics. Rows show the easy, medium, and hard performance groups; the left column includes OPTICS noise points and the right column removes them.}
   \label{fig:appendix_gam_optics_umaps}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.86\textwidth]{figures/cluster_umap_gam_hdbscan_noise_compare.png}
-  \caption{GAM--HDBSCAN additive-effect UMAP diagnostics. Rows show the easy, medium, and hard performance groups; the left column includes HDBSCAN noise points and the right column removes them.}
+  \caption[GAM--HDBSCAN effect-space UMAP diagnostics]{GAM--HDBSCAN additive-effect UMAP diagnostics. Rows show the easy, medium, and hard performance groups; the left column includes HDBSCAN noise points and the right column removes them.}
   \label{fig:appendix_gam_hdbscan_umaps}
 \end{figure}
 
@@ -1207,7 +1199,7 @@ The score ranges from $-1$ to $1$. Positive values indicate dense, separated clu
 \section{Electronic appendix}
 \label{el_app}
 
-Data, code and figures are provided in electronic form. The complete implementation is available in the accompanying GitHub repository at \url{https://github.com/simondrauz/ds_practical} (\texttt{main} branch). The repository contains the adapted Trajectron++ evaluation loop, the training and sweep configurations, the data-preparation and feature-engineering pipeline, the notebooks that fit the meta-models and produce every figure and table in this report, and the exported result artifacts underlying the analyses.
+Data, code and figures are provided in electronic form. The complete implementation is available in the accompanying GitHub repository at \url{https://github.com/simondrauz/ds_practical} (\texttt{main} branch). The repository contains the adapted Trajectron++ evaluation loop, the training and sweep configurations, the data-preparation and feature-engineering pipeline, the notebooks that fit the meta-models and produce every figure and table in this report, and the exported result artefacts underlying the analyses.
 
 \newpage
     
@@ -1231,14 +1223,14 @@ Data, code and figures are provided in electronic form. The complete implementat
 \noindent
 \normalsize
 
-I hereby declare that the report submitted is my own unaided work. All direct 
-or indirect sources used are acknowledged as references. I am aware that the 
-Thesis in digital form can be examined for the use of unauthorized aid and in 
-order to determine whether the report as a whole or parts incorporated in it may 
-be deemed as plagiarism. For the comparison of my work with existing sources I 
-agree that it shall be entered in a database where it shall also remain after 
-examination, to enable comparison with future Theses submitted. Further rights 
-of reproduction and usage, however, are not granted here. This paper was not 
+We hereby declare that the report submitted is our own unaided work. All direct
+or indirect sources used are acknowledged as references. We are aware that the
+Thesis in digital form can be examined for the use of unauthorized aid and in
+order to determine whether the report as a whole or parts incorporated in it may
+be deemed as plagiarism. For the comparison of our work with existing sources we
+agree that it shall be entered in a database where it shall also remain after
+examination, to enable comparison with future Theses submitted. Further rights
+of reproduction and usage, however, are not granted here. This paper was not
 previously presented to another examination board and has not been published.
 \\
 
@@ -1249,7 +1241,7 @@ Munich, 19 July 2026 \\
 
 \noindent\rule{0.5\textwidth}{0.4pt} \\
 
-Zoe Matrullo, Simon Drauz
+Simon Drauz, Zoe Matrullo
 
 % ------------------------------------------------------------------------------
 
