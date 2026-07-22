@@ -91,6 +91,8 @@ def _build_workflow(
     include_gam: bool,
     include_xgboost: bool,
     exported_run_name: str | None = None,
+    apply_mi_filter: bool = True,
+    exclude_has_collision: bool = False,
 ) -> list[NotebookExecution]:
     if not include_gam and not include_xgboost:
         raise ValueError("At least one model workflow must be selected.")
@@ -114,6 +116,8 @@ def _build_workflow(
                     "INCLUDE_MODEL_SETTINGS_AS_FEATURES",
                     repr(include_model_settings_as_features),
                 ),
+                lambda source: _replace_assignment(source, "APPLY_MI_FILTER", repr(apply_mi_filter)),
+                lambda source: _replace_assignment(source, "EXCLUDE_HAS_COLLISION", repr(exclude_has_collision)),
                 lambda source: _replace_assignment(source, "target_col", _python_literal(prepared_target_col)),
             ],
             output_name="01_interpretable_model_data_preparation.ipynb",
@@ -291,6 +295,34 @@ def parse_args() -> argparse.Namespace:
         action="store_false",
         help="Exclude model-setting columns from the prepared GAM/XGBoost model frame.",
     )
+    mi_filter_group = parser.add_mutually_exclusive_group()
+    mi_filter_group.add_argument(
+        "--apply-mi-filter",
+        dest="apply_mi_filter",
+        action="store_true",
+        help="Apply the MI elbow filter in addition to VIF (notebook default).",
+    )
+    mi_filter_group.add_argument(
+        "--no-apply-mi-filter",
+        dest="apply_mi_filter",
+        action="store_false",
+        help="Skip the MI elbow and apply only VIF, as in the VIF-only comparison.",
+    )
+    parser.set_defaults(apply_mi_filter=True)
+    collision_group = parser.add_mutually_exclusive_group()
+    collision_group.add_argument(
+        "--exclude-has-collision",
+        dest="exclude_has_collision",
+        action="store_true",
+        help="Omit has_collision from the analysis, as in both full-trainval result sets.",
+    )
+    collision_group.add_argument(
+        "--keep-has-collision",
+        dest="exclude_has_collision",
+        action="store_false",
+        help="Keep has_collision in the analysis (notebook default).",
+    )
+    parser.set_defaults(exclude_has_collision=False)
     parser.add_argument(
         "--models",
         nargs="+",
@@ -330,6 +362,8 @@ def main() -> int:
         include_gam=include_gam,
         include_xgboost=include_xgboost,
         exported_run_name=args.exported_run_name,
+        apply_mi_filter=args.apply_mi_filter,
+        exclude_has_collision=args.exclude_has_collision,
     )
 
     executed_notebooks: list[dict[str, str]] = []
