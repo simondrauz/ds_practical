@@ -39,11 +39,22 @@ meta-models of Trajectron++ error, not trajectory predictors.
 | `Report/` | Report source, cited figures, bibliography, and compiled PDF. |
 | `Presentation/` | Presentation source, slide inputs, figures, and compiled PDF. |
 | `unified-av-data-loader/` | Vendored `trajdata` dependency used by the training and join pipelines. |
+| `tests/` | Unit tests covering the runners, configuration, and notebook contracts. |
+| `requirements.txt`, `runtime.txt` | Pinned dependencies and the Python version the submitted runs used. |
 
 ## Environment and external data
 
-The verified local environment is the conda environment `adaptive-py310`.
-Commands should run from the repository root with:
+The submitted runs used Python 3.10 (`runtime.txt` pins 3.10.16) with the pinned
+dependencies in `requirements.txt`. Recreate the environment with:
+
+```bash
+conda create -n adaptive-py310 python=3.10
+conda activate adaptive-py310
+pip install -r requirements.txt
+```
+
+Every command below is written for that environment name. Run them from the
+repository root with:
 
 ```bash
 export PYTHONPATH=src:unified-av-data-loader/src
@@ -130,21 +141,42 @@ submitted evidence requires setting both:
 - `EXPORTED_RUN_NAME` names the prepared-data output that every downstream
   notebook then reads through `RUN_NAME`.
 
-For the full-trainval analysis use `RAW_RUN_NAME="full_trainval_12ep_1seed"`,
-`EXPORTED_RUN_NAME="full_trainval_12ep_1seed_MI_correct"` and
-`EVAL_CSV_NAME="eval_epoch_12.csv"`; exclude model-setting columns as
-predictors. The submitted evidence also includes the VIF-only comparison,
-exported as `full_trainval_12ep_1seed_vif_only_no_collision`.
+Three further settings select which of the submitted result sets is produced.
+The exact combination behind each one is:
 
-For the settings sweep use `RAW_RUN_NAME="sweep_large_30ep_1seed"`,
-`EXPORTED_RUN_NAME="sweep_large_30ep_1seed_MI_corrected"` and
-`EVAL_CSV_NAME="eval_epoch_30_combined.csv"`; include model-setting columns as
-predictors and stop after model inference.
+| `EXPORTED_RUN_NAME` | `RAW_RUN_NAME` / `EVAL_CSV_NAME` | `APPLY_MI_FILTER` | `EXCLUDE_HAS_COLLISION` | `INCLUDE_MODEL_SETTINGS_AS_FEATURES` |
+|---|---|---|---|---|
+| `full_trainval_12ep_1seed_MI_correct` | `full_trainval_12ep_1seed` / `eval_epoch_12.csv` | `True` | `True` | `False` |
+| `full_trainval_12ep_1seed_vif_only_no_collision` | `full_trainval_12ep_1seed` / `eval_epoch_12.csv` | `False` | `True` | `False` |
+| `sweep_large_30ep_1seed_MI_corrected` | `sweep_large_30ep_1seed` / `eval_epoch_30_combined.csv` | `True` | `False` | `True` |
+
+The two full-trainval rows are the MI+VIF main analysis and the VIF-only
+comparison; they differ only in `APPLY_MI_FILTER`. The sweep row is used for the
+model-settings analysis and stops after model inference.
 
 The workflow wrapper exposes the same contract, with `--run-name` selecting the
 input and `--exported-run-name` the output namespace. Omitting
 `--exported-run-name` makes the output namespace follow `--run-name`, which
-writes beside the submitted evidence rather than into it:
+writes beside the submitted evidence rather than into it. The three result sets
+correspond to:
+
+```bash
+# MI+VIF main analysis
+--run-name full_trainval_12ep_1seed \
+  --exported-run-name full_trainval_12ep_1seed_MI_correct \
+  --eval-csv-name eval_epoch_12.csv \
+  --apply-mi-filter --exclude-has-collision \
+  --exclude-model-settings-as-features
+
+# VIF-only comparison
+--run-name full_trainval_12ep_1seed \
+  --exported-run-name full_trainval_12ep_1seed_vif_only_no_collision \
+  --eval-csv-name eval_epoch_12.csv \
+  --no-apply-mi-filter --exclude-has-collision \
+  --exclude-model-settings-as-features
+```
+
+The settings sweep in full:
 
 ```bash
 conda run -n adaptive-py310 python \
@@ -152,9 +184,13 @@ conda run -n adaptive-py310 python \
   --run-name sweep_large_30ep_1seed \
   --exported-run-name sweep_large_30ep_1seed_MI_corrected \
   --eval-csv-name eval_epoch_30_combined.csv \
+  --apply-mi-filter --keep-has-collision \
   --include-model-settings-as-features \
   --models gam xgboost
 ```
+
+`--apply-mi-filter` and `--keep-has-collision` are the defaults; they are stated
+explicitly here so each command fully determines its result set.
 
 ### 3. Evidence provenance
 
