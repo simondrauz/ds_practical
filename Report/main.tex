@@ -1193,15 +1193,17 @@ Density-Based Clustering Validation (DBCV) \citep{moulavi2014density} evaluates 
   \label{eq:dbcv_cluster_validity}
 \end{equation}
 
-Here $\mathrm{DSC}(C_i)$ is the density sparseness of cluster $C_i$, interpreted as the weakest internal density connection, and $\mathrm{DSPC}(C_i,C_j)$ is the density separation between clusters $C_i$ and $C_j$. The overall score averages these cluster validities by cluster size:
+Here $\mathrm{DSC}(C_i)$ is the density sparseness of cluster $C_i$, defined as the largest weight among the internal edges of the minimum spanning tree constructed from mutual reachability distances within $C_i$, and therefore represents its sparsest internal region. The density separation $\mathrm{DSPC}(C_i,C_j)$ is the smallest mutual reachability distance between internal nodes of the two clusters' trees. The overall score forms a size-weighted sum of the cluster validities:
 
 \begin{equation}
   \mathrm{DBCV} =
-  \sum_{i=1}^{K} \frac{|C_i|}{|\mathcal{O}|}\, V(C_i).
+  \sum_{i=1}^{K} \frac{|C_i|}{|\mathcal{O}|}\, V(C_i),
   \label{eq:dbcv_overall}
 \end{equation}
 
-The score ranges from $-1$ to $1$. Positive values indicate dense, separated clusters; values near $0$ indicate ambiguous density structure; negative values indicate an implausible partition. Noise points have no own validity term, but they remain part of $\mathcal{O}$ in the denominator and therefore reduce the weighted support of the clustered structure.
+where $K$ is the number of non-noise clusters and $|\mathcal{O}|$ is the total number of objects, that is, clustered points plus noise.
+
+The score ranges from $-1$ to $1$. Positive values indicate that between-cluster separation generally exceeds within-cluster sparseness; values near $0$ indicate ambiguous density structure; negative values indicate the reverse. Noise points have no own validity term, but they remain part of $\mathcal{O}$ in the denominator and therefore reduce the weighted support of the clustered structure.
 
 \newpage
 
