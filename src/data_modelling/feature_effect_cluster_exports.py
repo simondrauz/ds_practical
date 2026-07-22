@@ -181,7 +181,6 @@ def write_cluster_exports(
             "artifact_kind": "table",
             "artifact_type": "cluster_feature_effect_profiles",
             "relative_path": str(cluster_feature_effect_profiles_path.relative_to(cluster_spec_root)),
-            "absolute_path": str(cluster_feature_effect_profiles_path.resolve()),
         }
     ]
     performance_group_series = clustered_df[performance_group_col].astype(str)
@@ -256,7 +255,6 @@ def write_cluster_exports(
                 "artifact_kind": "table",
                 "artifact_type": "cluster_members",
                 "relative_path": member_relative_path,
-                "absolute_path": str(member_path.resolve()),
                 "performance_group": performance_group,
                 "algorithm": algorithm,
                 "cluster_space": cluster_space,
@@ -315,7 +313,6 @@ def write_cluster_exports(
             "artifact_kind": "table",
             "artifact_type": "cluster_catalog",
             "relative_path": str(cluster_catalog_path.relative_to(cluster_spec_root)),
-            "absolute_path": str(cluster_catalog_path.resolve()),
         },
     )
 
