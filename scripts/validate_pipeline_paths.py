@@ -30,10 +30,13 @@ TRAJDATA_PATH = ROOT / "unified-av-data-loader" / "src"
 NOTEBOOK_DIR = ROOT / "src" / "data_modelling"
 SHARED_CONFIG_PATH = ROOT / "config" / "shared_config.yaml"
 
-MINI_RAW = ROOT / "data" / "raw"
-MINI_CACHE = ROOT / "data" / "processed" / "trajdata_cache"
-TRAINVAL_RAW = Path("/Volumes/LaCie 1TB/nuScenes/v1.0-trainval_raw")
-TRAINVAL_CACHE = Path("/Volumes/LaCie 1TB/nuScenes/trajdata_cache")
+# Machine-local nuScenes locations. The defaults describe the machine the submitted
+# runs were produced on; override them per machine with the matching CLI flags or
+# environment variables rather than editing this file.
+MINI_RAW = Path(os.environ.get("DS_MINI_RAW") or ROOT / "data" / "raw")
+MINI_CACHE = Path(os.environ.get("DS_MINI_CACHE") or ROOT / "data" / "processed" / "trajdata_cache")
+TRAINVAL_RAW = Path(os.environ.get("DS_TRAINVAL_RAW") or "/Volumes/LaCie 1TB/nuScenes/v1.0-trainval_raw")
+TRAINVAL_CACHE = Path(os.environ.get("DS_TRAINVAL_CACHE") or "/Volumes/LaCie 1TB/nuScenes/trajdata_cache")
 
 MODEL_LOG_DIR = ROOT / "results" / "trajectory_prediction" / "nuScenes" / "models"
 METRICS_ROOT = ROOT / "results" / "trajectory_prediction" / "trajectory_metrics"
@@ -1190,11 +1193,33 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional validation artifact root. Defaults under ignored notebook_runs.",
     )
+    parser.add_argument("--mini-raw", type=Path, default=None, help=f"nuScenes mini release. Default: {MINI_RAW}")
+    parser.add_argument("--mini-cache", type=Path, default=None, help=f"trajdata cache for mini. Default: {MINI_CACHE}")
+    parser.add_argument(
+        "--trainval-raw", type=Path, default=None, help=f"nuScenes trainval release. Default: {TRAINVAL_RAW}"
+    )
+    parser.add_argument(
+        "--trainval-cache", type=Path, default=None, help=f"trajdata cache for trainval. Default: {TRAINVAL_CACHE}"
+    )
     return parser.parse_args()
+
+
+def _apply_data_path_overrides(args: argparse.Namespace) -> None:
+    """Rebind the module-level data locations from the CLI, when supplied."""
+    global MINI_RAW, MINI_CACHE, TRAINVAL_RAW, TRAINVAL_CACHE
+    if args.mini_raw is not None:
+        MINI_RAW = args.mini_raw
+    if args.mini_cache is not None:
+        MINI_CACHE = args.mini_cache
+    if args.trainval_raw is not None:
+        TRAINVAL_RAW = args.trainval_raw
+    if args.trainval_cache is not None:
+        TRAINVAL_CACHE = args.trainval_cache
 
 
 def main() -> int:
     args = parse_args()
+    _apply_data_path_overrides(args)
     validation_id = _timestamp()
     output_root = (
         args.output_root

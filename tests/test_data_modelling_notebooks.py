@@ -62,10 +62,10 @@ def test_feature_effect_performance_regimes_notebook_references_export_first_clu
     assert "viz_umap_min_dist" in source
     assert "trustworthiness_neighbor_values" in source
     assert "CLUSTER_SWEEP_MODE" in source
-    assert 'CLUSTER_SWEEP_MODE = "empirical"' in source
-    assert "EMPIRICAL_CLUSTER_SWEEP_PROFILES" in source
-    assert "EMPIRICAL_FOCUSED_CLUSTER_SWEEP_PROFILES" in source
-    assert "empirical_focused" in source
+    assert 'CLUSTER_SWEEP_MODE = "promising_moderate"' in source
+    assert "CLUSTER_SWEEP_PROFILES" in source
+    assert "promising_small" in source
+    assert "promising_extended" in source
     assert "effect_representations" in source
     assert "distance_metrics" in source
     assert "optics_extraction_methods" in source
@@ -140,9 +140,33 @@ def test_notebook_workflow_patches_preparation_to_joined_eval_epoch():
     notebook = _patch_notebook(workflow[0].notebook_path, workflow[0].patchers)
     source = "\n".join(cell.get("source", "") for cell in notebook.cells)
 
-    assert "RUN_NAME = 'workflow_run'" in source
+    assert "RAW_RUN_NAME = 'workflow_run'" in source
+    assert "EXPORTED_RUN_NAME = 'workflow_run'" in source
+    assert "\nRUN_NAME = 'workflow_run'" in source
     assert "EVAL_CSV_NAME = 'eval_epoch_7.csv'" in source
     assert "INCLUDE_MODEL_SETTINGS_AS_FEATURES = False" in source
     assert "trajectory_metrics_joined" in source
-    assert 'df.insert(0, "run_name", RUN_NAME)' in source
+    assert 'df.insert(0, "run_name", RAW_RUN_NAME)' in source
     assert 'df.insert(insert_at, "eval_csv_name", EVAL_CSV_NAME)' in source
+
+
+def test_notebook_workflow_patches_raw_and_exported_run_names_independently():
+    workflow = _build_workflow(
+        run_name="full_trainval_12ep_1seed",
+        exported_run_name="full_trainval_12ep_1seed_MI_correct",
+        eval_csv_name="eval_epoch_12.csv",
+        prepared_target_col="ml_ade",
+        target_col=None,
+        include_model_settings_as_features=False,
+        include_gam=True,
+        include_xgboost=False,
+    )
+
+    notebook = _patch_notebook(workflow[0].notebook_path, workflow[0].patchers)
+    source = "\n".join(cell.get("source", "") for cell in notebook.cells)
+
+    # The joined-metrics input follows --run-name while the prepared-data output and
+    # every downstream notebook follow --exported-run-name.
+    assert "RAW_RUN_NAME = 'full_trainval_12ep_1seed'" in source
+    assert "EXPORTED_RUN_NAME = 'full_trainval_12ep_1seed_MI_correct'" in source
+    assert "\nRUN_NAME = 'full_trainval_12ep_1seed_MI_correct'" in source
