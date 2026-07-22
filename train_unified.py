@@ -56,8 +56,6 @@ from shared_config.config_loader import (
 # torch.autograd.set_detect_anomaly(True)
 
 # Note: The cache path is now set via --user argument or --trajdata_cache_dir
-# from trajdata.caching import EnvCache
-# cache = EnvCache("/Users/zoe/.unified_data_cache")
 
 DEFAULT_ONLY_PREDICT, DEFAULT_NO_TYPES = load_agent_type_defaults()
 EVAL_IDENTITY_COLS = ["data_idx", "scene_path", "agent_id", "scene_ts", "agent_type"]

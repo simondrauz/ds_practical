@@ -90,16 +90,24 @@ def _build_workflow(
     include_model_settings_as_features: bool,
     include_gam: bool,
     include_xgboost: bool,
+    exported_run_name: str | None = None,
 ) -> list[NotebookExecution]:
     if not include_gam and not include_xgboost:
         raise ValueError("At least one model workflow must be selected.")
+
+    # The preparation notebook reads its joined-metrics input from RAW_RUN_NAME and
+    # writes its prepared-data output under EXPORTED_RUN_NAME. Downstream notebooks
+    # locate that output through RUN_NAME, so they follow the exported name.
+    exported = exported_run_name or run_name
 
     workflow: list[NotebookExecution] = [
         NotebookExecution(
             label="interpretable_model_data_preparation",
             notebook_path=NOTEBOOK_DIR / "interpretable_model_data_preparation.ipynb",
             patchers=[
-                lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(run_name)),
+                lambda source: _replace_assignment(source, "RAW_RUN_NAME", _python_literal(run_name)),
+                lambda source: _replace_assignment(source, "EXPORTED_RUN_NAME", _python_literal(exported)),
+                lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(exported)),
                 lambda source: _replace_assignment(source, "EVAL_CSV_NAME", _python_literal(eval_csv_name)),
                 lambda source: _replace_assignment(
                     source,
@@ -119,7 +127,7 @@ def _build_workflow(
                     label="gam",
                     notebook_path=NOTEBOOK_DIR / "gam.ipynb",
                     patchers=[
-                        lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(run_name)),
+                        lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(exported)),
                         lambda source: _replace_assignment(
                             source, "PREPARED_TARGET_COL", _python_literal(prepared_target_col)
                         ),
@@ -132,7 +140,7 @@ def _build_workflow(
                     notebook_path=NOTEBOOK_DIR / "model_inference_analysis.ipynb",
                     patchers=[
                         lambda source: _replace_assignment(source, "MODEL_ID", _python_literal("gam")),
-                        lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(run_name)),
+                        lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(exported)),
                         lambda source: _replace_assignment(source, "TARGET_COL", _python_literal(target_col)),
                     ],
                     output_name="03_model_inference_analysis__gam.ipynb",
@@ -142,7 +150,7 @@ def _build_workflow(
                     notebook_path=NOTEBOOK_DIR / "feature_effect_performance_regimes.ipynb",
                     patchers=[
                         lambda source: _replace_assignment(source, "MODEL_ID", _python_literal("gam")),
-                        lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(run_name)),
+                        lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(exported)),
                         lambda source: _replace_assignment(source, "EVAL_CSV_NAME", _python_literal(eval_csv_name)),
                         lambda source: _replace_assignment(source, "TARGET_COL", _python_literal(target_col)),
                     ],
@@ -158,7 +166,7 @@ def _build_workflow(
                     label="xgboost",
                     notebook_path=NOTEBOOK_DIR / "xgboost.ipynb",
                     patchers=[
-                        lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(run_name)),
+                        lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(exported)),
                         lambda source: _replace_assignment(
                             source, "PREPARED_TARGET_COL", _python_literal(prepared_target_col)
                         ),
@@ -171,7 +179,7 @@ def _build_workflow(
                     notebook_path=NOTEBOOK_DIR / "model_inference_analysis.ipynb",
                     patchers=[
                         lambda source: _replace_assignment(source, "MODEL_ID", _python_literal("xgboost")),
-                        lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(run_name)),
+                        lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(exported)),
                         lambda source: _replace_assignment(source, "TARGET_COL", _python_literal(target_col)),
                     ],
                     output_name="06_model_inference_analysis__xgboost.ipynb",
@@ -181,7 +189,7 @@ def _build_workflow(
                     notebook_path=NOTEBOOK_DIR / "feature_effect_performance_regimes.ipynb",
                     patchers=[
                         lambda source: _replace_assignment(source, "MODEL_ID", _python_literal("xgboost")),
-                        lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(run_name)),
+                        lambda source: _replace_assignment(source, "RUN_NAME", _python_literal(exported)),
                         lambda source: _replace_assignment(source, "EVAL_CSV_NAME", _python_literal(eval_csv_name)),
                         lambda source: _replace_assignment(source, "TARGET_COL", _python_literal(target_col)),
                     ],
@@ -256,6 +264,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-name", required=True, help="Trajectory-metrics run name.")
     parser.add_argument("--eval-csv-name", required=True, help="Joined metrics CSV filename, e.g. eval_epoch_12.csv.")
     parser.add_argument(
+        "--exported-run-name",
+        default=None,
+        help="Prepared-data output namespace, e.g. full_trainval_12ep_1seed_MI_correct. Defaults to --run-name.",
+    )
+    parser.add_argument(
         "--prepared-target-col",
         default="ml_ade",
         help="Raw target column used by the preparation notebook export.",
@@ -316,6 +329,7 @@ def main() -> int:
         include_model_settings_as_features=args.include_model_settings_as_features,
         include_gam=include_gam,
         include_xgboost=include_xgboost,
+        exported_run_name=args.exported_run_name,
     )
 
     executed_notebooks: list[dict[str, str]] = []

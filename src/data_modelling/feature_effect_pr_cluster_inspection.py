@@ -265,12 +265,22 @@ def _artifact_path_from_manifest(
     for artifact_row in manifest_data.get("artifacts", []):
         if artifact_row.get("artifact_type") != artifact_type:
             continue
-        absolute_path = artifact_row.get("absolute_path")
-        if absolute_path:
-            return Path(str(absolute_path)).resolve()
+        # The manifest-relative location is preferred because it survives cloning the
+        # repository to a different path. The recorded absolute path is provenance from
+        # the machine that produced the run and need not exist here, so it is only used
+        # when it actually resolves.
+        candidates: list[Path] = []
         relative_path = artifact_row.get("relative_path")
         if relative_path:
-            return (manifest_path.parent / str(relative_path)).resolve()
+            candidates.append((manifest_path.parent / str(relative_path)).resolve())
+        absolute_path = artifact_row.get("absolute_path")
+        if absolute_path:
+            candidates.append(Path(str(absolute_path)).resolve())
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        if candidates:
+            return candidates[0]
     return (manifest_path.parent / "tables" / fallback_filename).resolve()
 
 
