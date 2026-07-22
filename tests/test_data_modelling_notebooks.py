@@ -8,7 +8,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from data_modelling.run_interpretable_notebook_workflow import _build_workflow, _patch_notebook
+from data_modelling.run_interpretable_notebook_workflow import (
+    _build_workflow,
+    _patch_notebook,
+    _write_summary,
+)
 
 
 NOTEBOOK_DIR = ROOT / "src" / "data_modelling"
@@ -160,6 +164,9 @@ def test_notebook_workflow_patches_raw_and_exported_run_names_independently():
         include_model_settings_as_features=False,
         include_gam=True,
         include_xgboost=False,
+        apply_mi_filter=False,
+        exclude_has_collision=True,
+        include_feature_effects=False,
     )
 
     notebook = _patch_notebook(workflow[0].notebook_path, workflow[0].patchers)
@@ -170,3 +177,39 @@ def test_notebook_workflow_patches_raw_and_exported_run_names_independently():
     assert "RAW_RUN_NAME = 'full_trainval_12ep_1seed'" in source
     assert "EXPORTED_RUN_NAME = 'full_trainval_12ep_1seed_MI_correct'" in source
     assert "\nRUN_NAME = 'full_trainval_12ep_1seed_MI_correct'" in source
+    assert "APPLY_MI_FILTER = False" in source
+    assert "EXCLUDE_HAS_COLLISION = True" in source
+    assert [execution.label for execution in workflow] == [
+        "interpretable_model_data_preparation",
+        "gam",
+        "model_inference_analysis_gam",
+    ]
+
+
+def test_notebook_workflow_summary_uses_exported_namespace(tmp_path: Path) -> None:
+    summary_path = _write_summary(
+        output_root=tmp_path,
+        raw_run_name="full_trainval_12ep_1seed",
+        exported_run_name="full_trainval_12ep_1seed_MI_correct",
+        eval_csv_name="eval_epoch_12.csv",
+        prepared_target_col="ml_ade",
+        target_col=None,
+        include_model_settings_as_features=False,
+        apply_mi_filter=True,
+        exclude_has_collision=True,
+        include_feature_effects=False,
+        include_gam=False,
+        include_xgboost=False,
+        executed_notebooks=[],
+    )
+
+    summary = json.loads(summary_path.read_text())
+    assert summary["run_name"] == "full_trainval_12ep_1seed_MI_correct"
+    assert summary["raw_run_name"] == "full_trainval_12ep_1seed"
+    assert summary["exported_run_name"] == "full_trainval_12ep_1seed_MI_correct"
+    assert summary["apply_mi_filter"] is True
+    assert summary["exclude_has_collision"] is True
+    assert summary["include_feature_effects"] is False
+    assert "prepared_data/full_trainval_12ep_1seed_MI_correct/" in summary["artifacts"][
+        "prepared_data_path"
+    ]

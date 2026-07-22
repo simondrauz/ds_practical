@@ -40,44 +40,66 @@ meta-models of Trajectron++ error, not trajectory predictors.
 | `Presentation/` | Presentation source, slide inputs, figures, and compiled PDF. |
 | `unified-av-data-loader/` | Vendored `trajdata` dependency used by the training and join pipelines. |
 | `tests/` | Unit tests covering the runners, configuration, and notebook contracts. |
-| `requirements.txt`, `runtime.txt` | Pinned dependencies and the Python version the submitted runs used. |
+| `requirements.txt`, `runtime.txt` | Runtime dependency constraints and the Python version used for the submission. |
 
 ## Environment and external data
 
-The submitted runs used Python 3.10 (`runtime.txt` pins 3.10.16) with the pinned
-dependencies in `requirements.txt`. Recreate the environment with:
+The submitted runs used Python 3.10.16, as recorded in `runtime.txt`.
+`requirements.txt` contains the project's runtime constraints, but it is not a
+complete lockfile: entries using `>=` or no version may resolve to newer
+compatible releases. Recreate an executable environment, including both local
+packages, with:
 
 ```bash
-conda create -n adaptive-py310 python=3.10
+conda create -n adaptive-py310 python=3.10.16 pip
 conda activate adaptive-py310
 pip install -r requirements.txt
+pip install -e .
+pip install -e ./unified-av-data-loader
 ```
 
 Every command below is written for that environment name. Run them from the
 repository root with:
 
 ```bash
-export PYTHONPATH=src:unified-av-data-loader/src
 export WANDB_MODE=disabled
 export MPLBACKEND=Agg
 ```
 
+The editable installs make `trajectron`, `data_modelling`, `data_preparation`,
+and the vendored `trajdata` package available both from repository-root commands
+and from notebook kernels whose working directory is `src/data_modelling/`.
+
 The raw nuScenes release, trajdata cache, and full training checkpoints are not
-committed. Download nuScenes under its licence and provide machine-local paths
-through command-line overrides:
+committed. Download nuScenes under its licence. The two prediction workflows
+use different nuScenes releases:
+
+| Workflow | Configuration | Dataset key | Required raw release |
+|---|---|---|---|
+| Full-trainval analysis | `config/nuScenes_full_trainval.json` | `nusc_trainval` | Full train/validation release |
+| 64-setting sweep | `config/nuScenes_mini.json` | `nusc_mini` | nuScenes mini release |
+
+For each raw root, retain the nuScenes directory layout, including the matching
+`v1.0-*` metadata directory and `maps/`. The trajdata cache may be empty on the
+first run; the loader populates it from the corresponding raw release. Supply
+both locations to the curated runner without editing committed configuration:
 
 ```bash
-conda run -n adaptive-py310 python -m torch.distributed.run \
-  --nproc_per_node=1 train_unified.py \
-  --conf config/nuScenes_full_trainval.json \
+conda run -n adaptive-py310 python scripts/run_prediction_result_set.py \
+  --experiment full_trainval_1seed --phase train --dry_run \
   --trajdata_cache_dir /path/to/trajdata_cache \
   --data_loc_dict '{"nusc_trainval":"/path/to/v1.0-trainval_raw"}'
+
+conda run -n adaptive-py310 python scripts/run_prediction_result_set.py \
+  --experiment sweep_large_1seed --phase train --dry_run \
+  --trajdata_cache_dir /path/to/trajdata_cache \
+  --data_loc_dict '{"nusc_mini":"/path/to/nuScenes-mini-root"}'
 ```
 
 The prediction-challenge split indexes required by the data-loading code are
-committed under `config/experimental_setup/nuScenes/`. Shared configuration
-files contain the experiment settings; override their machine-specific data
-paths locally and do not commit those local changes.
+committed under `config/experimental_setup/nuScenes/`. The command-line values
+above override any machine-specific paths in the selected configuration and are
+saved into each generated model configuration for the subsequent join phase.
 
 ## Submitted result sets
 
@@ -102,15 +124,19 @@ is used in downstream interpretation.
 ### 1. Recreate per-trajectory prediction results
 
 This stage performs the expensive Trajectron++ runs and requires the external
-nuScenes data and cache. After configuring local data paths, the curated
-entrypoints are:
+nuScenes data and cache. Replace the placeholder paths below with the locations
+described above. The complete curated entrypoints are:
 
 ```bash
 conda run -n adaptive-py310 python scripts/run_prediction_result_set.py \
-  --experiment full_trainval_1seed --phase all
+  --experiment full_trainval_1seed --phase all \
+  --trajdata_cache_dir /path/to/trajdata_cache \
+  --data_loc_dict '{"nusc_trainval":"/path/to/v1.0-trainval_raw"}'
 
 conda run -n adaptive-py310 python scripts/run_prediction_result_set.py \
-  --experiment sweep_large_1seed --phase all
+  --experiment sweep_large_1seed --phase all \
+  --trajdata_cache_dir /path/to/trajdata_cache \
+  --data_loc_dict '{"nusc_mini":"/path/to/nuScenes-mini-root"}'
 ```
 
 Use `--phase train --dry_run` first to inspect every planned command without
@@ -157,40 +183,51 @@ model-settings analysis and stops after model inference.
 The workflow wrapper exposes the same contract, with `--run-name` selecting the
 input and `--exported-run-name` the output namespace. Omitting
 `--exported-run-name` makes the output namespace follow `--run-name`, which
-writes beside the submitted evidence rather than into it. The three result sets
-correspond to:
+writes beside the submitted evidence rather than into it. These are the complete
+commands for all three result sets:
 
 ```bash
 # MI+VIF main analysis
---run-name full_trainval_12ep_1seed \
+conda run -n adaptive-py310 python \
+  src/data_modelling/run_interpretable_notebook_workflow.py \
+  --run-name full_trainval_12ep_1seed \
   --exported-run-name full_trainval_12ep_1seed_MI_correct \
   --eval-csv-name eval_epoch_12.csv \
+  --prepared-target-col ml_ade \
   --apply-mi-filter --exclude-has-collision \
-  --exclude-model-settings-as-features
+  --exclude-model-settings-as-features \
+  --include-feature-effects \
+  --models gam xgboost
 
 # VIF-only comparison
---run-name full_trainval_12ep_1seed \
+conda run -n adaptive-py310 python \
+  src/data_modelling/run_interpretable_notebook_workflow.py \
+  --run-name full_trainval_12ep_1seed \
   --exported-run-name full_trainval_12ep_1seed_vif_only_no_collision \
   --eval-csv-name eval_epoch_12.csv \
+  --prepared-target-col ml_ade \
   --no-apply-mi-filter --exclude-has-collision \
-  --exclude-model-settings-as-features
-```
+  --exclude-model-settings-as-features \
+  --include-feature-effects \
+  --models gam xgboost
 
-The settings sweep in full:
-
-```bash
+# Settings sweep; stop after model inference
 conda run -n adaptive-py310 python \
   src/data_modelling/run_interpretable_notebook_workflow.py \
   --run-name sweep_large_30ep_1seed \
   --exported-run-name sweep_large_30ep_1seed_MI_corrected \
   --eval-csv-name eval_epoch_30_combined.csv \
+  --prepared-target-col ml_ade \
   --apply-mi-filter --keep-has-collision \
   --include-model-settings-as-features \
+  --stop-after-model-inference \
   --models gam xgboost
 ```
 
 `--apply-mi-filter` and `--keep-has-collision` are the defaults; they are stated
-explicitly here so each command fully determines its result set.
+explicitly here so each command fully determines its result set. The commands
+intentionally omit `--target-col`, causing the GAM and XGBoost notebooks to run
+all submitted target variants rather than restricting execution to one target.
 
 ### 3. Evidence provenance
 

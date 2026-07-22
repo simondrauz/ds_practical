@@ -126,6 +126,22 @@ def test_prediction_result_set_experiment_definitions() -> None:
     assert len(result_sets.expected_training_keys(large)) == 64
 
 
+def test_prediction_result_set_training_specs_apply_data_overrides() -> None:
+    definition = result_sets.get_experiment_definition("full_trainval_1seed")
+    cache_dir = Path("/external/trajdata_cache")
+    data_loc_dict = '{"nusc_trainval":"/external/nuScenes"}'
+
+    specs = result_sets.training_specs(
+        definition,
+        trajdata_cache_dir=cache_dir,
+        data_loc_dict=data_loc_dict,
+    )
+
+    assert len(specs) == 1
+    assert specs[0]["train_args"]["trajdata_cache_dir"] == cache_dir
+    assert specs[0]["train_args"]["data_loc_dict"] == data_loc_dict
+
+
 def test_single_seed_trainval_output_uses_direct_joined_csv(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
