@@ -119,20 +119,38 @@ this order:
 5. `src/data_modelling/feature_effect_performance_regimes.ipynb` for each model
 6. `src/data_modelling/feature_effect_pr_cluster_inspection.ipynb`
 
-Use `RUN_NAME="full_trainval_12ep_1seed"` and
-`EVAL_CSV_NAME="eval_epoch_12.csv"`; exclude model-setting columns as
-predictors. The submitted evidence includes the MI+VIF main analysis and the
-VIF-only comparison.
+Step 6 reads the cluster exports committed under
+`results/interpretable_model/feature_effect_performance_regimes/`, so it runs
+against the submitted regimes without repeating the step-5 clustering sweep.
 
-For the settings sweep, use `RUN_NAME="sweep_large_30ep_1seed"` and
+The preparation notebook distinguishes two run names, and reproducing the
+submitted evidence requires setting both:
+
+- `RAW_RUN_NAME` selects the joined-metrics export to read;
+- `EXPORTED_RUN_NAME` names the prepared-data output that every downstream
+  notebook then reads through `RUN_NAME`.
+
+For the full-trainval analysis use `RAW_RUN_NAME="full_trainval_12ep_1seed"`,
+`EXPORTED_RUN_NAME="full_trainval_12ep_1seed_MI_correct"` and
+`EVAL_CSV_NAME="eval_epoch_12.csv"`; exclude model-setting columns as
+predictors. The submitted evidence also includes the VIF-only comparison,
+exported as `full_trainval_12ep_1seed_vif_only_no_collision`.
+
+For the settings sweep use `RAW_RUN_NAME="sweep_large_30ep_1seed"`,
+`EXPORTED_RUN_NAME="sweep_large_30ep_1seed_MI_corrected"` and
 `EVAL_CSV_NAME="eval_epoch_30_combined.csv"`; include model-setting columns as
-predictors and stop after model inference. The workflow wrapper exposes the
-same contract:
+predictors and stop after model inference.
+
+The workflow wrapper exposes the same contract, with `--run-name` selecting the
+input and `--exported-run-name` the output namespace. Omitting
+`--exported-run-name` makes the output namespace follow `--run-name`, which
+writes beside the submitted evidence rather than into it:
 
 ```bash
 conda run -n adaptive-py310 python \
   src/data_modelling/run_interpretable_notebook_workflow.py \
   --run-name sweep_large_30ep_1seed \
+  --exported-run-name sweep_large_30ep_1seed_MI_corrected \
   --eval-csv-name eval_epoch_30_combined.csv \
   --include-model-settings-as-features \
   --models gam xgboost
@@ -164,9 +182,10 @@ conda run -n adaptive-py310 python scripts/run_prediction_result_set.py \
 conda run -n adaptive-py310 python -m pytest -q
 ```
 
-The report-table check recomputes 110 displayed values from committed OOF and
-nested-CV artifacts. The dry run validates the exact 64-setting experiment
-contract without training.
+All four commands should complete without error and the test suite should pass
+in full. The report-table check recomputes 110 displayed values from committed
+OOF and nested-CV artifacts. The dry run validates the exact 64-setting
+experiment contract without training.
 
 ## Building the deliverables
 
