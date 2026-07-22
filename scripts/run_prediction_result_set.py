@@ -351,15 +351,29 @@ def _sweep_spec(
     }
 
 
-def training_specs(definition: ExperimentDefinition) -> list[dict[str, Any]]:
+def training_specs(
+    definition: ExperimentDefinition,
+    *,
+    trajdata_cache_dir: Path | None = None,
+    data_loc_dict: str | None = None,
+) -> list[dict[str, Any]]:
     logs_dir = definition.output_root / "logs"
     if definition.kind == "trainval":
-        return [_trainval_spec(definition, seed=seed, logs_dir=logs_dir) for seed in definition.seeds]
+        specs = [
+            _trainval_spec(definition, seed=seed, logs_dir=logs_dir)
+            for seed in definition.seeds
+        ]
+    else:
+        specs = []
+        for seed in definition.seeds:
+            for combo in experiment_grid(definition):
+                specs.append(_sweep_spec(definition, seed=seed, combo=combo, logs_dir=logs_dir))
 
-    specs = []
-    for seed in definition.seeds:
-        for combo in experiment_grid(definition):
-            specs.append(_sweep_spec(definition, seed=seed, combo=combo, logs_dir=logs_dir))
+    for spec in specs:
+        if trajdata_cache_dir is not None:
+            spec["train_args"]["trajdata_cache_dir"] = trajdata_cache_dir
+        if data_loc_dict is not None:
+            spec["train_args"]["data_loc_dict"] = data_loc_dict
     return specs
 
 
@@ -451,7 +465,11 @@ def run_train_phase(args: argparse.Namespace, definition: ExperimentDefinition, 
 
     original_shared = _load_yaml(SHARED_CONFIG_PATH)
     try:
-        for spec in training_specs(definition):
+        for spec in training_specs(
+            definition,
+            trajdata_cache_dir=args.trajdata_cache_dir,
+            data_loc_dict=args.data_loc_dict,
+        ):
             if definition.kind == "sweep" and not args.dry_run:
                 scaled_cfg = _scale_attention_radii(original_shared, float(spec["radius_scale"]))
                 _write_yaml(scaled_cfg, SHARED_CONFIG_PATH)
@@ -829,6 +847,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--archive-timestamp", default=_timestamp())
     parser.add_argument("--metrics_root", type=Path, default=DEFAULT_METRICS_ROOT)
     parser.add_argument("--joined_root", type=Path, default=DEFAULT_JOINED_ROOT)
+    parser.add_argument(
+        "--trajdata_cache_dir",
+        type=Path,
+        default=None,
+        help="Override the trajdata cache directory passed to every training run.",
+    )
+    parser.add_argument(
+        "--data_loc_dict",
+        default=None,
+        help=(
+            "Override the dataset locations passed to every training run, "
+            'e.g. {"nusc_mini":"/data/nuScenes"}.'
+        ),
+    )
     parser.add_argument("--python_executable", default=DEFAULT_PYTHON)
     parser.add_argument("--nproc_per_node", type=int, default=1)
     parser.add_argument("--format", choices=("csv", "parquet"), default="csv")
@@ -838,6 +870,16 @@ def parse_args() -> argparse.Namespace:
 
     args.metrics_root = _repo_path(args.metrics_root)
     args.joined_root = _repo_path(args.joined_root)
+    if args.trajdata_cache_dir is not None:
+        args.trajdata_cache_dir = _repo_path(args.trajdata_cache_dir)
+    if args.data_loc_dict is not None:
+        try:
+            parsed_data_locations = json.loads(args.data_loc_dict)
+        except json.JSONDecodeError as exc:
+            parser.error(f"--data_loc_dict must be valid JSON: {exc}")
+        if not isinstance(parsed_data_locations, dict):
+            parser.error("--data_loc_dict must decode to a JSON object")
+        args.data_loc_dict = json.dumps(parsed_data_locations, separators=(",", ":"))
 
     if args.archive_unused:
         return args

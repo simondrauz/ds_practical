@@ -93,6 +93,7 @@ def _build_workflow(
     exported_run_name: str | None = None,
     apply_mi_filter: bool = True,
     exclude_has_collision: bool = False,
+    include_feature_effects: bool = True,
 ) -> list[NotebookExecution]:
     if not include_gam and not include_xgboost:
         raise ValueError("At least one model workflow must be selected.")
@@ -149,6 +150,10 @@ def _build_workflow(
                     ],
                     output_name="03_model_inference_analysis__gam.ipynb",
                 ),
+            ]
+        )
+        if include_feature_effects:
+            workflow.append(
                 NotebookExecution(
                     label="feature_effect_performance_regimes_gam",
                     notebook_path=NOTEBOOK_DIR / "feature_effect_performance_regimes.ipynb",
@@ -159,9 +164,8 @@ def _build_workflow(
                         lambda source: _replace_assignment(source, "TARGET_COL", _python_literal(target_col)),
                     ],
                     output_name="04_feature_effect_performance_regimes__gam.ipynb",
-                ),
-            ]
-        )
+                )
+            )
 
     if include_xgboost:
         workflow.extend(
@@ -188,6 +192,10 @@ def _build_workflow(
                     ],
                     output_name="06_model_inference_analysis__xgboost.ipynb",
                 ),
+            ]
+        )
+        if include_feature_effects:
+            workflow.append(
                 NotebookExecution(
                     label="feature_effect_performance_regimes_xgboost",
                     notebook_path=NOTEBOOK_DIR / "feature_effect_performance_regimes.ipynb",
@@ -198,9 +206,8 @@ def _build_workflow(
                         lambda source: _replace_assignment(source, "TARGET_COL", _python_literal(target_col)),
                     ],
                     output_name="07_feature_effect_performance_regimes__xgboost.ipynb",
-                ),
-            ]
-        )
+                )
+            )
 
     return workflow
 
@@ -222,21 +229,30 @@ def _find_latest_regime_manifest(model_id: str, run_name: str) -> Path | None:
 def _write_summary(
     *,
     output_root: Path,
-    run_name: str,
+    raw_run_name: str,
+    exported_run_name: str,
     eval_csv_name: str,
     prepared_target_col: str,
     target_col: str | None,
     include_model_settings_as_features: bool,
+    apply_mi_filter: bool,
+    exclude_has_collision: bool,
+    include_feature_effects: bool,
     include_gam: bool,
     include_xgboost: bool,
     executed_notebooks: list[dict[str, str]],
 ) -> Path:
     summary = {
-        "run_name": run_name,
+        "run_name": exported_run_name,
+        "raw_run_name": raw_run_name,
+        "exported_run_name": exported_run_name,
         "eval_csv_name": eval_csv_name,
         "prepared_target_col": prepared_target_col,
         "target_col_override": target_col,
         "include_model_settings_as_features": include_model_settings_as_features,
+        "apply_mi_filter": apply_mi_filter,
+        "exclude_has_collision": exclude_has_collision,
+        "include_feature_effects": include_feature_effects,
         "executed_notebooks": executed_notebooks,
         "artifacts": {
             "prepared_data_path": str(
@@ -244,14 +260,22 @@ def _write_summary(
                 / "results"
                 / "interpretable_model"
                 / "prepared_data"
-                / run_name
+                / exported_run_name
                 / f"prepared_data_{prepared_target_col}.csv"
             ),
-            "gam_manifest_path": str(_find_manifest_path("gam", run_name)) if include_gam else None,
-            "xgboost_manifest_path": str(_find_manifest_path("xgboost", run_name)) if include_xgboost else None,
-            "gam_regime_manifest_path": str(_find_latest_regime_manifest("gam", run_name)) if include_gam else None,
-            "xgboost_regime_manifest_path": str(_find_latest_regime_manifest("xgboost", run_name))
+            "gam_manifest_path": str(_find_manifest_path("gam", exported_run_name))
+            if include_gam
+            else None,
+            "xgboost_manifest_path": str(_find_manifest_path("xgboost", exported_run_name))
             if include_xgboost
+            else None,
+            "gam_regime_manifest_path": str(_find_latest_regime_manifest("gam", exported_run_name))
+            if include_gam and include_feature_effects
+            else None,
+            "xgboost_regime_manifest_path": str(
+                _find_latest_regime_manifest("xgboost", exported_run_name)
+            )
+            if include_xgboost and include_feature_effects
             else None,
         },
     }
@@ -323,6 +347,20 @@ def parse_args() -> argparse.Namespace:
         help="Keep has_collision in the analysis (notebook default).",
     )
     parser.set_defaults(exclude_has_collision=False)
+    feature_effect_group = parser.add_mutually_exclusive_group()
+    feature_effect_group.add_argument(
+        "--include-feature-effects",
+        dest="include_feature_effects",
+        action="store_true",
+        help="Run feature-effect and performance-regime notebooks after model inference (default).",
+    )
+    feature_effect_group.add_argument(
+        "--stop-after-model-inference",
+        dest="include_feature_effects",
+        action="store_false",
+        help="Stop after both model-inference notebooks, as used for the settings sweep.",
+    )
+    parser.set_defaults(include_feature_effects=True)
     parser.add_argument(
         "--models",
         nargs="+",
@@ -364,6 +402,7 @@ def main() -> int:
         exported_run_name=args.exported_run_name,
         apply_mi_filter=args.apply_mi_filter,
         exclude_has_collision=args.exclude_has_collision,
+        include_feature_effects=args.include_feature_effects,
     )
 
     executed_notebooks: list[dict[str, str]] = []
@@ -389,11 +428,15 @@ def main() -> int:
 
     summary_path = _write_summary(
         output_root=output_root,
-        run_name=args.run_name,
+        raw_run_name=args.run_name,
+        exported_run_name=args.exported_run_name or args.run_name,
         eval_csv_name=args.eval_csv_name,
         prepared_target_col=args.prepared_target_col,
         target_col=args.target_col,
         include_model_settings_as_features=args.include_model_settings_as_features,
+        apply_mi_filter=args.apply_mi_filter,
+        exclude_has_collision=args.exclude_has_collision,
+        include_feature_effects=args.include_feature_effects,
         include_gam=include_gam,
         include_xgboost=include_xgboost,
         executed_notebooks=executed_notebooks,
