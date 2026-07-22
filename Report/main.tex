@@ -98,23 +98,26 @@ Supervised by \mysupervisor
 \begin{abstract}
 
 Trajectory prediction models are usually evaluated with aggregate displacement
-metrics, which hide why individual forecasts succeed or fail. This project
-develops an interpretable analysis pipeline for Trajectron++ on pedestrian
-trajectories from nuScenes. We modify the evaluation loop to retain
-per-trajectory prediction errors, join these errors with engineered trajectory
-and scene characteristics, and fit GAM and XGBoost meta-models to explain the
-resulting variation in most-likely ADE. Nested resampling and out-of-fold
-diagnostics are used to validate the meta-models, while SHAP values, partial
-dependence plots, and effect-space clustering are used to identify global
-drivers and success or failure modes. A separate sweep over prediction
-horizon, history window, and attention radius studies how Trajectron++ settings
-affect performance. The results show that the focal agent's motion, especially
-speed variability, heading change, and maximum speed, explains most of the
-trajectory-level error, whereas the engineered scene and social features are
-secondary. Trajectron++ performs best for slow or heading-stable pedestrians and
-fails most clearly when speed variability and turning occur together. Among model
-settings, prediction horizon has the largest effect, attention radius is second,
-and history-window length is comparatively weak within the tested range.
+metrics, obscuring why individual forecasts succeed or fail. We develop an
+interpretable analysis pipeline for Trajectron++ on pedestrian trajectories from
+nuScenes. We adapt its evaluation loop to retain per-trajectory errors, join
+them with engineered trajectory and scene characteristics, and use GAM and
+XGBoost meta-models to explain variation in most-likely ADE across $26{,}886$
+trajectories. Nested resampling and out-of-fold diagnostics assess
+generalisation, while SHAP values, partial dependence, and effect-space
+clustering identify global drivers and success or failure modes. A separate
+sweep of $64$ configurations on the nuScenes mini split examines prediction
+horizon, history window, and attention radius. The focal agent's
+motion---especially speed variability, heading change, and maximum
+speed---explains most trajectory-level error, whereas engineered scene and
+social features are secondary. Trajectron++ performs best for slow or
+heading-stable pedestrians and struggles most when speed variability and turning
+coincide. Prediction horizon has the largest setting effect; attention radius
+ranks second and shows an empirical optimum, while history-window length is
+comparatively weak within the tested range. These findings are associational and
+specific to Trajectron++, nuScenes, and the most-likely forecast. The
+meta-models under-predict the high-error tail, indicating that the available
+features do not fully explain the worst cases.
 
 \end{abstract}
 
